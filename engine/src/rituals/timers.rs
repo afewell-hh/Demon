@@ -1,4 +1,5 @@
 use chrono::{DateTime, Duration, Utc};
+use uuid::Uuid;
 
 #[derive(Clone, Debug)]
 pub struct TimerSpec {
@@ -35,7 +36,7 @@ impl TimerWheel {
     pub fn schedule_in(&mut self, run_id: &str, ritual_id: &str, delay: Duration) -> TimerSpec {
         let now = self.current_time.unwrap_or_else(|| Utc::now());
         let spec = TimerSpec {
-            timer_id: format!("timer-{}", self.specs.len() + 1),
+            timer_id: Uuid::new_v4().to_string(),
             ritual_id: ritual_id.to_string(),
             run_id: run_id.to_string(),
             due_at: now + delay,
