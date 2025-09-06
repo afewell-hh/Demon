@@ -63,9 +63,9 @@ impl EventLog {
         let client = async_nats::connect(nats_url)
             .await
             .context("Failed to connect to NATS")?;
-        
+
         let jetstream = jetstream::new(client.clone());
-        
+
         // Create or get the stream
         let stream = jetstream
             .get_or_create_stream(jetstream::stream::Config {
@@ -78,54 +78,60 @@ impl EventLog {
             })
             .await
             .context("Failed to create/get stream")?;
-        
+
         info!("Connected to JetStream stream: {}", STREAM_NAME);
-        
+
         Ok(Self {
             client,
             jetstream,
             stream,
         })
     }
-    
+
     pub async fn append(&self, event: &RitualEvent, sequence: u64) -> Result<()> {
         let (ritual_id, run_id) = match event {
-            RitualEvent::Started { ritual_id, run_id, .. } |
-            RitualEvent::StateTransitioned { ritual_id, run_id, .. } |
-            RitualEvent::Completed { ritual_id, run_id, .. } => (ritual_id, run_id),
+            RitualEvent::Started {
+                ritual_id, run_id, ..
+            }
+            | RitualEvent::StateTransitioned {
+                ritual_id, run_id, ..
+            }
+            | RitualEvent::Completed {
+                ritual_id, run_id, ..
+            } => (ritual_id, run_id),
         };
-        
+
         let subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
         let msg_id = format!("{}:{}", run_id, sequence);
-        
-        let payload = serde_json::to_vec(event)
-            .context("Failed to serialize event")?;
-        
+
+        let payload = serde_json::to_vec(event).context("Failed to serialize event")?;
+
         let mut headers = async_nats::HeaderMap::new();
         headers.insert("Nats-Msg-Id", msg_id.as_str());
-        
-        let ack = self.jetstream
-            .publish_with_headers(
-                subject.clone(),
-                headers,
-                payload.into(),
-            )
+
+        let ack = self
+            .jetstream
+            .publish_with_headers(subject.clone(), headers, payload.into())
             .await
             .context("Failed to publish event")?
             .await
             .context("Failed to get ack")?;
-        
-        debug!("Published event with msg-id {} to {}, seq: {}", msg_id, subject, ack.sequence);
-        
+
+        debug!(
+            "Published event with msg-id {} to {}, seq: {}",
+            msg_id, subject, ack.sequence
+        );
+
         Ok(())
     }
-    
+
     pub async fn read_run(&self, ritual_id: &str, run_id: &str) -> Result<Vec<RitualEvent>> {
         let filter_subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
-        
+
         // Create truly ephemeral pull consumer (no name = auto-generated)
         // This allows concurrent reads and prevents consumer conflicts
-        let mut consumer: PullConsumer = self.stream
+        let mut consumer: PullConsumer = self
+            .stream
             .create_consumer(jetstream::consumer::pull::Config {
                 name: None, // Let JetStream auto-generate ephemeral consumer name
                 filter_subject: filter_subject.clone(),
@@ -134,27 +140,31 @@ impl EventLog {
             })
             .await
             .context("Failed to create ephemeral consumer")?;
-        
+
         // Ensure consumer cleanup happens regardless of success or failure
         let result = self.read_messages_with_cleanup(&mut consumer, run_id).await;
-        
+
         // Always attempt cleanup, even if reading failed
         if let Ok(info) = consumer.info().await {
             let _ = self.stream.delete_consumer(&info.name).await;
             debug!("Cleaned up ephemeral consumer: {}", info.name);
         }
-        
+
         result
     }
-    
-    async fn read_messages_with_cleanup(&self, consumer: &mut PullConsumer, run_id: &str) -> Result<Vec<RitualEvent>> {
+
+    async fn read_messages_with_cleanup(
+        &self,
+        consumer: &mut PullConsumer,
+        run_id: &str,
+    ) -> Result<Vec<RitualEvent>> {
         let mut events = Vec::new();
-        
+
         // Fetch messages in batches to avoid infinite blocking
         // Use reasonable batch size and timeout for each batch
         const BATCH_SIZE: usize = 100;
         const BATCH_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
-        
+
         loop {
             // Fetch a batch of messages with timeout
             let batch_result = consumer
@@ -163,7 +173,7 @@ impl EventLog {
                 .expires(BATCH_TIMEOUT)
                 .messages()
                 .await;
-                
+
             let mut batch = match batch_result {
                 Ok(batch) => batch,
                 Err(e) => {
@@ -171,17 +181,21 @@ impl EventLog {
                     // All other errors should be propagated to avoid hiding real issues
                     let error_msg = format!("{}", e);
                     debug!("Batch fetch error: {}", error_msg);
-                    
+
                     // Only treat very specific timeout/empty conditions as expected completion
                     // All other errors must be propagated to avoid hiding operational issues
                     if error_msg.contains("Timed out") || error_msg.contains("TimedOut") {
                         // JetStream timeout - this is expected when no (more) messages available
                         // Handle both "Timed out" (with space) and "TimedOut" (no space) variants
-                        debug!("JetStream timeout - no more messages available: {}", error_msg);
+                        debug!(
+                            "JetStream timeout - no more messages available: {}",
+                            error_msg
+                        );
                         break;
-                    } else if error_msg.contains("no messages available") || 
-                              error_msg.contains("no matching messages") ||
-                              error_msg.contains("empty batch") {
+                    } else if error_msg.contains("no messages available")
+                        || error_msg.contains("no matching messages")
+                        || error_msg.contains("empty batch")
+                    {
                         // Explicit empty responses - expected completion
                         debug!("Empty batch response - no more messages: {}", error_msg);
                         break;
@@ -192,10 +206,10 @@ impl EventLog {
                     }
                 }
             };
-            
+
             let mut batch_count = 0;
             let mut batch_empty = true;
-            
+
             // Process all messages in this batch
             while let Some(msg_result) = batch.next().await {
                 batch_empty = false;
@@ -213,17 +227,17 @@ impl EventLog {
                     }
                 }
             }
-            
+
             debug!("Processed batch of {} messages", batch_count);
-            
+
             // If batch was empty or smaller than requested, we've read all available messages
             if batch_empty || batch_count < BATCH_SIZE {
                 break;
             }
         }
-        
+
         debug!("Read {} events for run {}", events.len(), run_id);
-        
+
         Ok(events)
     }
 }
@@ -232,7 +246,7 @@ impl EventLog {
 mod tests {
     use super::*;
     use chrono::Utc;
-    
+
     fn create_test_started_event(ritual_id: &str, run_id: &str) -> RitualEvent {
         RitualEvent::Started {
             ritual_id: ritual_id.to_string(),
@@ -255,7 +269,7 @@ mod tests {
             trace_id: Some("test-trace".to_string()),
         }
     }
-    
+
     fn create_test_completed_event(ritual_id: &str, run_id: &str) -> RitualEvent {
         RitualEvent::Completed {
             ritual_id: ritual_id.to_string(),
@@ -265,46 +279,48 @@ mod tests {
             trace_id: Some("test-trace".to_string()),
         }
     }
-    
+
     #[tokio::test]
     #[ignore] // Requires NATS to be running
     async fn test_append_and_read() {
-        let nats_url = std::env::var("NATS_URL").unwrap_or_else(|_| "nats://localhost:4222".to_string());
+        let nats_url =
+            std::env::var("NATS_URL").unwrap_or_else(|_| "nats://localhost:4222".to_string());
         let log = EventLog::new(&nats_url).await.unwrap();
-        
+
         let ritual_id = "test-ritual";
         let run_id = uuid::Uuid::new_v4().to_string();
-        
+
         // Append events
         let event1 = create_test_started_event(ritual_id, &run_id);
         let event2 = create_test_completed_event(ritual_id, &run_id);
-        
+
         log.append(&event1, 1).await.unwrap();
         log.append(&event2, 2).await.unwrap();
-        
+
         // Read back
         let events = log.read_run(ritual_id, &run_id).await.unwrap();
-        
+
         assert_eq!(events.len(), 2);
         matches!(events[0], RitualEvent::Started { .. });
         matches!(events[1], RitualEvent::Completed { .. });
     }
-    
+
     #[tokio::test]
     #[ignore] // Requires NATS to be running
     async fn test_idempotency() {
-        let nats_url = std::env::var("NATS_URL").unwrap_or_else(|_| "nats://localhost:4222".to_string());
+        let nats_url =
+            std::env::var("NATS_URL").unwrap_or_else(|_| "nats://localhost:4222".to_string());
         let log = EventLog::new(&nats_url).await.unwrap();
-        
+
         let ritual_id = "test-ritual";
         let run_id = uuid::Uuid::new_v4().to_string();
-        
+
         let event = create_test_started_event(ritual_id, &run_id);
-        
+
         // Publish same event twice with same sequence
         log.append(&event, 1).await.unwrap();
         log.append(&event, 1).await.unwrap(); // Should be deduplicated
-        
+
         // Read back - should only have one event
         let events = log.read_run(ritual_id, &run_id).await.unwrap();
         assert_eq!(events.len(), 1);

@@ -9,39 +9,50 @@ fn fixtures_validate_against_schemas() {
         .expect("should read started schema");
     let schema = JSONSchema::compile(&serde_json::from_str(&schema_started).unwrap())
         .expect("should compile schema");
-    
+
     let fixture_started = fs::read_to_string("../contracts/fixtures/events/ritual.started.v1.json")
         .expect("should read started fixture");
-    let instance: Value = serde_json::from_str(&fixture_started)
-        .expect("should parse fixture");
-    
-    assert!(schema.validate(&instance).is_ok(), "started fixture should validate");
-    
+    let instance: Value = serde_json::from_str(&fixture_started).expect("should parse fixture");
+
+    assert!(
+        schema.validate(&instance).is_ok(),
+        "started fixture should validate"
+    );
+
     // Validate ritual.transitioned.v1
-    let schema_transitioned = fs::read_to_string("../contracts/schemas/events.ritual.transitioned.v1.json")
-        .expect("should read transitioned schema");
+    let schema_transitioned =
+        fs::read_to_string("../contracts/schemas/events.ritual.transitioned.v1.json")
+            .expect("should read transitioned schema");
     let schema = JSONSchema::compile(&serde_json::from_str(&schema_transitioned).unwrap())
         .expect("should compile schema");
-    
-    let fixture_transitioned = fs::read_to_string("../contracts/fixtures/events/ritual.transitioned.v1.json")
-        .expect("should read transitioned fixture");
-    let instance: Value = serde_json::from_str(&fixture_transitioned)
-        .expect("should parse fixture");
-    
-    assert!(schema.validate(&instance).is_ok(), "transitioned fixture should validate");
-    
+
+    let fixture_transitioned =
+        fs::read_to_string("../contracts/fixtures/events/ritual.transitioned.v1.json")
+            .expect("should read transitioned fixture");
+    let instance: Value =
+        serde_json::from_str(&fixture_transitioned).expect("should parse fixture");
+
+    assert!(
+        schema.validate(&instance).is_ok(),
+        "transitioned fixture should validate"
+    );
+
     // Validate ritual.completed.v1
-    let schema_completed = fs::read_to_string("../contracts/schemas/events.ritual.completed.v1.json")
-        .expect("should read completed schema");
+    let schema_completed =
+        fs::read_to_string("../contracts/schemas/events.ritual.completed.v1.json")
+            .expect("should read completed schema");
     let schema = JSONSchema::compile(&serde_json::from_str(&schema_completed).unwrap())
         .expect("should compile schema");
-    
-    let fixture_completed = fs::read_to_string("../contracts/fixtures/events/ritual.completed.v1.json")
-        .expect("should read completed fixture");
-    let instance: Value = serde_json::from_str(&fixture_completed)
-        .expect("should parse fixture");
-    
-    assert!(schema.validate(&instance).is_ok(), "completed fixture should validate");
+
+    let fixture_completed =
+        fs::read_to_string("../contracts/fixtures/events/ritual.completed.v1.json")
+            .expect("should read completed fixture");
+    let instance: Value = serde_json::from_str(&fixture_completed).expect("should parse fixture");
+
+    assert!(
+        schema.validate(&instance).is_ok(),
+        "completed fixture should validate"
+    );
 }
 
 #[tokio::test]

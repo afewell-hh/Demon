@@ -46,28 +46,31 @@ fn restarting_before_due_still_fires_once_after_due() {
 fn timer_ids_are_globally_unique_across_restarts() {
     let t0 = Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap();
     let mut wheel = engine::rituals::timers::TimerWheel::new_with_time(t0);
-    
+
     // Schedule first timer
     let spec1 = wheel.schedule_in("run-1", "ritual-1", Duration::seconds(5));
-    
+
     // Fire and mark delivered (simulates delivery)
     wheel.mark_fired(&spec1.timer_id);
-    
+
     // Simulate restart: rebuild wheel from specs (delivered timers filtered out)
-    let remaining_specs: Vec<_> = wheel.tick(t0 + Duration::seconds(10))
+    let remaining_specs: Vec<_> = wheel
+        .tick(t0 + Duration::seconds(10))
         .into_iter()
         .filter(|s| !s.delivered)
         .collect();
-    
+
     let mut wheel2 = engine::rituals::timers::TimerWheel::from_specs(remaining_specs);
-    
+
     // Schedule new timer after restart
     let spec2 = wheel2.schedule_in("run-2", "ritual-2", Duration::seconds(3));
-    
+
     // Timer IDs must be different to prevent confusion
-    assert_ne!(spec1.timer_id, spec2.timer_id, 
-        "Timer IDs must be globally unique even after restart");
-    
+    assert_ne!(
+        spec1.timer_id, spec2.timer_id,
+        "Timer IDs must be globally unique even after restart"
+    );
+
     // Both should be valid UUID format
     assert!(spec1.timer_id.len() > 10, "Timer ID should be UUID-like");
     assert!(spec2.timer_id.len() > 10, "Timer ID should be UUID-like");
