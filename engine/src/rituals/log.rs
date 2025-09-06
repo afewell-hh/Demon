@@ -171,20 +171,32 @@ impl EventLog {
                     let error_msg = format!("{}", e);
                     debug!("Batch fetch error: {}", error_msg);
                     
-                    // Only consider this expected completion if:
-                    // 1. The error message contains "Timed out" (JetStream's empty batch response)
-                    // 2. AND we've already read some events (so this isn't a total failure)
-                    // 3. OR it explicitly mentions no messages/empty batch
-                    if (error_msg.contains("Timed out") && !events.is_empty()) ||
+                    // Handle timeout scenarios:
+                    // 1. "Timed out" from JetStream usually means no more messages available
+                    // 2. For empty runs, this is the expected response
+                    // 3. For non-empty runs, this means we've read all available events
+                    if error_msg.contains("Timed out") || 
                        error_msg.contains("no messages available") || 
                        error_msg.contains("no matching messages") ||
                        error_msg.contains("empty batch") {
-                        // This appears to be expected end-of-stream
-                        debug!("Interpreted as end-of-stream: {}", error_msg);
+                        // This appears to be expected end-of-stream (empty run or no more events)
+                        debug!("Interpreted as end-of-stream (empty run or completion): {}", error_msg);
                         break;
+                    } else if error_msg.contains("connection") || 
+                              error_msg.contains("network") ||
+                              error_msg.contains("refused") {
+                        // These look like genuine network/connection issues - propagate them
+                        return Err(anyhow::anyhow!("Network/connection error: {}", e));
                     } else {
-                        // All other timeouts/errors are likely real problems - propagate them
-                        return Err(anyhow::anyhow!("Batch fetch failed: {}", e));
+                        // For other errors, be conservative but allow for empty runs
+                        // If this is the first batch and we got a timeout, treat as empty run
+                        if events.is_empty() {
+                            debug!("First batch timeout - treating as empty run: {}", error_msg);
+                            break;
+                        } else {
+                            // We had events but now got an unexpected error - propagate it
+                            return Err(anyhow::anyhow!("Unexpected batch fetch error: {}", e));
+                        }
                     }
                 }
             };
