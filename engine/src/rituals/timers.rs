@@ -34,7 +34,7 @@ impl TimerWheel {
 
     /// For M1A, a simple in-memory schedule API. Persistence comes in M1B.
     pub fn schedule_in(&mut self, run_id: &str, ritual_id: &str, delay: Duration) -> TimerSpec {
-        let now = self.current_time.unwrap_or_else(|| Utc::now());
+        let now = self.current_time.unwrap_or_else(Utc::now);
         let spec = TimerSpec {
             timer_id: Uuid::new_v4().to_string(),
             ritual_id: ritual_id.to_string(),

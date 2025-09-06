@@ -2,6 +2,7 @@ use anyhow::Result;
 
 /// Link-name router stub: resolves a functionRef to a capsule call.
 /// Milestone 0 supports only the `echo` capsule with `{ message: String }`.
+#[derive(Default)]
 pub struct Router;
 
 impl Router {

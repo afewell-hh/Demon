@@ -45,6 +45,7 @@ pub struct RitualSpec {
     pub states: Vec<State>,
 }
 
+#[derive(Default)]
 pub struct Engine {
     router: runtime::link::router::Router,
 }

@@ -116,6 +116,7 @@ impl RitualState {
     }
 }
 
+#[derive(Default)]
 pub struct StateStore {
     states: HashMap<String, RitualState>,
 }

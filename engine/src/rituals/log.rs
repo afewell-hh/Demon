@@ -10,6 +10,7 @@ const STREAM_SUBJECTS: &str = "demon.ritual.v1.>";
 
 #[derive(Debug, Clone)]
 pub struct EventLog {
+    #[allow(dead_code)]
     client: async_nats::Client,
     jetstream: jetstream::Context,
     stream: Stream,
