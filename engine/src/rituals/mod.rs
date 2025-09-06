@@ -49,25 +49,35 @@ pub struct Engine {
 
 impl Engine {
     pub fn new() -> Self {
-        Self { router: runtime::link::router::Router::new() }
+        Self {
+            router: runtime::link::router::Router::new(),
+        }
     }
 
     /// Execute a minimal ritual: only a single `task` with `end: true` is supported.
     pub fn run_from_file(&self, path: &str) -> Result<()> {
         let text = std::fs::read_to_string(path)
             .with_context(|| format!("reading ritual spec: {path}"))?;
-        let spec: RitualSpec = serde_yaml::from_str(&text)
-            .with_context(|| "parsing ritual yaml")?;
+        let spec: RitualSpec =
+            serde_yaml::from_str(&text).with_context(|| "parsing ritual yaml")?;
 
         let run_id = Uuid::new_v4().to_string();
         info!(ritual = %spec.id, %run_id, "ritual.start");
 
-        let state = spec.states.first().context("Milestone 0 expects exactly one state")?;
+        let state = spec
+            .states
+            .first()
+            .context("Milestone 0 expects exactly one state")?;
         match state {
             State::Task { action, end, .. } => {
-                let out = self.router.dispatch(&action.function_ref.ref_name, &action.function_ref.arguments)?;
+                let out = self.router.dispatch(
+                    &action.function_ref.ref_name,
+                    &action.function_ref.arguments,
+                )?;
                 if !end {
-                    warn!("Milestone 0 only supports single task with end=true; treating as terminal");
+                    warn!(
+                        "Milestone 0 only supports single task with end=true; treating as terminal"
+                    );
                 }
                 // Emit a completion event (stdout for now; bus to be wired later)
                 let evt = json!({

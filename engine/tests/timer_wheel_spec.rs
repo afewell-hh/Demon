@@ -4,7 +4,7 @@ use chrono::{Duration, TimeZone, Utc};
 /// They are #[ignore] initially; unignore one by one as you implement (TDD).
 #[test]
 fn schedule_then_no_fire_before_due() {
-    let t0 = Utc.with_ymd_and_hms(2025,1,1,0,0,0).unwrap();
+    let t0 = Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap();
     let mut wheel = engine::rituals::timers::TimerWheel::new_with_time(t0);
     let spec = wheel.schedule_in("run-1", "timer-ritual", Duration::seconds(5));
     assert_eq!(spec.timer_id.len() > 0, true);
@@ -15,7 +15,7 @@ fn schedule_then_no_fire_before_due() {
 
 #[test]
 fn fires_once_at_due_and_marks_delivered() {
-    let t0 = Utc.with_ymd_and_hms(2025,1,1,0,0,0).unwrap();
+    let t0 = Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap();
     let mut wheel = engine::rituals::timers::TimerWheel::new_with_time(t0);
     let spec = wheel.schedule_in("run-1", "timer-ritual", Duration::seconds(5));
     // At due time
@@ -30,7 +30,7 @@ fn fires_once_at_due_and_marks_delivered() {
 
 #[test]
 fn restarting_before_due_still_fires_once_after_due() {
-    let t0 = Utc.with_ymd_and_hms(2025,1,1,0,0,0).unwrap();
+    let t0 = Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap();
     let mut wheel = engine::rituals::timers::TimerWheel::new_with_time(t0);
     let spec = wheel.schedule_in("run-1", "timer-ritual", Duration::seconds(5));
     // "Restart": re-create the wheel and restore the spec (persistence comes in M1B).

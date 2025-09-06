@@ -16,11 +16,19 @@ pub struct TimerWheel {
 }
 
 impl TimerWheel {
-    pub fn new() -> Self { Self { specs: Vec::new(), current_time: None } }
+    pub fn new() -> Self {
+        Self {
+            specs: Vec::new(),
+            current_time: None,
+        }
+    }
 
     /// For testing: create wheel with a fixed "current time"
-    pub fn new_with_time(current_time: DateTime<Utc>) -> Self { 
-        Self { specs: Vec::new(), current_time: Some(current_time) }
+    pub fn new_with_time(current_time: DateTime<Utc>) -> Self {
+        Self {
+            specs: Vec::new(),
+            current_time: Some(current_time),
+        }
     }
 
     /// For M1A, a simple in-memory schedule API. Persistence comes in M1B.
@@ -55,6 +63,9 @@ impl TimerWheel {
 
     /// Helper to rebuild wheel from known specs (simulated persistence for tests).
     pub fn from_specs(specs: Vec<TimerSpec>) -> Self {
-        Self { specs, current_time: None }
+        Self {
+            specs,
+            current_time: None,
+        }
     }
 }
