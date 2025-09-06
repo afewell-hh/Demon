@@ -25,3 +25,6 @@ clap = { version = "4.5", features = ["derive"] }
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 humantime = "2.1"
+async-nats = "0.39"
+tokio = { version = "1", features = ["full"] }
+jsonschema = "0.26"

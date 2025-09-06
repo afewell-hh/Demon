@@ -15,3 +15,9 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 runtime = { path = "../runtime" }
 humantime = { workspace = true }
+async-nats = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+jsonschema = { workspace = true }
+tokio-test = "0.4"
