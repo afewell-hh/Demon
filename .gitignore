@@ -25,3 +25,6 @@ dist/
 # Coverage / Reports
 coverage/
 lcov.info
+
+# Runtime data
+.demon/
