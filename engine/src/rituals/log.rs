@@ -134,6 +134,19 @@ impl EventLog {
             .await
             .context("Failed to create ephemeral consumer")?;
         
+        // Ensure consumer cleanup happens regardless of success or failure
+        let result = self.read_messages_with_cleanup(&mut consumer, run_id).await;
+        
+        // Always attempt cleanup, even if reading failed
+        if let Ok(info) = consumer.info().await {
+            let _ = self.stream.delete_consumer(&info.name).await;
+            debug!("Cleaned up ephemeral consumer: {}", info.name);
+        }
+        
+        result
+    }
+    
+    async fn read_messages_with_cleanup(&self, consumer: &mut PullConsumer, run_id: &str) -> Result<Vec<RitualEvent>> {
         let mut events = Vec::new();
         
         // Fetch messages in batches to avoid infinite blocking
@@ -196,13 +209,6 @@ impl EventLog {
             if batch_empty || batch_count < BATCH_SIZE {
                 break;
             }
-        }
-        
-        // Clean up ephemeral consumer
-        // Note: With auto-generated names, we get the name from the consumer info
-        if let Ok(info) = consumer.info().await {
-            let _ = self.stream.delete_consumer(&info.name).await;
-            debug!("Cleaned up ephemeral consumer: {}", info.name);
         }
         
         debug!("Read {} events for run {}", events.len(), run_id);
