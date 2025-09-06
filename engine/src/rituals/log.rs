@@ -135,29 +135,47 @@ impl EventLog {
             .context("Failed to create consumer")?;
         
         let mut events = Vec::new();
-        let mut messages = consumer.messages().await?;
         
-        // Fetch all available messages (no timeout to avoid truncation)
-        while let Some(msg_result) = messages.next().await {
-            match msg_result {
-                Ok(msg) => {
-                    let event: RitualEvent = serde_json::from_slice(&msg.message.payload)
-                        .context("Failed to deserialize event")?;
-                    events.push(event);
-                    let _ = msg.ack().await; // Best effort ack
-                }
-                Err(e) => {
-                    // Check if this is a "no more messages" condition vs a real error
-                    let error_msg = format!("{}", e);
-                    if error_msg.contains("no more messages") || error_msg.contains("timeout") {
-                        // Expected end of stream
-                        debug!("End of message stream reached");
-                        break;
-                    } else {
-                        // Actual fetch error - propagate it
-                        return Err(anyhow::anyhow!("Failed to fetch message: {}", e));
+        // Fetch messages in batches to avoid infinite blocking
+        // Use reasonable batch size and timeout for each batch
+        const BATCH_SIZE: usize = 100;
+        const BATCH_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
+        
+        loop {
+            // Fetch a batch of messages with timeout
+            let mut batch = consumer
+                .batch()
+                .max_messages(BATCH_SIZE)
+                .expires(BATCH_TIMEOUT)
+                .messages()
+                .await?;
+            
+            let mut batch_count = 0;
+            let mut batch_empty = true;
+            
+            // Process all messages in this batch
+            while let Some(msg_result) = batch.next().await {
+                batch_empty = false;
+                match msg_result {
+                    Ok(msg) => {
+                        let event: RitualEvent = serde_json::from_slice(&msg.message.payload)
+                            .context("Failed to deserialize event")?;
+                        events.push(event);
+                        let _ = msg.ack().await; // Best effort ack
+                        batch_count += 1;
+                    }
+                    Err(e) => {
+                        // Batch fetch error - propagate it
+                        return Err(anyhow::anyhow!("Failed to fetch message in batch: {}", e));
                     }
                 }
+            }
+            
+            debug!("Processed batch of {} messages", batch_count);
+            
+            // If batch was empty or smaller than requested, we've read all available messages
+            if batch_empty || batch_count < BATCH_SIZE {
+                break;
             }
         }
         
