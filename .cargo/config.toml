@@ -1,0 +1,5 @@
+[build]
+incremental = true
+
+[target.'cfg(all())']
+rustflags = ["-C", "debuginfo=1"]
