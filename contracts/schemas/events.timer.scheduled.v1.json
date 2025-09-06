@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demon.meta/contracts/events.timer.scheduled.v1.json",
+  "title": "TimerScheduledV1",
+  "type": "object",
+  "required": ["event", "timerId", "runId", "scheduledFor", "ts"],
+  "properties": {
+    "event": { "const": "timer.scheduled:v1" },
+    "timerId": { "type": "string" },
+    "runId": { "type": "string" },
+    "scheduledFor": { "type": "string", "format": "date-time" },
+    "ts": { "type": "string", "format": "date-time" },
+    "traceId": { "type": "string" }
+  },
+  "additionalProperties": false
+}

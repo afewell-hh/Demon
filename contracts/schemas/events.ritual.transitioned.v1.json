@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demon.meta/contracts/events.ritual.state.transitioned.v1.json",
+  "title": "RitualStateTransitionedV1",
+  "type": "object",
+  "required": ["event", "ritualId", "runId", "ts", "fromState", "toState"],
+  "properties": {
+    "event": { "const": "ritual.state.transitioned:v1" },
+    "ritualId": { "type": "string" },
+    "runId": { "type": "string" },
+    "ts": { "type": "string", "format": "date-time" },
+    "fromState": { "type": "string" },
+    "toState": { "type": "string" },
+    "traceId": { "type": "string" }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,46 @@
+id: timer-ritual
+version: '1.0'
+name: Timer Ritual
+description: Demonstrates schedule->fire->compensate (compensation is a no-op in M1A).
+
+states:
+  - name: Schedule
+    type: task
+    action:
+      functionRef:
+        refName: scheduleTimer
+        arguments:
+          delaySeconds: 5
+    end: false
+
+  - name: AfterTimer
+    type: event
+    on:
+      - eventRef: timer.fired:v1
+        transition: MaybeCompensate
+    end: false
+
+  - name: MaybeCompensate
+    type: switch
+    dataConditions:
+      - condition: "${ .needCompensation == true }"
+        transition: Compensate
+    defaultCondition:
+      transition: End
+
+  - name: Compensate
+    type: task
+    action:
+      functionRef:
+        refName: compensate
+        arguments: {}
+    end: false
+
+  - name: End
+    type: task
+    action:
+      functionRef:
+        refName: echo
+        arguments:
+          message: "Timer finished."
+    end: true
