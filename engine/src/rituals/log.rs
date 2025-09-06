@@ -154,10 +154,13 @@ impl EventLog {
                 Ok(batch) => batch,
                 Err(e) => {
                     // Check if this is a timeout (no more messages) vs a real error
+                    // JetStream returns "Timed out" (capital T) for empty batches
                     let error_msg = format!("{}", e);
-                    if error_msg.contains("timeout") || error_msg.contains("no messages") {
+                    if error_msg.contains("Timed out") || 
+                       error_msg.to_lowercase().contains("timeout") || 
+                       error_msg.to_lowercase().contains("no messages") {
                         // Timeout on empty batch - this is expected completion
-                        debug!("Batch fetch timeout - no more messages available");
+                        debug!("Batch fetch timeout - no more messages available: {}", error_msg);
                         break;
                     } else {
                         // Real batch fetch error - propagate it
