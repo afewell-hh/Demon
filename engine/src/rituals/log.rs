@@ -139,7 +139,7 @@ impl EventLog {
         let mut messages = consumer.messages().await?;
         
         // Fetch messages with timeout
-        let timeout = tokio::time::timeout(Duration::from_secs(1), async {
+        match tokio::time::timeout(Duration::from_secs(1), async {
             while let Some(msg_result) = messages.next().await {
                 match msg_result {
                     Ok(msg) => {
@@ -148,14 +148,20 @@ impl EventLog {
                         events.push(event);
                         let _ = msg.ack().await; // Best effort ack
                     }
-                    Err(_) => break, // End of messages or error
+                    Err(e) => {
+                        // Propagate JetStream errors (not just end of messages)
+                        return Err(anyhow::anyhow!("Failed to fetch message: {}", e));
+                    }
                 }
             }
             Ok::<(), anyhow::Error>(())
-        });
-        
-        // Ignore timeout - it just means we've read all messages
-        let _ = timeout.await;
+        }).await {
+            Ok(result) => result.context("Error processing messages")?,
+            Err(_) => {
+                // Timeout elapsed - this is expected when no more messages are available
+                debug!("Timeout elapsed while reading messages (expected)");
+            }
+        }
         
         // Clean up consumer
         let _ = self.stream.delete_consumer(&consumer_name).await;
