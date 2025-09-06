@@ -121,18 +121,18 @@ impl EventLog {
     
     pub async fn read_run(&self, ritual_id: &str, run_id: &str) -> Result<Vec<RitualEvent>> {
         let filter_subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
-        let consumer_name = format!("replay-{}", run_id);
         
-        // Create ephemeral pull consumer
-        let consumer: PullConsumer = self.stream
+        // Create truly ephemeral pull consumer (no name = auto-generated)
+        // This allows concurrent reads and prevents consumer conflicts
+        let mut consumer: PullConsumer = self.stream
             .create_consumer(jetstream::consumer::pull::Config {
-                name: Some(consumer_name.clone()),
+                name: None, // Let JetStream auto-generate ephemeral consumer name
                 filter_subject: filter_subject.clone(),
                 ack_policy: jetstream::consumer::AckPolicy::Explicit,
                 ..Default::default()
             })
             .await
-            .context("Failed to create consumer")?;
+            .context("Failed to create ephemeral consumer")?;
         
         let mut events = Vec::new();
         
@@ -198,8 +198,12 @@ impl EventLog {
             }
         }
         
-        // Clean up consumer
-        let _ = self.stream.delete_consumer(&consumer_name).await;
+        // Clean up ephemeral consumer
+        // Note: With auto-generated names, we get the name from the consumer info
+        if let Ok(info) = consumer.info().await {
+            let _ = self.stream.delete_consumer(&info.name).await;
+            debug!("Cleaned up ephemeral consumer: {}", info.name);
+        }
         
         debug!("Read {} events for run {}", events.len(), run_id);
         
