@@ -3,7 +3,6 @@ use async_nats::jetstream::{self, consumer::PullConsumer, stream::Stream};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::time::Duration;
 use tracing::{debug, info};
 
 const STREAM_NAME: &str = "DEMON_RITUAL_EVENTS";
@@ -73,7 +72,7 @@ impl EventLog {
                 subjects: vec![STREAM_SUBJECTS.to_string()],
                 retention: jetstream::stream::RetentionPolicy::Limits,
                 storage: jetstream::stream::StorageType::File,
-                duplicate_window: Duration::from_secs(120), // 2 minute dedup window
+                duplicate_window: std::time::Duration::from_secs(120), // 2 minute dedup window
                 ..Default::default()
             })
             .await
@@ -138,28 +137,27 @@ impl EventLog {
         let mut events = Vec::new();
         let mut messages = consumer.messages().await?;
         
-        // Fetch messages with timeout
-        match tokio::time::timeout(Duration::from_secs(1), async {
-            while let Some(msg_result) = messages.next().await {
-                match msg_result {
-                    Ok(msg) => {
-                        let event: RitualEvent = serde_json::from_slice(&msg.message.payload)
-                            .context("Failed to deserialize event")?;
-                        events.push(event);
-                        let _ = msg.ack().await; // Best effort ack
-                    }
-                    Err(e) => {
-                        // Propagate JetStream errors (not just end of messages)
+        // Fetch all available messages (no timeout to avoid truncation)
+        while let Some(msg_result) = messages.next().await {
+            match msg_result {
+                Ok(msg) => {
+                    let event: RitualEvent = serde_json::from_slice(&msg.message.payload)
+                        .context("Failed to deserialize event")?;
+                    events.push(event);
+                    let _ = msg.ack().await; // Best effort ack
+                }
+                Err(e) => {
+                    // Check if this is a "no more messages" condition vs a real error
+                    let error_msg = format!("{}", e);
+                    if error_msg.contains("no more messages") || error_msg.contains("timeout") {
+                        // Expected end of stream
+                        debug!("End of message stream reached");
+                        break;
+                    } else {
+                        // Actual fetch error - propagate it
                         return Err(anyhow::anyhow!("Failed to fetch message: {}", e));
                     }
                 }
-            }
-            Ok::<(), anyhow::Error>(())
-        }).await {
-            Ok(result) => result.context("Error processing messages")?,
-            Err(_) => {
-                // Timeout elapsed - this is expected when no more messages are available
-                debug!("Timeout elapsed while reading messages (expected)");
             }
         }
         
