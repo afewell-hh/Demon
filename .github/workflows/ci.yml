@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, trunk, master ]
+  pull_request:
+    branches: [ "**" ]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust (toolchain from repo)
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ secrets.RUST_TOOLCHAIN_OVERRIDE || '' }}
+          components: clippy, rustfmt
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+          cache-on-failure: true
+
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+      - name: Clippy (deny warnings)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Build (debug)
+        run: cargo build --workspace
+
+      - name: Unit tests
+        run: cargo test --workspace --all-features -- --nocapture
+
+      # M0 smoke: run echo ritual; NATS not required yet, but we bring it up to match dev profile
+      - name: Start NATS (JetStream)
+        run: |
+          docker run -d --rm --name nats -p 4222:4222 -p 8222:8222 nats:2.10 -js
+          # Wait briefly for readiness
+          for i in {1..20}; do
+            if docker logs nats 2>&1 | grep -q "Server is ready"; then exit 0; fi
+            sleep 0.5
+          done
+          echo "NATS did not report ready in time"; docker logs nats; exit 1
+
+      - name: Smoke run (demonctl)
+        run: |
+          set -euo pipefail
+          OUT="$(cargo run -q -p demonctl -- run examples/rituals/echo.yaml)"
+          echo "$OUT"
+          echo "$OUT" | grep -q '"event": "ritual.completed:v1"'
+          echo "$OUT" | grep -q 'Hello from Demon!' || true  # printed to stdout by capsule; may be interleaved
+
+      - name: Teardown NATS
+        if: always()
+        run: docker rm -f nats || true

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demon.meta/contracts/events.ritual.completed.v1.json",
+  "title": "RitualCompletedV1",
+  "type": "object",
+  "required": ["event", "ritualId", "runId", "ts"],
+  "properties": {
+    "event": { "const": "ritual.completed:v1" },
+    "ritualId": { "type": "string" },
+    "runId": { "type": "string" },
+    "ts": { "type": "string", "format": "date-time" },
+    "outputs": { "type": "object", "additionalProperties": true },
+    "traceId": { "type": "string" }
+  },
+  "additionalProperties": false
+}

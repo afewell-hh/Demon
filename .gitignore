@@ -1,0 +1,27 @@
+# Rust / Cargo
+/target
+**/*.rs.bk
+Cargo.lock
+
+# Editors / IDE
+.vscode/
+.idea/
+*.iml
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Docker / Compose
+docker-data/
+.env
+
+# Node / UI (future Operate UI)
+node_modules/
+dist/
+.build/
+.cache/
+
+# Coverage / Reports
+coverage/
+lcov.info

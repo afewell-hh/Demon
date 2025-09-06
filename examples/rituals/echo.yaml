@@ -1,3 +1,14 @@
-name: echo-ritual
-steps:
-  - echo "hello world"
+id: echo-ritual
+version: '1.0'
+name: Echo Ritual
+description: Minimal ritual to validate the Demon engine.
+
+states:
+  - name: EchoState
+    type: task
+    action:
+      functionRef:
+        refName: echo
+        arguments:
+          message: "Hello from Demon!"
+    end: true
