@@ -1,5 +1,7 @@
 //! Minimal ritual interpreter for Milestone 0 (single task with end=true)
 
+pub mod timers;
+
 use anyhow::{Context, Result};
 use serde::Deserialize;
 use serde_json::json;
