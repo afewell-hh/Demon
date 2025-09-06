@@ -143,12 +143,28 @@ impl EventLog {
         
         loop {
             // Fetch a batch of messages with timeout
-            let mut batch = consumer
+            let batch_result = consumer
                 .batch()
                 .max_messages(BATCH_SIZE)
                 .expires(BATCH_TIMEOUT)
                 .messages()
-                .await?;
+                .await;
+                
+            let mut batch = match batch_result {
+                Ok(batch) => batch,
+                Err(e) => {
+                    // Check if this is a timeout (no more messages) vs a real error
+                    let error_msg = format!("{}", e);
+                    if error_msg.contains("timeout") || error_msg.contains("no messages") {
+                        // Timeout on empty batch - this is expected completion
+                        debug!("Batch fetch timeout - no more messages available");
+                        break;
+                    } else {
+                        // Real batch fetch error - propagate it
+                        return Err(anyhow::anyhow!("Failed to fetch batch: {}", e));
+                    }
+                }
+            };
             
             let mut batch_count = 0;
             let mut batch_empty = true;
@@ -165,8 +181,8 @@ impl EventLog {
                         batch_count += 1;
                     }
                     Err(e) => {
-                        // Batch fetch error - propagate it
-                        return Err(anyhow::anyhow!("Failed to fetch message in batch: {}", e));
+                        // Message processing error - propagate it
+                        return Err(anyhow::anyhow!("Failed to process message in batch: {}", e));
                     }
                 }
             }
