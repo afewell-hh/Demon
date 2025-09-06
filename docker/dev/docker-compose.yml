@@ -4,10 +4,10 @@ services:
     image: nats:2.10
     command: ["-js"]
     ports:
-      - "4222:4222"
-      - "8222:8222"
+      - "${NATS_PORT:-4222}:4222"
+      - "${NATS_MON_PORT:-8222}:8222"
     healthcheck:
-      test: ["CMD", "nats", "server", "report", "varz", "-s", "nats://nats:4222"]
+      test: ["CMD", "nats", "server", "report", "varz", "-s", "nats://localhost:4222"]
       interval: 5s
       timeout: 3s
       retries: 10

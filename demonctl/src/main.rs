@@ -16,6 +16,8 @@ enum Commands {
         /// Path to ritual YAML
         #[arg(value_name = "FILE")]
         file: String,
+        #[arg(long, default_value = "false")]
+        replay: bool,
     },
     /// Print version and exit
     Version,
@@ -33,9 +35,12 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.cmd {
-        Commands::Run { file } => {
+        Commands::Run { file, replay: _ } => {
             let engine = engine::rituals::Engine::new();
-            engine.run_from_file(&file)?;
+            if let Err(e) = engine.run_from_file(&file) {
+                eprintln!("Error running ritual: {:?}", e);
+                std::process::exit(1);
+            }
         }
         Commands::Version => {
             println!("{}", env!("CARGO_PKG_VERSION"));

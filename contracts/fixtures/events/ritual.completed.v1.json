@@ -1,0 +1,8 @@
+{
+  "event": "ritual.completed:v1",
+  "ritualId": "echo-ritual",
+  "runId": "00000000-0000-0000-0000-000000000000",
+  "ts": "2025-01-01T00:00:00Z",
+  "outputs": { "printed": "Hello from Demon!" },
+  "traceId": "trace-abc"
+}

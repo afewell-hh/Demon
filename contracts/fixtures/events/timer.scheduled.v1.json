@@ -1,0 +1,9 @@
+{
+  "event": "timer.scheduled:v1",
+  "timerId": "timer-1",
+  "dueAt": "2025-01-01T00:00:05Z",
+  "ts": "2025-01-01T00:00:00Z",
+  "ritualId": "timer-ritual",
+  "runId": "00000000-0000-0000-0000-000000000000",
+  "traceId": "trace-abc"
+}

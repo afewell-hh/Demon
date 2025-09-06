@@ -1,3 +1,5 @@
+//! Minimal ritual interpreter for Milestone 0 (single task with end=true)
+
 use anyhow::{Context, Result};
 use serde::Deserialize;
 use serde_json::json;
@@ -85,10 +87,11 @@ impl Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn parse_minimal_yaml() {
-        let y = r#"
-id: t
+        // Properly terminated raw string (r#" ... "#)
+        let y = r#"id: t
 version: '1.0'
 states:
   - name: s

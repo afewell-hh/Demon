@@ -1,0 +1,7 @@
+{
+  "event": "timer.fired:v1",
+  "timerId": "timer-1",
+  "scheduledFor": "2025-01-01T00:00:05Z",
+  "ts": "2025-01-01T00:00:05Z",
+  "traceId": "trace-abc"
+}
