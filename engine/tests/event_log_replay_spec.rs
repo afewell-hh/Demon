@@ -3,7 +3,6 @@ use serde_json::Value;
 use std::fs;
 
 #[test]
-#[ignore]
 fn fixtures_validate_against_schemas() {
     // Validate ritual.started.v1
     let schema_started = fs::read_to_string("../contracts/schemas/events.ritual.started.v1.json")
