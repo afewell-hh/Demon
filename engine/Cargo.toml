@@ -17,6 +17,7 @@ runtime = { path = "../runtime" }
 humantime = { workspace = true }
 async-nats = { workspace = true }
 tokio = { workspace = true }
+futures-util = { workspace = true }
 
 [dev-dependencies]
 jsonschema = { workspace = true }

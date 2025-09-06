@@ -1,5 +1,5 @@
 [toolchain]
 # Pin a modern stable; update deliberately via PRs to keep reproducibility.
-channel = "1.81.0"
+channel = "1.82.0"
 components = ["rustfmt", "clippy"]
 profile = "minimal"

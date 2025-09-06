@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use async_nats::jetstream::{self, consumer::PullConsumer, stream::Stream};
+use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::time::Duration;
@@ -100,12 +101,13 @@ impl EventLog {
         let payload = serde_json::to_vec(event)
             .context("Failed to serialize event")?;
         
+        let mut headers = async_nats::HeaderMap::new();
+        headers.insert("Nats-Msg-Id", msg_id.as_str());
+        
         let ack = self.jetstream
             .publish_with_headers(
                 subject.clone(),
-                async_nats::HeaderMap::from_iter([
-                    ("Nats-Msg-Id".to_string(), msg_id.clone()),
-                ]),
+                headers,
                 payload.into(),
             )
             .await
@@ -126,7 +128,7 @@ impl EventLog {
         let consumer: PullConsumer = self.stream
             .create_consumer(jetstream::consumer::pull::Config {
                 name: Some(consumer_name.clone()),
-                filter_subject: Some(filter_subject.clone()),
+                filter_subject: filter_subject.clone(),
                 ack_policy: jetstream::consumer::AckPolicy::Explicit,
                 ..Default::default()
             })
@@ -138,11 +140,16 @@ impl EventLog {
         
         // Fetch messages with timeout
         let timeout = tokio::time::timeout(Duration::from_secs(1), async {
-            while let Ok(Some(msg)) = messages.try_next().await {
-                let event: RitualEvent = serde_json::from_slice(&msg.payload)
-                    .context("Failed to deserialize event")?;
-                events.push(event);
-                msg.ack().await.context("Failed to ack message")?;
+            while let Some(msg_result) = messages.next().await {
+                match msg_result {
+                    Ok(msg) => {
+                        let event: RitualEvent = serde_json::from_slice(&msg.message.payload)
+                            .context("Failed to deserialize event")?;
+                        events.push(event);
+                        let _ = msg.ack().await; // Best effort ack
+                    }
+                    Err(_) => break, // End of messages or error
+                }
             }
             Ok::<(), anyhow::Error>(())
         });
