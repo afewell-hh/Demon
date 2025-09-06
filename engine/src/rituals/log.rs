@@ -166,18 +166,25 @@ impl EventLog {
             let mut batch = match batch_result {
                 Ok(batch) => batch,
                 Err(e) => {
-                    // Check if this is a timeout (no more messages) vs a real error
-                    // JetStream returns "Timed out" (capital T) for empty batches
+                    // Be very conservative - only treat very specific empty-batch conditions as completion
+                    // All other errors should be propagated to avoid hiding real issues
                     let error_msg = format!("{}", e);
-                    if error_msg.contains("Timed out") || 
-                       error_msg.to_lowercase().contains("timeout") || 
-                       error_msg.to_lowercase().contains("no messages") {
-                        // Timeout on empty batch - this is expected completion
-                        debug!("Batch fetch timeout - no more messages available: {}", error_msg);
+                    debug!("Batch fetch error: {}", error_msg);
+                    
+                    // Only consider this expected completion if:
+                    // 1. The error message contains "Timed out" (JetStream's empty batch response)
+                    // 2. AND we've already read some events (so this isn't a total failure)
+                    // 3. OR it explicitly mentions no messages/empty batch
+                    if (error_msg.contains("Timed out") && !events.is_empty()) ||
+                       error_msg.contains("no messages available") || 
+                       error_msg.contains("no matching messages") ||
+                       error_msg.contains("empty batch") {
+                        // This appears to be expected end-of-stream
+                        debug!("Interpreted as end-of-stream: {}", error_msg);
                         break;
                     } else {
-                        // Real batch fetch error - propagate it
-                        return Err(anyhow::anyhow!("Failed to fetch batch: {}", e));
+                        // All other timeouts/errors are likely real problems - propagate them
+                        return Err(anyhow::anyhow!("Batch fetch failed: {}", e));
                     }
                 }
             };
