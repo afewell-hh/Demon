@@ -173,8 +173,9 @@ impl EventLog {
                     
                     // Only treat very specific timeout/empty conditions as expected completion
                     // All other errors must be propagated to avoid hiding operational issues
-                    if error_msg.contains("Timed out") {
+                    if error_msg.contains("Timed out") || error_msg.contains("TimedOut") {
                         // JetStream timeout - this is expected when no (more) messages available
+                        // Handle both "Timed out" (with space) and "TimedOut" (no space) variants
                         debug!("JetStream timeout - no more messages available: {}", error_msg);
                         break;
                     } else if error_msg.contains("no messages available") || 
