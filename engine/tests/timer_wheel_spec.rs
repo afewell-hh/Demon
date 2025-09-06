@@ -14,10 +14,9 @@ fn schedule_then_no_fire_before_due() {
 }
 
 #[test]
-#[ignore = "implement firing at due time with at-least-once semantics"]
 fn fires_once_at_due_and_marks_delivered() {
     let t0 = Utc.with_ymd_and_hms(2025,1,1,0,0,0).unwrap();
-    let mut wheel = engine::rituals::timers::TimerWheel::new();
+    let mut wheel = engine::rituals::timers::TimerWheel::new_with_time(t0);
     let spec = wheel.schedule_in("run-1", "timer-ritual", Duration::seconds(5));
     // At due time
     let fired1 = wheel.tick(t0 + Duration::seconds(5));
