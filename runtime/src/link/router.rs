@@ -5,7 +5,9 @@ use anyhow::Result;
 pub struct Router;
 
 impl Router {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 
     /// Dispatch a functionRef by name with JSON arguments and return JSON output.
     pub fn dispatch(&self, ref_name: &str, args: &serde_json::Value) -> Result<serde_json::Value> {
