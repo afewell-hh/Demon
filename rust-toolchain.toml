@@ -1,5 +1,5 @@
 [toolchain]
-# Pin a modern stable; update deliberately via PRs to keep reproducibility.
-channel = "1.81.0"
+# Use nightly to support dependencies that require edition2024
+channel = "nightly"
 components = ["rustfmt", "clippy"]
 profile = "minimal"

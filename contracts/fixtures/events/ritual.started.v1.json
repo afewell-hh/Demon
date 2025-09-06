@@ -1,0 +1,23 @@
+{
+  "event": "ritual.started:v1",
+  "ritualId": "echo-basic",
+  "runId": "550e8400-e29b-41d4-a716-446655440000",
+  "ts": "2025-01-06T10:30:00Z",
+  "spec": {
+    "id": "echo-basic",
+    "name": "Basic Echo Test",
+    "version": "1.0.0",
+    "initial": "start",
+    "states": {
+      "start": {
+        "type": "action",
+        "action": "echo",
+        "input": {
+          "message": "Hello, World!"
+        },
+        "end": true
+      }
+    }
+  },
+  "traceId": "trace-123"
+}
