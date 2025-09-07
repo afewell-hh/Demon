@@ -250,9 +250,8 @@ impl JetStreamClient {
                         stream
                     }
                     Err(e) => {
-                        warn!("Failed to create stream {}: {}", stream_name, e);
-                        // Return empty list if we can't create it
-                        return Ok(vec![]);
+                        error!("Failed to create stream {}: {}", stream_name, e);
+                        return Err(e.into());
                     }
                 }
             }
@@ -375,9 +374,8 @@ impl JetStreamClient {
                         stream
                     }
                     Err(e) => {
-                        warn!("Failed to create stream {}: {}", stream_name, e);
-                        // Return empty stream if we can't create it
-                        return Ok(vec![]);
+                        error!("Failed to create stream {}: {}", stream_name, e);
+                        return Err(e.into());
                     }
                 }
             }
@@ -428,12 +426,12 @@ impl JetStreamClient {
                 Ok(collected_messages)
             }
             Ok(Err(e)) => {
-                warn!("Failed to fetch messages: {}", e);
-                Ok(vec![])
+                error!("Failed to fetch messages: {}", e);
+                Err(e.into())
             }
-            Err(_) => {
-                warn!("Timeout fetching messages from JetStream");
-                Ok(vec![])
+            Err(e) => {
+                error!("Timeout fetching messages from JetStream: {:?}", e);
+                Err(anyhow::anyhow!("JetStream operation timed out"))
             }
         };
         
