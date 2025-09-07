@@ -285,6 +285,7 @@ impl JetStreamClient {
             filter_subject: subject_filter.to_string(),
             durable_name: None, // Ephemeral consumer - no state persistence
             deliver_policy: DeliverPolicy::All, // Get all historical messages
+            ack_policy: async_nats::jetstream::consumer::AckPolicy::None, // No acknowledgment needed for read-only operations
             inactive_threshold: std::time::Duration::from_secs(60), // Auto-delete after 60 seconds of inactivity
             ..Default::default()
         };
@@ -430,6 +431,7 @@ impl JetStreamClient {
             filter_subject: subject_filter.to_string(),
             durable_name: None, // Ephemeral consumer - no state persistence
             deliver_policy,     // Use provided delivery policy
+            ack_policy: async_nats::jetstream::consumer::AckPolicy::None, // No acknowledgment needed for read-only operations
             inactive_threshold: std::time::Duration::from_secs(60), // Auto-delete after 60 seconds of inactivity
             ..Default::default()
         };
