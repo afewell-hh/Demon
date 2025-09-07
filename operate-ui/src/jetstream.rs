@@ -102,8 +102,9 @@ impl JetStreamClient {
         let mut runs_map: HashMap<String, RunSummary> = HashMap::new();
         let mut message_count = 0;
 
-        // Get messages from JetStream stream - no artificial limit, process until we have enough runs
-        match self.query_stream_messages(subject_filter, None).await {
+        // Get messages from JetStream stream starting from recent messages
+        // Use DeliverPolicy::Last to start from the most recent messages and work backwards
+        match self.query_stream_messages(subject_filter, None, DeliverPolicy::Last).await {
             Ok(mut messages) => {
                 while let Some(message) = messages.next().await {
                     message_count += 1;
@@ -148,7 +149,7 @@ impl JetStreamClient {
             }
             Err(e) => {
                 error!("Failed to query stream messages: {}", e);
-                return Ok(vec![]); // Return empty list on error
+                return Err(e); // Propagate error instead of hiding as empty list
             }
         }
 
@@ -197,7 +198,7 @@ impl JetStreamClient {
             }
             Err(e) => {
                 error!("Failed to query stream messages for run {}: {}", run_id, e);
-                return Ok(None);
+                return Err(e); // Propagate error instead of hiding as 404
             }
         }
 
@@ -334,11 +335,12 @@ impl JetStreamClient {
         }
     }
 
-    /// Query stream messages with optional limit
+    /// Query stream messages with optional limit and delivery policy
     async fn query_stream_messages(
         &self,
         subject_filter: &str,
         limit: Option<usize>,
+        deliver_policy: DeliverPolicy,
     ) -> Result<BoxStream<'static, async_nats::jetstream::Message>> {
         debug!("Querying messages with subject filter: {}", subject_filter);
 
@@ -383,7 +385,7 @@ impl JetStreamClient {
         let consumer_config = jetstream::consumer::pull::Config {
             filter_subject: subject_filter.to_string(),
             durable_name: Some(durable_name), // Required for pull consumers
-            deliver_policy: DeliverPolicy::All, // Get all historical messages
+            deliver_policy, // Use provided delivery policy
             ..Default::default()
         };
 
