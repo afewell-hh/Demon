@@ -102,9 +102,9 @@ impl JetStreamClient {
         let mut runs_map: HashMap<String, RunSummary> = HashMap::new();
         let mut message_count = 0;
 
-        // Get messages from JetStream stream starting from recent messages
-        // Use DeliverPolicy::Last to start from the most recent messages and work backwards
-        match self.query_stream_messages(subject_filter, None, DeliverPolicy::Last).await {
+        // Get messages from JetStream stream
+        // Use DeliverPolicy::All to get all messages, then sort by timestamp to prioritize recent runs
+        match self.query_stream_messages(subject_filter, None, DeliverPolicy::All).await {
             Ok(mut messages) => {
                 while let Some(message) = messages.next().await {
                     message_count += 1;
@@ -138,7 +138,7 @@ impl JetStreamClient {
                         }
                     }
 
-                    // No need to acknowledge with non-durable consumers
+                    // Message acknowledgment handled in the stream processing
 
                     // Stop when we have enough unique runs (with some buffer for completeness)
                     if runs_map.len() >= limit && message_count >= limit * 2 {
@@ -288,6 +288,10 @@ impl JetStreamClient {
                             while let Some(msg_result) = messages.next().await {
                                 match msg_result {
                                     Ok(msg) => {
+                                        // Acknowledge message to prevent redelivery
+                                        if let Err(e) = msg.ack().await {
+                                            debug!("Failed to acknowledge message: {}", e);
+                                        }
                                         batch_messages.push(msg);
                                         batch_count += 1;
                                     }
@@ -384,46 +388,64 @@ impl JetStreamClient {
         
         let consumer_config = jetstream::consumer::pull::Config {
             filter_subject: subject_filter.to_string(),
-            durable_name: Some(durable_name), // Required for pull consumers
+            durable_name: Some(durable_name.clone()), // Required for pull consumers
             deliver_policy, // Use provided delivery policy
             ..Default::default()
         };
 
-        match stream.create_consumer(consumer_config).await {
+        // Try to get existing consumer or create new one
+        let consumer = match stream.get_consumer(&durable_name).await {
             Ok(consumer) => {
-                debug!("Created consumer for subject filter: {}", subject_filter);
-                
-                // Use batch fetch with timeout to prevent hanging on empty streams
-                let batch_size = limit.unwrap_or(10000).min(10000);
-                let timeout = std::time::Duration::from_secs(5);
-                
-                match tokio::time::timeout(timeout, consumer.batch().max_messages(batch_size).expires(std::time::Duration::from_secs(2)).messages()).await {
-                    Ok(Ok(messages)) => {
-                        // Messages already implements Stream, so we can use it directly
-                        let message_stream = messages.filter_map(|msg_result| async move {
-                            match msg_result {
-                                Ok(msg) => Some(msg),
-                                Err(e) => {
-                                    error!("Error receiving message from JetStream: {}", e);
-                                    None
-                                }
-                            }
-                        }).boxed();
-                        Ok(message_stream)
+                debug!("Retrieved existing consumer: {}", durable_name);
+                consumer
+            }
+            Err(_) => {
+                // Consumer doesn't exist, create it
+                match stream.create_consumer(consumer_config).await {
+                    Ok(consumer) => {
+                        debug!("Created new consumer: {}", durable_name);
+                        consumer
                     }
-                    Ok(Err(e)) => {
-                        warn!("Failed to fetch messages: {}", e);
-                        Ok(futures_util::stream::iter(vec![]).boxed())
-                    }
-                    Err(_) => {
-                        warn!("Timeout fetching messages from JetStream");
-                        Ok(futures_util::stream::iter(vec![]).boxed())
+                    Err(e) => {
+                        error!("Failed to create consumer: {}", e);
+                        return Err(e.into());
                     }
                 }
             }
-            Err(e) => {
-                error!("Failed to create consumer: {}", e);
-                // Return empty stream on error
+        };
+
+        debug!("Using consumer for subject filter: {}", subject_filter);
+        
+        // Use batch fetch with timeout to prevent hanging on empty streams
+        let batch_size = limit.unwrap_or(10000).min(10000);
+        let timeout = std::time::Duration::from_secs(5);
+        
+        match tokio::time::timeout(timeout, consumer.batch().max_messages(batch_size).expires(std::time::Duration::from_secs(2)).messages()).await {
+            Ok(Ok(messages)) => {
+                // Messages already implements Stream, so we can use it directly
+                let message_stream = messages.filter_map(|msg_result| async move {
+                    match msg_result {
+                        Ok(msg) => {
+                            // Acknowledge message to prevent redelivery
+                            if let Err(e) = msg.ack().await {
+                                debug!("Failed to acknowledge message: {}", e);
+                            }
+                            Some(msg)
+                        },
+                        Err(e) => {
+                            error!("Error receiving message from JetStream: {}", e);
+                            None
+                        }
+                    }
+                }).boxed();
+                Ok(message_stream)
+            }
+            Ok(Err(e)) => {
+                warn!("Failed to fetch messages: {}", e);
+                Ok(futures_util::stream::iter(vec![]).boxed())
+            }
+            Err(_) => {
+                warn!("Timeout fetching messages from JetStream");
                 Ok(futures_util::stream::iter(vec![]).boxed())
             }
         }
