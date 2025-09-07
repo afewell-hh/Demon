@@ -123,7 +123,7 @@ async fn test_runs_api_without_jetstream() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
 
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
@@ -173,7 +173,7 @@ async fn test_run_detail_api_without_jetstream() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
 
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
@@ -222,7 +222,7 @@ async fn test_runs_api_with_limit_param() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR); // JetStream unavailable
+    assert_eq!(response.status(), StatusCode::BAD_GATEWAY); // JetStream unavailable
 }
 
 #[tokio::test]
@@ -250,7 +250,7 @@ async fn test_content_type_headers() {
         .await
         .unwrap();
 
-    assert_eq!(json_response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(json_response.status(), StatusCode::BAD_GATEWAY);
     // JSON responses should have application/json content type (handled by Axum)
 }
 

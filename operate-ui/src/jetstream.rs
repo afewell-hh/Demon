@@ -247,37 +247,13 @@ impl JetStreamClient {
             subject_filter
         );
 
-        // Try to get or create the stream for ritual events
+        // Get the stream for ritual events (read-only; do not create)
         let stream_name = "RITUAL_EVENTS";
-        let stream = match self.jetstream.get_stream(stream_name).await {
-            Ok(stream) => {
-                debug!("Found existing stream: {}", stream_name);
-                stream
-            }
-            Err(_) => {
-                info!("Stream {} not found, attempting to create it", stream_name);
-
-                // Create stream configuration for ritual events
-                let stream_config = jetstream::stream::Config {
-                    name: stream_name.to_string(),
-                    subjects: vec!["demon.ritual.v1.>".to_string()],
-                    max_messages: 10_000,
-                    max_bytes: 100_000_000, // 100MB
-                    ..Default::default()
-                };
-
-                match self.jetstream.create_stream(stream_config).await {
-                    Ok(stream) => {
-                        info!("Successfully created stream: {}", stream_name);
-                        stream
-                    }
-                    Err(e) => {
-                        error!("Failed to create stream {}: {}", stream_name, e);
-                        return Err(e.into());
-                    }
-                }
-            }
-        };
+        let stream = self
+            .jetstream
+            .get_stream(stream_name)
+            .await
+            .with_context(|| format!("JetStream stream '{}' not found", stream_name))?;
 
         // Create ephemeral (non-durable) consumer for truly stateless read-only queries
         // Non-durable consumers are automatically deleted after use and don't persist state
@@ -307,70 +283,56 @@ impl JetStreamClient {
 
         debug!("Using consumer for all messages: {}", subject_filter);
 
+        const BATCH_SIZE: usize = 10_000;
+        const BATCH_EXPIRES_SECS: u64 = 5; // bounded per-batch wait; documented (not hidden)
+
         let mut all_messages = Vec::new();
-        let batch_size = 10000;
-        let timeout = std::time::Duration::from_secs(10); // Longer timeout for batch processing
-        let mut total_fetched = 0;
+        let mut total_fetched = 0usize;
 
         loop {
-            match tokio::time::timeout(
-                timeout,
-                consumer
-                    .batch()
-                    .max_messages(batch_size)
-                    .expires(std::time::Duration::from_secs(5))
-                    .messages(),
-            )
-            .await
-            {
-                Ok(Ok(mut messages)) => {
-                    let mut batch_count = 0;
-                    let mut batch_messages = Vec::new();
+            let mut messages = consumer
+                .batch()
+                .max_messages(BATCH_SIZE)
+                .expires(std::time::Duration::from_secs(BATCH_EXPIRES_SECS))
+                .messages()
+                .await
+                .context("Failed to initiate JetStream batch fetch")?;
 
-                    while let Some(msg_result) = messages.next().await {
-                        match msg_result {
-                            Ok(msg) => {
-                                // No acknowledgment needed with AckPolicy::None
-                                batch_messages.push(msg);
-                                batch_count += 1;
-                            }
-                            Err(e) => {
-                                error!("Error receiving message from JetStream: {}", e);
-                            }
-                        }
+            let mut batch_count = 0usize;
+            let mut batch_messages = Vec::new();
+
+            while let Some(msg_result) = messages.next().await {
+                match msg_result {
+                    Ok(msg) => {
+                        batch_messages.push(msg);
+                        batch_count += 1;
                     }
-
-                    if batch_count == 0 {
-                        debug!("No more messages available, stopping");
-                        break;
+                    Err(e) => {
+                        warn!("Error receiving message from JetStream: {}", e);
                     }
-
-                    total_fetched += batch_count;
-                    all_messages.extend(batch_messages);
-
-                    // If we got fewer messages than the batch size, we've reached the end
-                    if batch_count < batch_size {
-                        debug!(
-                            "Received {} messages (less than batch size {}), stopping",
-                            batch_count, batch_size
-                        );
-                        break;
-                    }
-
-                    debug!(
-                        "Fetched batch of {} messages, total: {}",
-                        batch_count, total_fetched
-                    );
-                }
-                Ok(Err(e)) => {
-                    warn!("Failed to fetch batch: {}", e);
-                    break;
-                }
-                Err(_) => {
-                    warn!("Timeout fetching batch from JetStream");
-                    break;
                 }
             }
+
+            if batch_count == 0 {
+                debug!("No more messages available, stopping");
+                break;
+            }
+
+            total_fetched += batch_count;
+            all_messages.extend(batch_messages);
+
+            if batch_count < BATCH_SIZE {
+                debug!(
+                    "Received {} messages (< batch size {}), stopping",
+                    batch_count, BATCH_SIZE
+                );
+                break;
+            }
+
+            debug!(
+                "Fetched batch of {} messages, total so far: {}",
+                batch_count, total_fetched
+            );
         }
 
         info!(
@@ -393,37 +355,13 @@ impl JetStreamClient {
     ) -> Result<Vec<async_nats::jetstream::Message>> {
         debug!("Querying messages with subject filter: {}", subject_filter);
 
-        // Try to get or create the stream for ritual events
+        // Get the stream for ritual events (read-only; do not create)
         let stream_name = "RITUAL_EVENTS";
-        let stream = match self.jetstream.get_stream(stream_name).await {
-            Ok(stream) => {
-                debug!("Found existing stream: {}", stream_name);
-                stream
-            }
-            Err(_) => {
-                info!("Stream {} not found, attempting to create it", stream_name);
-
-                // Create stream configuration for ritual events
-                let stream_config = jetstream::stream::Config {
-                    name: stream_name.to_string(),
-                    subjects: vec!["demon.ritual.v1.>".to_string()],
-                    max_messages: 10_000,
-                    max_bytes: 100_000_000, // 100MB
-                    ..Default::default()
-                };
-
-                match self.jetstream.create_stream(stream_config).await {
-                    Ok(stream) => {
-                        info!("Successfully created stream: {}", stream_name);
-                        stream
-                    }
-                    Err(e) => {
-                        error!("Failed to create stream {}: {}", stream_name, e);
-                        return Err(e.into());
-                    }
-                }
-            }
-        };
+        let stream = self
+            .jetstream
+            .get_stream(stream_name)
+            .await
+            .with_context(|| format!("JetStream stream '{}' not found", stream_name))?;
 
         // Create ephemeral (non-durable) consumer for truly stateless read-only queries
         // Non-durable consumers are automatically deleted after use and don't persist state
@@ -453,21 +391,16 @@ impl JetStreamClient {
 
         debug!("Using consumer for subject filter: {}", subject_filter);
 
-        // Use batch fetch with timeout to prevent hanging on empty streams
-        let batch_size = limit.unwrap_or(10000).min(10000);
-        let timeout = std::time::Duration::from_secs(5);
-
-        let result = match tokio::time::timeout(
-            timeout,
-            consumer
-                .batch()
-                .max_messages(batch_size)
-                .expires(std::time::Duration::from_secs(2))
-                .messages(),
-        )
-        .await
+        // Use batch fetch with a bounded per-batch wait (deterministic termination)
+        let batch_size = limit.unwrap_or(10_000).min(10_000);
+        match consumer
+            .batch()
+            .max_messages(batch_size)
+            .expires(std::time::Duration::from_secs(5))
+            .messages()
+            .await
         {
-            Ok(Ok(mut messages)) => {
+            Ok(mut messages) => {
                 // Collect all messages from the stream immediately
                 let mut collected_messages = Vec::new();
 
@@ -482,20 +415,14 @@ impl JetStreamClient {
 
                 Ok(collected_messages)
             }
-            Ok(Err(e)) => {
+            Err(e) => {
                 error!("Failed to fetch messages: {}", e);
                 Err(e.into())
             }
-            Err(e) => {
-                error!("Timeout fetching messages from JetStream: {:?}", e);
-                Err(anyhow::anyhow!("JetStream operation timed out"))
-            }
-        };
+        }
 
         // Note: Ephemeral consumers should be automatically cleaned up by JetStream
         // when the client connection is closed or after a timeout period
-
-        result
     }
 
     /// Parse a NATS message for run summary information

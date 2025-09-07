@@ -88,7 +88,7 @@ pub async fn list_runs_api(
             Err(e) => {
                 error!("Failed to retrieve runs: {}", e);
                 (
-                    StatusCode::INTERNAL_SERVER_ERROR,
+                    StatusCode::BAD_GATEWAY,
                     Json(serde_json::json!({
                         "error": format!("Failed to retrieve runs: {}", e)
                     })),
@@ -99,7 +99,7 @@ pub async fn list_runs_api(
         None => {
             error!("JetStream client not available");
             (
-                StatusCode::INTERNAL_SERVER_ERROR,
+                StatusCode::BAD_GATEWAY,
                 Json(serde_json::json!({
                     "error": "JetStream is not available"
                 })),
@@ -140,6 +140,26 @@ pub async fn get_run_html(
     context.insert("error", &error);
     context.insert("jetstream_available", &state.jetstream_client.is_some());
     context.insert("run_id", &run_id);
+
+    // View helpers to avoid template method calls
+    if let Some(ref rd) = run {
+        // started timestamp: first event ts if present
+        let started = rd.events.first().map(|e| e.ts.to_rfc3339());
+        context.insert("run_started", &started);
+
+        // status and class based on last event
+        let (status, status_class) = rd
+            .events
+            .last()
+            .map(|e| match e.event.as_str() {
+                "ritual.completed:v1" => ("Completed", "status-completed"),
+                "ritual.failed:v1" => ("Failed", "status-failed"),
+                _ => ("Running", "status-running"),
+            })
+            .unwrap_or(("Running", "status-running"));
+        context.insert("run_status", &status);
+        context.insert("run_status_class", &status_class);
+    }
 
     let html = state
         .tera
@@ -188,7 +208,7 @@ pub async fn get_run_api(State(state): State<AppState>, Path(run_id): Path<Strin
             Err(e) => {
                 error!("Failed to retrieve run detail: {}", e);
                 (
-                    StatusCode::INTERNAL_SERVER_ERROR,
+                    StatusCode::BAD_GATEWAY,
                     Json(serde_json::json!({
                         "error": format!("Failed to retrieve run detail: {}", e)
                     })),
@@ -199,7 +219,7 @@ pub async fn get_run_api(State(state): State<AppState>, Path(run_id): Path<Strin
         None => {
             error!("JetStream client not available");
             (
-                StatusCode::INTERNAL_SERVER_ERROR,
+                StatusCode::BAD_GATEWAY,
                 Json(serde_json::json!({
                     "error": "JetStream is not available"
                 })),

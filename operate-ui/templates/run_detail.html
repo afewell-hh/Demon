@@ -27,9 +27,7 @@
 <div class="card">
     <div class="card-header">
         <h2 class="card-title">Run Details</h2>
-        <span class="status-indicator {{ run.status_class }}">
-            {{ run.status }}
-        </span>
+        <span class="status-indicator {{ run_status_class }}">{{ run_status }}</span>
     </div>
 
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
@@ -43,7 +41,7 @@
         </div>
         <div>
             <strong>Started:</strong><br>
-            {{ run.format_timestamp }}
+            {{ run_started | default(value="-") }}
         </div>
         <div>
             <strong>Events:</strong><br>
@@ -71,20 +69,22 @@
                 <tbody>
                     {% for event in run.events %}
                     <tr>
+                        <td><code>{{ event.ts }}</code></td>
                         <td>
-                            <code>{{ event.format_timestamp }}</code>
-                            <div style="font-size: 0.75rem; color: var(--text-secondary);">
-                                {{ event.format_full_timestamp }}
-                            </div>
-                        </td>
-                        <td>
-                            <strong>{{ event.event_display_name }}</strong>
+                            <strong>
+                                {% if event.event == "ritual.started:v1" %}Ritual Started
+                                {% elif event.event == "ritual.completed:v1" %}Ritual Completed
+                                {% elif event.event == "ritual.failed:v1" %}Ritual Failed
+                                {% elif event.event == "ritual.transitioned:v1" %}State Transition
+                                {% elif event.event == "timer.scheduled:v1" %}Timer Scheduled
+                                {% else %}{{ event.event }}{% endif %}
+                            </strong>
                             <div style="font-size: 0.875rem; color: var(--text-secondary);">
                                 <code>{{ event.event }}</code>
                             </div>
                         </td>
                         <td>
-                            {% if event.has_state_transition %}
+                            {% if event.stateFrom or event.stateTo %}
                                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                                     {% if event.state_from %}
                                         <code>{{ event.state_from }}</code>

@@ -48,11 +48,15 @@
                             </a>
                         </td>
                         <td><code>{{ run.ritual_id }}</code></td>
-                        <td>{{ run.format_timestamp }}</td>
+                        <td>{{ run.startTs }}</td>
                         <td>
-                            <span class="status-indicator {{ run.status_class }}">
-                                {{ run.status }}
-                            </span>
+                            {% set status_class = "status-running" %}
+                            {% if run.status == "Completed" %}
+                                {% set status_class = "status-completed" %}
+                            {% elif run.status == "Failed" %}
+                                {% set status_class = "status-failed" %}
+                            {% endif %}
+                            <span class="status-indicator {{ status_class }}">{{ run.status }}</span>
                         </td>
                         <td>
                             <a href="/runs/{{ run.run_id }}" class="btn btn-secondary btn-sm">View Details</a>

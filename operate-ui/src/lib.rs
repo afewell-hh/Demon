@@ -37,21 +37,30 @@ impl AppState {
             }
         };
 
-        let mut tera = match Tera::new("templates/**/*.html") {
+        // Load templates using crate-absolute path for deterministic resolution
+        let tpl_glob = format!("{}/templates/**/*.html", env!("CARGO_MANIFEST_DIR"));
+        let mut tera = match Tera::new(&tpl_glob) {
             Ok(t) => t,
             Err(e) => {
-                error!("Parsing error for Tera templates: {}", e);
+                error!("Parsing error for Tera templates ({}): {}", tpl_glob, e);
                 std::process::exit(1);
             }
         };
 
-        // Register JSON filter for template rendering
-        tera.register_filter("json", |value: &tera::Value, _: &std::collections::HashMap<String, tera::Value>| -> tera::Result<tera::Value> {
+        // Register JSON filters for template rendering (`json` and `tojson` aliases)
+        let tojson = |value: &tera::Value,
+                      _: &std::collections::HashMap<String, tera::Value>|
+         -> tera::Result<tera::Value> {
             match serde_json::to_string_pretty(value) {
                 Ok(json_string) => Ok(tera::Value::String(json_string)),
-                Err(e) => Err(tera::Error::msg(format!("Failed to serialize to JSON: {}", e))),
+                Err(e) => Err(tera::Error::msg(format!(
+                    "Failed to serialize to JSON: {}",
+                    e
+                ))),
             }
-        });
+        };
+        tera.register_filter("json", tojson);
+        tera.register_filter("tojson", tojson);
 
         Self {
             jetstream_client,
