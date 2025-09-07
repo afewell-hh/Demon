@@ -184,6 +184,6 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response.status(), StatusCode::OK); // HTML response with 404 content
+        assert_eq!(response.status(), StatusCode::NOT_FOUND); // HTML response with 404 content
     }
 }

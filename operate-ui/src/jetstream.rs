@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use async_nats::jetstream::{self, stream::Stream};
+use async_nats::jetstream::{self, stream::Stream, consumer::DeliverPolicy};
 use chrono::{DateTime, Utc};
 use futures_util::{StreamExt, stream::BoxStream};
 use serde::{Deserialize, Serialize};
@@ -110,12 +110,22 @@ impl JetStreamClient {
                     
                     match self.parse_message_for_run_summary(&message) {
                         Ok(Some(summary)) => {
-                            // Keep the most recent summary for each run
+                            // Merge summaries: keep earliest start time, latest status
                             let key = format!("{}:{}", summary.ritual_id, summary.run_id);
-                            if let Some(existing) = runs_map.get(&key) {
-                                if summary.start_ts > existing.start_ts {
-                                    runs_map.insert(key, summary);
+                            if let Some(mut existing) = runs_map.remove(&key) {
+                                // Keep the earliest start time (unless it's the placeholder)
+                                if summary.start_ts != DateTime::from_timestamp(0, 0).unwrap_or_else(|| Utc::now()) {
+                                    if existing.start_ts == DateTime::from_timestamp(0, 0).unwrap_or_else(|| Utc::now()) || summary.start_ts < existing.start_ts {
+                                        existing.start_ts = summary.start_ts;
+                                    }
                                 }
+                                // Always update to the most definitive status
+                                match (existing.status, summary.status) {
+                                    (_, RunStatus::Completed) | (_, RunStatus::Failed) => existing.status = summary.status,
+                                    (RunStatus::Running, _) => existing.status = summary.status,
+                                    _ => {} // Keep existing status
+                                }
+                                runs_map.insert(key, existing);
                             } else {
                                 runs_map.insert(key, summary);
                             }
@@ -126,6 +136,11 @@ impl JetStreamClient {
                         Err(e) => {
                             debug!("Failed to parse message for run summary: {}", e);
                         }
+                    }
+
+                    // Acknowledge the message to prevent redelivery
+                    if let Err(e) = message.ack().await {
+                        error!("Failed to acknowledge message: {}", e);
                     }
 
                     // Stop if we've processed enough messages
@@ -179,6 +194,11 @@ impl JetStreamClient {
                         if let Some(extracted) = self.extract_ritual_id_from_subject(&message.subject) {
                             ritual_id = Some(extracted);
                         }
+                    }
+
+                    // Acknowledge the message to prevent redelivery
+                    if let Err(e) = message.ack().await {
+                        error!("Failed to acknowledge message: {}", e);
                     }
                 }
             }
@@ -245,9 +265,15 @@ impl JetStreamClient {
             }
         };
 
-        // Create a consumer for the subject filter
+        // Create a consumer for the subject filter with a durable name
+        // Generate a stable durable name from the subject filter
+        let durable_name = format!("operate-ui-{}", 
+            subject_filter.replace("*", "all").replace(".", "-"));
+        
         let consumer_config = jetstream::consumer::pull::Config {
             filter_subject: subject_filter.to_string(),
+            durable_name: Some(durable_name),
+            deliver_policy: DeliverPolicy::Last,
             ..Default::default()
         };
 
@@ -305,21 +331,30 @@ impl JetStreamClient {
             Utc::now()
         };
 
-        // Determine status from event type
-        let status = if let Some(event_type) = payload.get("event").and_then(|v| v.as_str()) {
+        // Determine status from event type and if this is a start event
+        let (status, is_start_event) = if let Some(event_type) = payload.get("event").and_then(|v| v.as_str()) {
             match event_type {
-                "ritual.completed:v1" => RunStatus::Completed,
-                "ritual.failed:v1" => RunStatus::Failed,
-                _ => RunStatus::Running,
+                "ritual.completed:v1" => (RunStatus::Completed, false),
+                "ritual.failed:v1" => (RunStatus::Failed, false),
+                "ritual.started:v1" => (RunStatus::Running, true),
+                _ => (RunStatus::Running, false),
             }
         } else {
-            RunStatus::Running
+            (RunStatus::Running, false)
+        };
+
+        // Only use this timestamp as start_ts if it's actually a start event
+        // Otherwise, use a placeholder (will be overwritten by actual start time)
+        let start_ts = if is_start_event {
+            ts
+        } else {
+            DateTime::from_timestamp(0, 0).unwrap_or_else(|| Utc::now())
         };
 
         Ok(Some(RunSummary {
             run_id,
             ritual_id,
-            start_ts: ts,
+            start_ts,
             status,
         }))
     }
@@ -377,12 +412,17 @@ impl JetStreamClient {
 
     /// Extract ritual ID from subject
     fn extract_ritual_id_from_subject(&self, subject: &str) -> Option<String> {
-        let parts: Vec<&str> = subject.split('.').collect();
-        if parts.len() >= 4 {
-            Some(parts[3].to_string())
-        } else {
-            None
-        }
+        extract_ritual_id_from_subject(subject)
+    }
+}
+
+/// Extract ritual ID from subject string (standalone function for testing)
+fn extract_ritual_id_from_subject(subject: &str) -> Option<String> {
+    let parts: Vec<&str> = subject.split('.').collect();
+    if parts.len() >= 4 {
+        Some(parts[3].to_string())
+    } else {
+        None
     }
 }
 
@@ -392,16 +432,12 @@ mod tests {
 
     #[test]
     fn test_extract_ritual_id_from_subject() {
-        let client = JetStreamClient {
-            jetstream: todo!(), // This is just for testing the method
-        };
-
         let subject = "demon.ritual.v1.my-ritual.run-123.events";
-        let ritual_id = client.extract_ritual_id_from_subject(subject);
+        let ritual_id = extract_ritual_id_from_subject(subject);
         assert_eq!(ritual_id, Some("my-ritual".to_string()));
 
         let invalid_subject = "demon.ritual";
-        let ritual_id = client.extract_ritual_id_from_subject(invalid_subject);
+        let ritual_id = extract_ritual_id_from_subject(invalid_subject);
         assert_eq!(ritual_id, None);
     }
 
