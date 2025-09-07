@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use async_nats::jetstream::{self, consumer::DeliverPolicy};
+use async_nats::jetstream::{self, consumer::{DeliverPolicy, AckPolicy}};
 use chrono::{DateTime, Utc};
 use futures_util::{StreamExt, stream::BoxStream};
 use serde::{Deserialize, Serialize};
@@ -138,7 +138,7 @@ impl JetStreamClient {
                         }
                     }
 
-                    // Message acknowledgment handled in the stream processing
+                    // No acknowledgment needed with AckPolicy::None
 
                     // Stop when we have enough unique runs (with some buffer for completeness)
                     if runs_map.len() >= limit && message_count >= limit * 2 {
@@ -265,22 +265,42 @@ impl JetStreamClient {
         
         let consumer_config = jetstream::consumer::pull::Config {
             filter_subject: subject_filter.to_string(),
-            durable_name: Some(durable_name), // Required for pull consumers
+            durable_name: Some(durable_name.clone()), // Required for pull consumers
             deliver_policy: DeliverPolicy::All, // Get all historical messages
+            ack_policy: AckPolicy::None, // Read-only, don't advance position
             ..Default::default()
         };
 
-        match stream.create_consumer(consumer_config).await {
+        // Try to get existing consumer or create new one
+        let consumer = match stream.get_consumer(&durable_name).await {
             Ok(consumer) => {
-                debug!("Created consumer for subject filter: {}", subject_filter);
-                
-                let mut all_messages = Vec::new();
-                let batch_size = 10000;
-                let timeout = std::time::Duration::from_secs(10); // Longer timeout for batch processing
-                let mut total_fetched = 0;
-                
-                loop {
-                    match tokio::time::timeout(timeout, consumer.batch().max_messages(batch_size).expires(std::time::Duration::from_secs(5)).messages()).await {
+                debug!("Retrieved existing consumer: {}", durable_name);
+                consumer
+            }
+            Err(_) => {
+                // Consumer doesn't exist, create it
+                match stream.create_consumer(consumer_config).await {
+                    Ok(consumer) => {
+                        debug!("Created new consumer: {}", durable_name);
+                        consumer
+                    }
+                    Err(e) => {
+                        error!("Failed to create consumer: {}", e);
+                        return Err(e.into());
+                    }
+                }
+            }
+        };
+
+        debug!("Using consumer for all messages: {}", subject_filter);
+        
+        let mut all_messages = Vec::new();
+        let batch_size = 10000;
+        let timeout = std::time::Duration::from_secs(10); // Longer timeout for batch processing
+        let mut total_fetched = 0;
+        
+        loop {
+            match tokio::time::timeout(timeout, consumer.batch().max_messages(batch_size).expires(std::time::Duration::from_secs(5)).messages()).await {
                         Ok(Ok(mut messages)) => {
                             let mut batch_count = 0;
                             let mut batch_messages = Vec::new();
@@ -288,10 +308,7 @@ impl JetStreamClient {
                             while let Some(msg_result) = messages.next().await {
                                 match msg_result {
                                     Ok(msg) => {
-                                        // Acknowledge message to prevent redelivery
-                                        if let Err(e) = msg.ack().await {
-                                            debug!("Failed to acknowledge message: {}", e);
-                                        }
+                                        // No acknowledgment needed with AckPolicy::None
                                         batch_messages.push(msg);
                                         batch_count += 1;
                                     }
@@ -326,17 +343,10 @@ impl JetStreamClient {
                             break;
                         }
                     }
-                }
-                
-                info!("Fetched total of {} messages across all batches", total_fetched);
-                Ok(all_messages)
-            }
-            Err(e) => {
-                error!("Failed to create consumer: {}", e);
-                // Return empty list on error
-                Ok(vec![])
-            }
         }
+        
+        info!("Fetched total of {} messages across all batches", total_fetched);
+        Ok(all_messages)
     }
 
     /// Query stream messages with optional limit and delivery policy
@@ -390,6 +400,7 @@ impl JetStreamClient {
             filter_subject: subject_filter.to_string(),
             durable_name: Some(durable_name.clone()), // Required for pull consumers
             deliver_policy, // Use provided delivery policy
+            ack_policy: AckPolicy::None, // Read-only, don't advance position
             ..Default::default()
         };
 
@@ -426,10 +437,7 @@ impl JetStreamClient {
                 let message_stream = messages.filter_map(|msg_result| async move {
                     match msg_result {
                         Ok(msg) => {
-                            // Acknowledge message to prevent redelivery
-                            if let Err(e) = msg.ack().await {
-                                debug!("Failed to acknowledge message: {}", e);
-                            }
+                            // No acknowledgment needed with AckPolicy::None
                             Some(msg)
                         },
                         Err(e) => {
