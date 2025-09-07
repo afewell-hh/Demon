@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use async_nats::jetstream::{self, consumer::DeliverPolicy};
 use chrono::{DateTime, Utc};
-use futures_util::{StreamExt, stream::BoxStream};
+use futures_util::{StreamExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
@@ -105,8 +105,8 @@ impl JetStreamClient {
         // Get messages from JetStream stream
         // Use DeliverPolicy::All to get all messages, then sort by timestamp to prioritize recent runs
         match self.query_stream_messages(subject_filter, None, DeliverPolicy::All).await {
-            Ok(mut messages) => {
-                while let Some(message) = messages.next().await {
+            Ok(messages) => {
+                for message in messages {
                     message_count += 1;
                     
                     match self.parse_message_for_run_summary(&message) {
@@ -264,6 +264,7 @@ impl JetStreamClient {
             filter_subject: subject_filter.to_string(),
             durable_name: None, // Ephemeral consumer - no state persistence
             deliver_policy: DeliverPolicy::All, // Get all historical messages
+            inactive_threshold: std::time::Duration::from_secs(60), // Auto-delete after 60 seconds of inactivity
             ..Default::default()
         };
 
@@ -333,6 +334,10 @@ impl JetStreamClient {
         }
         
         info!("Fetched total of {} messages across all batches", total_fetched);
+        
+        // Note: Ephemeral consumers should be automatically cleaned up by JetStream
+        // when the client connection is closed or after a timeout period
+        
         Ok(all_messages)
     }
 
@@ -342,7 +347,7 @@ impl JetStreamClient {
         subject_filter: &str,
         limit: Option<usize>,
         deliver_policy: DeliverPolicy,
-    ) -> Result<BoxStream<'static, async_nats::jetstream::Message>> {
+    ) -> Result<Vec<async_nats::jetstream::Message>> {
         debug!("Querying messages with subject filter: {}", subject_filter);
 
         // Try to get or create the stream for ritual events
@@ -372,7 +377,7 @@ impl JetStreamClient {
                     Err(e) => {
                         warn!("Failed to create stream {}: {}", stream_name, e);
                         // Return empty stream if we can't create it
-                        return Ok(futures_util::stream::iter(vec![]).boxed());
+                        return Ok(vec![]);
                     }
                 }
             }
@@ -384,6 +389,7 @@ impl JetStreamClient {
             filter_subject: subject_filter.to_string(),
             durable_name: None, // Ephemeral consumer - no state persistence
             deliver_policy, // Use provided delivery policy
+            inactive_threshold: std::time::Duration::from_secs(60), // Auto-delete after 60 seconds of inactivity
             ..Default::default()
         };
 
@@ -405,32 +411,36 @@ impl JetStreamClient {
         let batch_size = limit.unwrap_or(10000).min(10000);
         let timeout = std::time::Duration::from_secs(5);
         
-        match tokio::time::timeout(timeout, consumer.batch().max_messages(batch_size).expires(std::time::Duration::from_secs(2)).messages()).await {
-            Ok(Ok(messages)) => {
-                // Messages already implements Stream, so we can use it directly
-                let message_stream = messages.filter_map(|msg_result| async move {
+        let result = match tokio::time::timeout(timeout, consumer.batch().max_messages(batch_size).expires(std::time::Duration::from_secs(2)).messages()).await {
+            Ok(Ok(mut messages)) => {
+                // Collect all messages from the stream immediately
+                let mut collected_messages = Vec::new();
+                
+                while let Some(msg_result) = messages.next().await {
                     match msg_result {
-                        Ok(msg) => {
-                            // No acknowledgment needed with AckPolicy::None
-                            Some(msg)
-                        },
+                        Ok(msg) => collected_messages.push(msg),
                         Err(e) => {
                             error!("Error receiving message from JetStream: {}", e);
-                            None
                         }
                     }
-                }).boxed();
-                Ok(message_stream)
+                }
+                
+                Ok(collected_messages)
             }
             Ok(Err(e)) => {
                 warn!("Failed to fetch messages: {}", e);
-                Ok(futures_util::stream::iter(vec![]).boxed())
+                Ok(vec![])
             }
             Err(_) => {
                 warn!("Timeout fetching messages from JetStream");
-                Ok(futures_util::stream::iter(vec![]).boxed())
+                Ok(vec![])
             }
-        }
+        };
+        
+        // Note: Ephemeral consumers should be automatically cleaned up by JetStream
+        // when the client connection is closed or after a timeout period
+        
+        result
     }
 
     /// Parse a NATS message for run summary information
