@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use async_nats::jetstream::{self, stream::Stream};
 use chrono::{DateTime, Utc};
-use futures_util::StreamExt;
+use futures_util::{StreamExt, stream::BoxStream};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
@@ -209,16 +209,74 @@ impl JetStreamClient {
         &self,
         subject_filter: &str,
         limit: Option<usize>,
-    ) -> Result<impl StreamExt<Item = async_nats::jetstream::Message>> {
-        // Try to get the stream - assume it exists for now
-        // In a real implementation, you might want to create the stream if it doesn't exist
-        
+    ) -> Result<BoxStream<'static, async_nats::jetstream::Message>> {
         debug!("Querying messages with subject filter: {}", subject_filter);
 
-        // For now, return an empty stream if we can't connect
-        // In a real implementation, you'd use the actual JetStream consumer API
-        let messages = futures_util::stream::iter(vec![]);
-        Ok(messages)
+        // Try to get or create the stream for ritual events
+        let stream_name = "RITUAL_EVENTS";
+        let stream = match self.jetstream.get_stream(stream_name).await {
+            Ok(stream) => {
+                debug!("Found existing stream: {}", stream_name);
+                stream
+            }
+            Err(_) => {
+                info!("Stream {} not found, attempting to create it", stream_name);
+                
+                // Create stream configuration for ritual events
+                let stream_config = jetstream::stream::Config {
+                    name: stream_name.to_string(),
+                    subjects: vec!["demon.ritual.v1.>".to_string()],
+                    max_messages: 10_000,
+                    max_bytes: 100_000_000, // 100MB
+                    ..Default::default()
+                };
+
+                match self.jetstream.create_stream(stream_config).await {
+                    Ok(stream) => {
+                        info!("Successfully created stream: {}", stream_name);
+                        stream
+                    }
+                    Err(e) => {
+                        warn!("Failed to create stream {}: {}", stream_name, e);
+                        // Return empty stream if we can't create it
+                        return Ok(futures_util::stream::iter(vec![]).boxed());
+                    }
+                }
+            }
+        };
+
+        // Create a consumer for the subject filter
+        let consumer_config = jetstream::consumer::pull::Config {
+            filter_subject: subject_filter.to_string(),
+            ..Default::default()
+        };
+
+        match stream.create_consumer(consumer_config).await {
+            Ok(consumer) => {
+                debug!("Created consumer for subject filter: {}", subject_filter);
+                
+                let messages = if let Some(limit) = limit {
+                    consumer
+                        .messages()
+                        .await?
+                        .take(limit)
+                        .boxed()
+                } else {
+                    consumer
+                        .messages()
+                        .await?
+                        .take(10000) // Default reasonable limit
+                        .boxed()
+                };
+
+                Ok(messages)
+            }
+            Err(e) => {
+                error!("Failed to create consumer: {}", e);
+                // Return empty stream on error
+                Ok(futures_util::stream::iter(vec![]).boxed())
+            }
+        }
     }
 
     /// Parse a NATS message for run summary information

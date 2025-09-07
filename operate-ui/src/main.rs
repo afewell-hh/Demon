@@ -68,7 +68,7 @@ async fn health() -> impl IntoResponse {
 
 // Fallback handler for 404s
 async fn not_found() -> impl IntoResponse {
-    Html(r#"
+    (StatusCode::NOT_FOUND, Html(r#"
 <!DOCTYPE html>
 <html>
 <head>
@@ -83,7 +83,7 @@ async fn not_found() -> impl IntoResponse {
     <p><a href="/runs">← Back to Runs</a></p>
 </body>
 </html>
-    "#)
+    "#))
 }
 
 pub fn create_app(state: AppState) -> Router {
