@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use async_nats::jetstream::{self, consumer::{DeliverPolicy, AckPolicy}};
+use async_nats::jetstream::{self, consumer::DeliverPolicy};
 use chrono::{DateTime, Utc};
 use futures_util::{StreamExt, stream::BoxStream};
 use serde::{Deserialize, Serialize};
@@ -258,37 +258,24 @@ impl JetStreamClient {
             }
         };
 
-        // Create a durable consumer for read-only queries
-        // Use a unique durable name based on the subject filter to ensure idempotency
-        let sanitized_subject = subject_filter.replace("*", "wildcard").replace(".", "_");
-        let durable_name = format!("operate-ui-all-{}", sanitized_subject);
-        
+        // Create ephemeral (non-durable) consumer for truly stateless read-only queries
+        // Non-durable consumers are automatically deleted after use and don't persist state
         let consumer_config = jetstream::consumer::pull::Config {
             filter_subject: subject_filter.to_string(),
-            durable_name: Some(durable_name.clone()), // Required for pull consumers
+            durable_name: None, // Ephemeral consumer - no state persistence
             deliver_policy: DeliverPolicy::All, // Get all historical messages
-            ack_policy: AckPolicy::None, // Read-only, don't advance position
             ..Default::default()
         };
 
-        // Try to get existing consumer or create new one
-        let consumer = match stream.get_consumer(&durable_name).await {
+        // Create ephemeral consumer (no get-or-create needed since they're temporary)
+        let consumer = match stream.create_consumer(consumer_config).await {
             Ok(consumer) => {
-                debug!("Retrieved existing consumer: {}", durable_name);
+                debug!("Created ephemeral consumer for all messages: {}", subject_filter);
                 consumer
             }
-            Err(_) => {
-                // Consumer doesn't exist, create it
-                match stream.create_consumer(consumer_config).await {
-                    Ok(consumer) => {
-                        debug!("Created new consumer: {}", durable_name);
-                        consumer
-                    }
-                    Err(e) => {
-                        error!("Failed to create consumer: {}", e);
-                        return Err(e.into());
-                    }
-                }
+            Err(e) => {
+                error!("Failed to create ephemeral consumer: {}", e);
+                return Err(e.into());
             }
         };
 
@@ -391,37 +378,24 @@ impl JetStreamClient {
             }
         };
 
-        // Create a durable consumer for read-only queries
-        // Use a unique durable name based on the subject filter to ensure idempotency
-        let sanitized_subject = subject_filter.replace("*", "wildcard").replace(".", "_");
-        let durable_name = format!("operate-ui-{}", sanitized_subject);
-        
+        // Create ephemeral (non-durable) consumer for truly stateless read-only queries
+        // Non-durable consumers are automatically deleted after use and don't persist state
         let consumer_config = jetstream::consumer::pull::Config {
             filter_subject: subject_filter.to_string(),
-            durable_name: Some(durable_name.clone()), // Required for pull consumers
+            durable_name: None, // Ephemeral consumer - no state persistence
             deliver_policy, // Use provided delivery policy
-            ack_policy: AckPolicy::None, // Read-only, don't advance position
             ..Default::default()
         };
 
-        // Try to get existing consumer or create new one
-        let consumer = match stream.get_consumer(&durable_name).await {
+        // Create ephemeral consumer (no get-or-create needed since they're temporary)
+        let consumer = match stream.create_consumer(consumer_config).await {
             Ok(consumer) => {
-                debug!("Retrieved existing consumer: {}", durable_name);
+                debug!("Created ephemeral consumer for subject filter: {}", subject_filter);
                 consumer
             }
-            Err(_) => {
-                // Consumer doesn't exist, create it
-                match stream.create_consumer(consumer_config).await {
-                    Ok(consumer) => {
-                        debug!("Created new consumer: {}", durable_name);
-                        consumer
-                    }
-                    Err(e) => {
-                        error!("Failed to create consumer: {}", e);
-                        return Err(e.into());
-                    }
-                }
+            Err(e) => {
+                error!("Failed to create ephemeral consumer: {}", e);
+                return Err(e.into());
             }
         };
 
