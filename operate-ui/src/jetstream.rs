@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use async_nats::jetstream::{self, stream::Stream, consumer::DeliverPolicy};
+use async_nats::jetstream::{self, consumer::DeliverPolicy};
 use chrono::{DateTime, Utc};
 use futures_util::{StreamExt, stream::BoxStream};
 use serde::{Deserialize, Serialize};
@@ -26,7 +26,7 @@ pub struct RunSummary {
 }
 
 /// Run status
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum RunStatus {
     Running,
     Completed,
@@ -114,10 +114,9 @@ impl JetStreamClient {
                             let key = format!("{}:{}", summary.ritual_id, summary.run_id);
                             if let Some(mut existing) = runs_map.remove(&key) {
                                 // Keep the earliest start time (unless it's the placeholder)
-                                if summary.start_ts != DateTime::from_timestamp(0, 0).unwrap_or_else(|| Utc::now()) {
-                                    if existing.start_ts == DateTime::from_timestamp(0, 0).unwrap_or_else(|| Utc::now()) || summary.start_ts < existing.start_ts {
-                                        existing.start_ts = summary.start_ts;
-                                    }
+                                if summary.start_ts != DateTime::from_timestamp(0, 0).unwrap_or_else(Utc::now)
+                                    && (existing.start_ts == DateTime::from_timestamp(0, 0).unwrap_or_else(Utc::now) || summary.start_ts < existing.start_ts) {
+                                    existing.start_ts = summary.start_ts;
                                 }
                                 // Always update to the most definitive status
                                 match (existing.status, summary.status) {
@@ -259,11 +258,14 @@ impl JetStreamClient {
             }
         };
 
-        // Create a non-durable consumer for read-only queries
-        // This ensures queries are idempotent and don't consume history
+        // Create a durable consumer for read-only queries
+        // Use a unique durable name based on the subject filter to ensure idempotency
+        let sanitized_subject = subject_filter.replace("*", "wildcard").replace(".", "_");
+        let durable_name = format!("operate-ui-{}", sanitized_subject);
+        
         let consumer_config = jetstream::consumer::pull::Config {
             filter_subject: subject_filter.to_string(),
-            durable_name: None, // Non-durable for read-only operations
+            durable_name: Some(durable_name), // Required for pull consumers
             deliver_policy: DeliverPolicy::All, // Get all historical messages
             ..Default::default()
         };
@@ -278,8 +280,17 @@ impl JetStreamClient {
                 
                 match tokio::time::timeout(timeout, consumer.batch().max_messages(batch_size).expires(std::time::Duration::from_secs(2)).messages()).await {
                     Ok(Ok(messages)) => {
-                        let message_stream = futures_util::stream::iter(messages);
-                        Ok(message_stream.boxed())
+                        // Messages already implements Stream, so we can use it directly
+                        let message_stream = messages.filter_map(|msg_result| async move {
+                            match msg_result {
+                                Ok(msg) => Some(msg),
+                                Err(e) => {
+                                    error!("Error receiving message from JetStream: {}", e);
+                                    None
+                                }
+                            }
+                        }).boxed();
+                        Ok(message_stream)
                     }
                     Ok(Err(e)) => {
                         warn!("Failed to fetch messages: {}", e);
@@ -342,7 +353,7 @@ impl JetStreamClient {
         let start_ts = if is_start_event {
             ts
         } else {
-            DateTime::from_timestamp(0, 0).unwrap_or_else(|| Utc::now())
+            DateTime::from_timestamp(0, 0).unwrap_or_else(Utc::now)
         };
 
         Ok(Some(RunSummary {
