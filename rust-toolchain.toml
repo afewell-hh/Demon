@@ -1,5 +1,4 @@
 [toolchain]
-# Use nightly to support dependencies that require edition2024
-channel = "nightly"
+channel = "1.82.0"
 components = ["rustfmt", "clippy"]
 profile = "minimal"

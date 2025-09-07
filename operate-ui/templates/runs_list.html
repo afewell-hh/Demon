@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Runs - Demon Operate UI{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Recent Runs</h2>
+        <div>
+            {% if jetstream_available %}
+                <span class="status-indicator status-completed">JetStream Connected</span>
+            {% else %}
+                <span class="status-indicator status-failed">JetStream Unavailable</span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if error %}
+        <div class="alert alert-error">
+            <strong>Error:</strong> {{ error }}
+        </div>
+    {% endif %}
+
+    {% if not jetstream_available %}
+        <div class="alert alert-warning">
+            <strong>Warning:</strong> JetStream is not available. Unable to retrieve runs from the event store.
+        </div>
+    {% endif %}
+
+    {% if runs %}
+        <div style="overflow-x: auto;">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Run ID</th>
+                        <th>Ritual ID</th>
+                        <th>Started</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for run in runs %}
+                    <tr>
+                        <td>
+                            <a href="/runs/{{ run.run_id }}">
+                                <code>{{ run.run_id }}</code>
+                            </a>
+                        </td>
+                        <td><code>{{ run.ritual_id }}</code></td>
+                        <td>{{ run.startTs }}</td>
+                        <td>
+                            {% set status_class = "status-running" %}
+                            {% if run.status == "Completed" %}
+                                {% set status_class = "status-completed" %}
+                            {% elif run.status == "Failed" %}
+                                {% set status_class = "status-failed" %}
+                            {% endif %}
+                            <span class="status-indicator {{ status_class }}">{{ run.status }}</span>
+                        </td>
+                        <td>
+                            <a href="/runs/{{ run.run_id }}" class="btn btn-secondary btn-sm">View Details</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div style="margin-top: 1rem; color: var(--text-secondary); font-size: 0.875rem;">
+            Showing {{ runs|length }} runs
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h3>No runs found</h3>
+            {% if jetstream_available %}
+                <p>No ritual runs have been recorded yet, or they may not be available in JetStream.</p>
+            {% else %}
+                <p>Cannot retrieve runs because JetStream is not available.</p>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+
+{% if jetstream_available %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">API Endpoints</h3>
+    </div>
+    <p>Access the same data programmatically:</p>
+    <ul style="margin-top: 1rem; margin-left: 1rem;">
+        <li><a href="/api/runs" target="_blank"><code>GET /api/runs</code></a> - List runs (JSON)</li>
+        <li><code>GET /api/runs/:runId</code> - Get run details (JSON)</li>
+    </ul>
+</div>
+{% endif %}
+
+<script>
+    // Auto-refresh every 30 seconds if JetStream is available
+    {% if jetstream_available %}
+    setTimeout(function() {
+        window.location.reload();
+    }, 30000);
+    {% endif %}
+</script>
+{% endblock %}

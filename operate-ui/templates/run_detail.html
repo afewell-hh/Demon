@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+
+{% block title %}Run {{ run_id }} - Demon Operate UI{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 1rem;">
+    <a href="/runs" class="btn btn-secondary">← Back to Runs</a>
+</div>
+
+{% if error %}
+<div class="card">
+    <div class="alert alert-error">
+        <strong>Error:</strong> {{ error }}
+    </div>
+</div>
+{% endif %}
+
+{% if not jetstream_available %}
+<div class="card">
+    <div class="alert alert-warning">
+        <strong>Warning:</strong> JetStream is not available. Unable to retrieve run details from the event store.
+    </div>
+</div>
+{% endif %}
+
+{% if run %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Run Details</h2>
+        <span class="status-indicator {{ run_status_class }}">{{ run_status }}</span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+        <div>
+            <strong>Run ID:</strong><br>
+            <code>{{ run.run_id }}</code>
+        </div>
+        <div>
+            <strong>Ritual ID:</strong><br>
+            <code>{{ run.ritual_id }}</code>
+        </div>
+        <div>
+            <strong>Started:</strong><br>
+            {{ run_started | default(value="-") }}
+        </div>
+        <div>
+            <strong>Events:</strong><br>
+            {{ run.events|length }} events
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Event Timeline</h3>
+    </div>
+
+    {% if run.events %}
+        <div style="overflow-x: auto;">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Event</th>
+                        <th>State Transition</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for event in run.events %}
+                    <tr>
+                        <td><code>{{ event.ts }}</code></td>
+                        <td>
+                            <strong>
+                                {% if event.event == "ritual.started:v1" %}Ritual Started
+                                {% elif event.event == "ritual.completed:v1" %}Ritual Completed
+                                {% elif event.event == "ritual.failed:v1" %}Ritual Failed
+                                {% elif event.event == "ritual.transitioned:v1" %}State Transition
+                                {% elif event.event == "timer.scheduled:v1" %}Timer Scheduled
+                                {% else %}{{ event.event }}{% endif %}
+                            </strong>
+                            <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                                <code>{{ event.event }}</code>
+                            </div>
+                        </td>
+                        <td>
+                            {% if event.stateFrom or event.stateTo %}
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    {% if event.state_from %}
+                                        <code>{{ event.state_from }}</code>
+                                    {% else %}
+                                        <span style="color: var(--text-secondary);">-</span>
+                                    {% endif %}
+                                    <span>→</span>
+                                    {% if event.state_to %}
+                                        <code>{{ event.state_to }}</code>
+                                    {% else %}
+                                        <span style="color: var(--text-secondary);">-</span>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <span style="color: var(--text-secondary);">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if event.extra %}
+                                <details>
+                                    <summary style="cursor: pointer; color: var(--primary-color);">
+                                        {{ event.extra|length }} field(s)
+                                    </summary>
+                                    <pre style="margin-top: 0.5rem; font-size: 0.8rem; background: #f5f5f5; padding: 0.5rem; border-radius: 4px; overflow-x: auto;">{{ event.extra | json }}</pre>
+                                </details>
+                            {% else %}
+                                <span style="color: var(--text-secondary);">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h3>No events found</h3>
+            <p>This run has no recorded events.</p>
+        </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">API Access</h3>
+    </div>
+    <p>Get this run's data programmatically:</p>
+    <div style="margin-top: 1rem;">
+        <a href="/api/runs/{{ run_id }}" target="_blank" class="btn btn-primary">
+            <code>GET /api/runs/{{ run_id }}</code>
+        </a>
+    </div>
+</div>
+
+{% endif %}
+
+{% if not error and not run %}
+<div class="card">
+    <div class="empty-state">
+        <h3>Run not found</h3>
+        <p>The run with ID <code>{{ run_id }}</code> could not be found in the event store.</p>
+        {% if jetstream_available %}
+            <p>This could mean:</p>
+            <ul style="text-align: left; margin-top: 1rem;">
+                <li>The run ID doesn't exist</li>
+                <li>The run hasn't started yet</li>
+                <li>The events haven't been persisted to JetStream</li>
+            </ul>
+        {% endif %}
+    </div>
+</div>
+
+{% endif %}
+
+{% if jetstream_available %}
+<script>
+    // Auto-refresh every 10 seconds for running rituals
+    {% if run and run.is_running %}
+    setTimeout(function() {
+        window.location.reload();
+    }, 10000);
+    {% endif %}
+</script>
+{% endif %}
+{% endblock %}
