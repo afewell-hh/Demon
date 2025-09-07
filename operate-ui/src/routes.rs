@@ -45,6 +45,7 @@ pub async fn list_runs_html(
     context.insert("runs", &runs);
     context.insert("error", &error);
     context.insert("jetstream_available", &state.jetstream_client.is_some());
+    context.insert("stream_ready", &state.stream_ready);
 
     let html = state
         .tera
@@ -79,34 +80,27 @@ pub async fn list_runs_api(
         query.limit
     );
 
-    match &state.jetstream_client {
-        Some(client) => match client.list_runs(query.limit).await {
-            Ok(runs) => {
-                info!("Successfully retrieved {} runs for API", runs.len());
-                Json(runs).into_response()
+    // New behavior: return 200 with { runs: [] } and a warning header when NATS/stream missing
+    let mut warn_header: Option<&'static str> = None;
+    let body = if let Some(client) = &state.jetstream_client {
+        match client.list_runs(query.limit).await {
+            Ok(runs) => serde_json::json!({ "runs": runs }),
+            Err(_) => {
+                warn_header = Some("stream-missing");
+                serde_json::json!({ "runs": [] })
             }
-            Err(e) => {
-                error!("Failed to retrieve runs: {}", e);
-                (
-                    StatusCode::BAD_GATEWAY,
-                    Json(serde_json::json!({
-                        "error": format!("Failed to retrieve runs: {}", e)
-                    })),
-                )
-                    .into_response()
-            }
-        },
-        None => {
-            error!("JetStream client not available");
-            (
-                StatusCode::BAD_GATEWAY,
-                Json(serde_json::json!({
-                    "error": "JetStream is not available"
-                })),
-            )
-                .into_response()
         }
+    } else {
+        warn_header = Some("nats-unavailable");
+        serde_json::json!({ "runs": [] })
+    };
+
+    let mut resp = Json(body).into_response();
+    if let Some(v) = warn_header {
+        resp.headers_mut()
+            .insert("X-Demon-Warn", axum::http::HeaderValue::from_static(v));
     }
+    resp
 }
 
 /// Get run detail - HTML response

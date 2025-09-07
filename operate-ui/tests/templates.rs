@@ -19,6 +19,7 @@ async fn templates_compile_and_render_minimal() {
     ctx.insert("runs", &Vec::<serde_json::Value>::new());
     ctx.insert("error", &Option::<String>::None);
     ctx.insert("jetstream_available", &false);
+    ctx.insert("stream_ready", &false);
     ctx.insert("current_page", &"runs");
 
     let html = tera

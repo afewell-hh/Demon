@@ -22,6 +22,7 @@ use tracing::{error, info, warn};
 pub struct AppState {
     pub jetstream_client: Option<jetstream::JetStreamClient>,
     pub tera: Tera,
+    pub stream_ready: bool,
 }
 
 impl AppState {
@@ -62,9 +63,19 @@ impl AppState {
         tera.register_filter("json", tojson);
         tera.register_filter("tojson", tojson);
 
+        // Ensure stream exists if connected
+        let mut stream_ready = false;
+        if let Some(client) = &jetstream_client {
+            match client.ensure_stream().await {
+                Ok(()) => stream_ready = true,
+                Err(e) => warn!("Stream not ready: {}", e),
+            }
+        }
+
         Self {
             jetstream_client,
             tera,
+            stream_ready,
         }
     }
 }

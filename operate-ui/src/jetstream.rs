@@ -11,6 +11,13 @@ use tracing::{debug, error, info, warn};
 #[derive(Clone)]
 pub struct JetStreamClient {
     jetstream: jetstream::Context,
+    cfg: JetStreamConfig,
+}
+
+#[derive(Clone, Debug)]
+pub struct JetStreamConfig {
+    pub stream_name: String,
+    pub subjects: Vec<String>,
 }
 
 /// Run summary information
@@ -87,7 +94,42 @@ impl JetStreamClient {
 
         let jetstream = jetstream::new(client);
 
-        Ok(Self { jetstream })
+        let cfg = JetStreamConfig {
+            stream_name: env::var("RITUAL_STREAM_NAME").unwrap_or_else(|_| "RITUAL_EVENTS".into()),
+            subjects: env::var("RITUAL_SUBJECTS")
+                .unwrap_or_else(|_| "demon.ritual.v1.>".into())
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect(),
+        };
+
+        Ok(Self { jetstream, cfg })
+    }
+
+    /// Ensure the configured stream exists; create if missing (idempotent).
+    pub async fn ensure_stream(&self) -> Result<()> {
+        match self.jetstream.get_stream(&self.cfg.stream_name).await {
+            Ok(_) => Ok(()),
+            Err(_) => {
+                tracing::info!(
+                    "Creating JetStream stream '{}' with subjects {:?}",
+                    self.cfg.stream_name,
+                    self.cfg.subjects
+                );
+                let stream_config = jetstream::stream::Config {
+                    name: self.cfg.stream_name.clone(),
+                    subjects: self.cfg.subjects.clone(),
+                    duplicate_window: std::time::Duration::from_secs(120),
+                    ..Default::default()
+                };
+                Ok(self
+                    .jetstream
+                    .create_stream(stream_config)
+                    .await
+                    .map(|_| ())?)
+            }
+        }
     }
 
     /// List recent runs with optional limit
@@ -247,13 +289,12 @@ impl JetStreamClient {
             subject_filter
         );
 
-        // Get the stream for ritual events (read-only; do not create)
-        let stream_name = "RITUAL_EVENTS";
+        // Get stream; caller handles missing stream
         let stream = self
             .jetstream
-            .get_stream(stream_name)
+            .get_stream(&self.cfg.stream_name)
             .await
-            .with_context(|| format!("JetStream stream '{}' not found", stream_name))?;
+            .with_context(|| format!("JetStream stream '{}' not found", self.cfg.stream_name))?;
 
         // Create ephemeral (non-durable) consumer for truly stateless read-only queries
         // Non-durable consumers are automatically deleted after use and don't persist state
@@ -355,13 +396,12 @@ impl JetStreamClient {
     ) -> Result<Vec<async_nats::jetstream::Message>> {
         debug!("Querying messages with subject filter: {}", subject_filter);
 
-        // Get the stream for ritual events (read-only; do not create)
-        let stream_name = "RITUAL_EVENTS";
+        // Get stream; caller handles missing stream
         let stream = self
             .jetstream
-            .get_stream(stream_name)
+            .get_stream(&self.cfg.stream_name)
             .await
-            .with_context(|| format!("JetStream stream '{}' not found", stream_name))?;
+            .with_context(|| format!("JetStream stream '{}' not found", self.cfg.stream_name))?;
 
         // Create ephemeral (non-durable) consumer for truly stateless read-only queries
         // Non-durable consumers are automatically deleted after use and don't persist state

@@ -25,6 +25,10 @@
         <div class="alert alert-warning">
             <strong>Warning:</strong> JetStream is not available. Unable to retrieve runs from the event store.
         </div>
+    {% elif not stream_ready %}
+        <div class="alert alert-info">
+            <strong>No event stream found.</strong> See Runbook: setup.
+        </div>
     {% endif %}
 
     {% if runs %}
