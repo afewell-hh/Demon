@@ -27,8 +27,8 @@
 <div class="card">
     <div class="card-header">
         <h2 class="card-title">Run Details</h2>
-        <span class="status-indicator {{ run.status_class() }}">
-            {{ run.status() }}
+        <span class="status-indicator {{ run.status_class }}">
+            {{ run.status }}
         </span>
     </div>
 
@@ -43,7 +43,7 @@
         </div>
         <div>
             <strong>Started:</strong><br>
-            {{ run.format_timestamp() }}
+            {{ run.format_timestamp }}
         </div>
         <div>
             <strong>Events:</strong><br>
@@ -72,19 +72,19 @@
                     {% for event in run.events %}
                     <tr>
                         <td>
-                            <code>{{ event.format_timestamp() }}</code>
+                            <code>{{ event.format_timestamp }}</code>
                             <div style="font-size: 0.75rem; color: var(--text-secondary);">
-                                {{ event.format_full_timestamp() }}
+                                {{ event.format_full_timestamp }}
                             </div>
                         </td>
                         <td>
-                            <strong>{{ event.event_display_name() }}</strong>
+                            <strong>{{ event.event_display_name }}</strong>
                             <div style="font-size: 0.875rem; color: var(--text-secondary);">
                                 <code>{{ event.event }}</code>
                             </div>
                         </td>
                         <td>
-                            {% if event.has_state_transition() %}
+                            {% if event.has_state_transition %}
                                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                                     {% if event.state_from %}
                                         <code>{{ event.state_from }}</code>
@@ -108,7 +108,7 @@
                                     <summary style="cursor: pointer; color: var(--primary-color);">
                                         {{ event.extra|length }} field(s)
                                     </summary>
-                                    <pre style="margin-top: 0.5rem; font-size: 0.8rem; background: #f5f5f5; padding: 0.5rem; border-radius: 4px; overflow-x: auto;">{{ event.extra | json_encode(pretty=true) }}</pre>
+                                    <pre style="margin-top: 0.5rem; font-size: 0.8rem; background: #f5f5f5; padding: 0.5rem; border-radius: 4px; overflow-x: auto;">{{ event.extra | json }}</pre>
                                 </details>
                             {% else %}
                                 <span style="color: var(--text-secondary);">-</span>
@@ -139,7 +139,9 @@
     </div>
 </div>
 
-{% elif not error %}
+{% endif %}
+
+{% if not error and not run %}
 <div class="card">
     <div class="empty-state">
         <h3>Run not found</h3>
@@ -155,10 +157,12 @@
     </div>
 </div>
 
+{% endif %}
+
 {% if jetstream_available %}
 <script>
     // Auto-refresh every 10 seconds for running rituals
-    {% if run and run.is_running() %}
+    {% if run and run.is_running %}
     setTimeout(function() {
         window.location.reload();
     }, 10000);
