@@ -264,7 +264,7 @@ impl JetStreamClient {
         let consumer_config = jetstream::consumer::pull::Config {
             filter_subject: subject_filter.to_string(),
             durable_name: None, // Non-durable for read-only operations
-            deliver_policy: DeliverPolicy::Last, // Get recent messages for UI
+            deliver_policy: DeliverPolicy::All, // Get all historical messages
             ..Default::default()
         };
 

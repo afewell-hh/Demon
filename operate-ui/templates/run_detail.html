@@ -159,7 +159,7 @@
 {% if jetstream_available %}
 <script>
     // Auto-refresh every 10 seconds for running rituals
-    {% if run and run.status() == "Running" %}
+    {% if run and run.status().to_string() == "Running" %}
     setTimeout(function() {
         window.location.reload();
     }, 10000);
