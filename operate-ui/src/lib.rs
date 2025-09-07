@@ -25,8 +25,23 @@ pub struct AppState {
     pub stream_ready: bool,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct AppConfig {
+    pub skip_stream_bootstrap: bool,
+}
+
 impl AppState {
     pub async fn new() -> Self {
+        let skip = std::env::var("DEMON_SKIP_STREAM_BOOTSTRAP")
+            .ok()
+            .map_or(false, |v| v == "1" || v.eq_ignore_ascii_case("true"));
+        Self::new_with_config(AppConfig {
+            skip_stream_bootstrap: skip,
+        })
+        .await
+    }
+
+    pub async fn new_with_config(cfg: AppConfig) -> Self {
         let jetstream_client = match jetstream::JetStreamClient::new().await {
             Ok(client) => {
                 info!("Successfully connected to NATS JetStream");
@@ -66,9 +81,11 @@ impl AppState {
         // Ensure stream exists if connected
         let mut stream_ready = false;
         if let Some(client) = &jetstream_client {
-            match client.ensure_stream().await {
-                Ok(()) => stream_ready = true,
-                Err(e) => warn!("Stream not ready: {}", e),
+            if !cfg.skip_stream_bootstrap {
+                match client.ensure_stream().await {
+                    Ok(()) => stream_ready = true,
+                    Err(e) => warn!("Stream not ready: {}", e),
+                }
             }
         }
 

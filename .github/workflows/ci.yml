@@ -50,6 +50,9 @@ jobs:
           done
           echo "NATS did not report ready in time"; docker logs nats; exit 1
 
+      - name: Operate UI NATS-backed tests
+        run: cargo test -p operate-ui -- --ignored --nocapture
+
       - name: Smoke run (demonctl)
         run: |
           set -euo pipefail
