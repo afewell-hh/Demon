@@ -102,8 +102,8 @@ impl JetStreamClient {
         let mut runs_map: HashMap<String, RunSummary> = HashMap::new();
         let mut message_count = 0;
 
-        // Get messages from JetStream stream
-        match self.query_stream_messages(subject_filter, Some(limit * 10)).await {
+        // Get messages from JetStream stream - no artificial limit, process until we have enough runs
+        match self.query_stream_messages(subject_filter, None).await {
             Ok(mut messages) => {
                 while let Some(message) = messages.next().await {
                     message_count += 1;
@@ -139,8 +139,9 @@ impl JetStreamClient {
 
                     // No need to acknowledge with non-durable consumers
 
-                    // Stop if we've processed enough messages
-                    if message_count >= limit * 10 {
+                    // Stop when we have enough unique runs (with some buffer for completeness)
+                    if runs_map.len() >= limit && message_count >= limit * 2 {
+                        debug!("Collected {} runs from {} messages, stopping", runs_map.len(), message_count);
                         break;
                     }
                 }
@@ -275,7 +276,7 @@ impl JetStreamClient {
                 debug!("Created consumer for subject filter: {}", subject_filter);
                 
                 // Use batch fetch with timeout to prevent hanging on empty streams
-                let batch_size = limit.unwrap_or(1000).min(1000);
+                let batch_size = limit.unwrap_or(10000).min(10000);
                 let timeout = std::time::Duration::from_secs(5);
                 
                 match tokio::time::timeout(timeout, consumer.batch().max_messages(batch_size).expires(std::time::Duration::from_secs(2)).messages()).await {
