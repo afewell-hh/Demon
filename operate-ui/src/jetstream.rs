@@ -138,10 +138,7 @@ impl JetStreamClient {
                         }
                     }
 
-                    // Acknowledge the message to prevent redelivery
-                    if let Err(e) = message.ack().await {
-                        error!("Failed to acknowledge message: {}", e);
-                    }
+                    // No need to acknowledge with non-durable consumers
 
                     // Stop if we've processed enough messages
                     if message_count >= limit * 10 {
@@ -196,10 +193,7 @@ impl JetStreamClient {
                         }
                     }
 
-                    // Acknowledge the message to prevent redelivery
-                    if let Err(e) = message.ack().await {
-                        error!("Failed to acknowledge message: {}", e);
-                    }
+                    // No need to acknowledge with non-durable consumers
                 }
             }
             Err(e) => {
@@ -265,15 +259,12 @@ impl JetStreamClient {
             }
         };
 
-        // Create a consumer for the subject filter with a durable name
-        // Generate a stable durable name from the subject filter
-        let durable_name = format!("operate-ui-{}", 
-            subject_filter.replace("*", "all").replace(".", "-"));
-        
+        // Create a non-durable consumer for read-only queries
+        // This ensures queries are idempotent and don't consume history
         let consumer_config = jetstream::consumer::pull::Config {
             filter_subject: subject_filter.to_string(),
-            durable_name: Some(durable_name),
-            deliver_policy: DeliverPolicy::Last,
+            durable_name: None, // Non-durable for read-only operations
+            deliver_policy: DeliverPolicy::Last, // Get recent messages for UI
             ..Default::default()
         };
 
@@ -281,21 +272,24 @@ impl JetStreamClient {
             Ok(consumer) => {
                 debug!("Created consumer for subject filter: {}", subject_filter);
                 
-                let messages = if let Some(limit) = limit {
-                    consumer
-                        .messages()
-                        .await?
-                        .take(limit)
-                        .boxed()
-                } else {
-                    consumer
-                        .messages()
-                        .await?
-                        .take(10000) // Default reasonable limit
-                        .boxed()
-                };
-
-                Ok(messages)
+                // Use batch fetch with timeout to prevent hanging on empty streams
+                let batch_size = limit.unwrap_or(1000).min(1000);
+                let timeout = std::time::Duration::from_secs(5);
+                
+                match tokio::time::timeout(timeout, consumer.batch().max_messages(batch_size).expires(std::time::Duration::from_secs(2)).messages()).await {
+                    Ok(Ok(messages)) => {
+                        let message_stream = futures_util::stream::iter(messages);
+                        Ok(message_stream.boxed())
+                    }
+                    Ok(Err(e)) => {
+                        warn!("Failed to fetch messages: {}", e);
+                        Ok(futures_util::stream::iter(vec![]).boxed())
+                    }
+                    Err(_) => {
+                        warn!("Timeout fetching messages from JetStream");
+                        Ok(futures_util::stream::iter(vec![]).boxed())
+                    }
+                }
             }
             Err(e) => {
                 error!("Failed to create consumer: {}", e);
