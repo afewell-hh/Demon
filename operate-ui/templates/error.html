@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Error {{ status_code }} - Demon Operate UI{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Error {{ status_code }}</h2>
+    </div>
+
+    <div class="alert alert-error">
+        {{ error_message }}
+    </div>
+
+    <div style="margin-top: 2rem;">
+        <a href="/runs" class="btn btn-primary">← Back to Runs</a>
+    </div>
+</div>
+{% endblock %}
