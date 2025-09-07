@@ -5,21 +5,23 @@ pub mod routes;
 
 use anyhow::Result;
 use axum::{
+    handler::HandlerWithoutStateExt,
     http::StatusCode,
     response::{Html, IntoResponse, Response},
-    routing::get,
+    routing::{get, get_service},
     Router,
 };
-use tower::ServiceBuilder;
+use tera::Tera;
 use tower_http::{
     services::ServeDir,
     trace::{DefaultMakeSpan, TraceLayer},
 };
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 #[derive(Clone)]
 pub struct AppState {
     pub jetstream_client: Option<jetstream::JetStreamClient>,
+    pub tera: Tera,
 }
 
 impl AppState {
@@ -35,27 +37,66 @@ impl AppState {
             }
         };
 
-        Self { jetstream_client }
+        let tera = match Tera::new("templates/**/*.html") {
+            Ok(t) => t,
+            Err(e) => {
+                error!("Parsing error for Tera templates: {}", e);
+                std::process::exit(1);
+            }
+        };
+
+        Self {
+            jetstream_client,
+            tera,
+        }
     }
 }
 
 // Custom error type for better error handling
 #[derive(Debug)]
-pub struct AppError(anyhow::Error);
+pub struct AppError {
+    pub status_code: StatusCode,
+    pub message: String,
+}
 
-impl IntoResponse for AppError {
-    fn into_response(self) -> Response {
-        let error_msg = format!("Internal server error: {}", self.0);
-        (StatusCode::INTERNAL_SERVER_ERROR, error_msg).into_response()
+impl From<anyhow::Error> for AppError {
+    fn from(err: anyhow::Error) -> Self {
+        AppError {
+            status_code: StatusCode::INTERNAL_SERVER_ERROR,
+            message: format!("Internal server error: {}", err),
+        }
     }
 }
 
-impl<E> From<E> for AppError
-where
-    E: Into<anyhow::Error>,
-{
-    fn from(err: E) -> Self {
-        Self(err.into())
+impl From<tera::Error> for AppError {
+    fn from(err: tera::Error) -> Self {
+        AppError {
+            status_code: StatusCode::INTERNAL_SERVER_ERROR,
+            message: format!("Template rendering error: {}", err),
+        }
+    }
+}
+
+impl From<Box<tera::Error>> for AppError {
+    fn from(err: Box<tera::Error>) -> Self {
+        AppError {
+            status_code: StatusCode::INTERNAL_SERVER_ERROR,
+            message: format!("Template rendering error: {}", err),
+        }
+    }
+}
+
+impl std::fmt::Display for AppError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl std::error::Error for AppError {}
+
+impl IntoResponse for AppError {
+    fn into_response(self) -> Response {
+        (self.status_code, self.message).into_response()
     }
 }
 
@@ -68,7 +109,10 @@ async fn health() -> impl IntoResponse {
 
 // Fallback handler for 404s
 async fn not_found() -> impl IntoResponse {
-    (StatusCode::NOT_FOUND, Html(r#"
+    (
+        StatusCode::NOT_FOUND,
+        Html(
+            r#"
 <!DOCTYPE html>
 <html>
 <head>
@@ -83,7 +127,13 @@ async fn not_found() -> impl IntoResponse {
     <p><a href="/runs">← Back to Runs</a></p>
 </body>
 </html>
-    "#))
+    "#,
+        ),
+    )
+}
+
+async fn handle_static_file_error() -> impl IntoResponse {
+    (StatusCode::NOT_FOUND, "Static file not found").into_response()
 }
 
 pub fn create_app(state: AppState) -> Router {
@@ -93,13 +143,16 @@ pub fn create_app(state: AppState) -> Router {
         .route("/runs/:run_id", get(routes::get_run_html))
         .route("/api/runs", get(routes::list_runs_api))
         .route("/api/runs/:run_id", get(routes::get_run_api))
-        .nest_service("/static", ServeDir::new("static"))
+        .route(
+            "/static/*path",
+            get_service(
+                ServeDir::new("static").not_found_service(handle_static_file_error.into_service()),
+            ),
+        )
         .fallback(not_found)
         .layer(
-            ServiceBuilder::new().layer(
-                TraceLayer::new_for_http()
-                    .make_span_with(DefaultMakeSpan::default().include_headers(true)),
-            ),
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::default().include_headers(true)),
         )
         .with_state(state)
 }

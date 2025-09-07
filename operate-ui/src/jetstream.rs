@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use async_nats::jetstream::{self, consumer::DeliverPolicy};
 use chrono::{DateTime, Utc};
-use futures_util::{StreamExt};
+use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
@@ -37,7 +37,7 @@ impl std::fmt::Display for RunStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             RunStatus::Running => write!(f, "Running"),
-            RunStatus::Completed => write!(f, "Completed"), 
+            RunStatus::Completed => write!(f, "Completed"),
             RunStatus::Failed => write!(f, "Failed"),
         }
     }
@@ -70,7 +70,7 @@ impl JetStreamClient {
     /// Create a new JetStream client
     pub async fn new() -> Result<Self> {
         let nats_url = env::var("NATS_URL").unwrap_or_else(|_| "nats://localhost:4222".to_string());
-        
+
         info!("Connecting to NATS at {}", nats_url);
 
         let client = if let Ok(creds_path) = env::var("NATS_CREDS_PATH") {
@@ -86,7 +86,7 @@ impl JetStreamClient {
         };
 
         let jetstream = jetstream::new(client);
-        
+
         Ok(Self { jetstream })
     }
 
@@ -98,30 +98,39 @@ impl JetStreamClient {
         // Query JetStream for ritual events
         // Subject pattern: demon.ritual.v1.<ritualId>.<runId>.events
         let subject_filter = "demon.ritual.v1.*.*.events";
-        
+
         let mut runs_map: HashMap<String, RunSummary> = HashMap::new();
         let mut message_count = 0;
 
         // Get messages from JetStream stream
         // Use DeliverPolicy::All to get all messages, then sort by timestamp to prioritize recent runs
-        match self.query_stream_messages(subject_filter, None, DeliverPolicy::All).await {
+        match self
+            .query_stream_messages(subject_filter, None, DeliverPolicy::All)
+            .await
+        {
             Ok(messages) => {
                 for message in messages {
                     message_count += 1;
-                    
+
                     match self.parse_message_for_run_summary(&message) {
                         Ok(Some(summary)) => {
                             // Merge summaries: keep earliest start time, latest status
                             let key = format!("{}:{}", summary.ritual_id, summary.run_id);
                             if let Some(mut existing) = runs_map.remove(&key) {
                                 // Keep the earliest start time (unless it's the placeholder)
-                                if summary.start_ts != DateTime::from_timestamp(0, 0).unwrap_or_else(Utc::now)
-                                    && (existing.start_ts == DateTime::from_timestamp(0, 0).unwrap_or_else(Utc::now) || summary.start_ts < existing.start_ts) {
+                                if summary.start_ts
+                                    != DateTime::from_timestamp(0, 0).unwrap_or_else(Utc::now)
+                                    && (existing.start_ts
+                                        == DateTime::from_timestamp(0, 0).unwrap_or_else(Utc::now)
+                                        || summary.start_ts < existing.start_ts)
+                                {
                                     existing.start_ts = summary.start_ts;
                                 }
                                 // Always update to the most definitive status
                                 match (existing.status, summary.status) {
-                                    (_, RunStatus::Completed) | (_, RunStatus::Failed) => existing.status = summary.status,
+                                    (_, RunStatus::Completed) | (_, RunStatus::Failed) => {
+                                        existing.status = summary.status
+                                    }
                                     (RunStatus::Running, _) => existing.status = summary.status,
                                     _ => {} // Keep existing status
                                 }
@@ -142,7 +151,11 @@ impl JetStreamClient {
 
                     // Stop when we have enough unique runs (with some buffer for completeness)
                     if runs_map.len() >= limit && message_count >= limit * 2 {
-                        debug!("Collected {} runs from {} messages, stopping", runs_map.len(), message_count);
+                        debug!(
+                            "Collected {} runs from {} messages, stopping",
+                            runs_map.len(),
+                            message_count
+                        );
                         break;
                     }
                 }
@@ -158,7 +171,11 @@ impl JetStreamClient {
         runs.sort_by(|a, b| b.start_ts.cmp(&a.start_ts));
         runs.truncate(limit);
 
-        info!("Retrieved {} runs from {} messages", runs.len(), message_count);
+        info!(
+            "Retrieved {} runs from {} messages",
+            runs.len(),
+            message_count
+        );
         Ok(runs)
     }
 
@@ -168,7 +185,7 @@ impl JetStreamClient {
 
         // Subject pattern for specific run: demon.ritual.v1.*.<runId>.events
         let subject_filter = &format!("demon.ritual.v1.*.{}.events", run_id);
-        
+
         let mut events = Vec::new();
         let mut ritual_id: Option<String> = None;
 
@@ -190,7 +207,9 @@ impl JetStreamClient {
 
                     // Extract ritual_id from subject if we haven't found it yet
                     if ritual_id.is_none() {
-                        if let Some(extracted) = self.extract_ritual_id_from_subject(&message.subject) {
+                        if let Some(extracted) =
+                            self.extract_ritual_id_from_subject(&message.subject)
+                        {
                             ritual_id = Some(extracted);
                         }
                     }
@@ -223,7 +242,10 @@ impl JetStreamClient {
         &self,
         subject_filter: &str,
     ) -> Result<Vec<async_nats::jetstream::Message>> {
-        debug!("Querying all messages with subject filter: {}", subject_filter);
+        debug!(
+            "Querying all messages with subject filter: {}",
+            subject_filter
+        );
 
         // Try to get or create the stream for ritual events
         let stream_name = "RITUAL_EVENTS";
@@ -234,7 +256,7 @@ impl JetStreamClient {
             }
             Err(_) => {
                 info!("Stream {} not found, attempting to create it", stream_name);
-                
+
                 // Create stream configuration for ritual events
                 let stream_config = jetstream::stream::Config {
                     name: stream_name.to_string(),
@@ -270,7 +292,10 @@ impl JetStreamClient {
         // Create ephemeral consumer (no get-or-create needed since they're temporary)
         let consumer = match stream.create_consumer(consumer_config).await {
             Ok(consumer) => {
-                debug!("Created ephemeral consumer for all messages: {}", subject_filter);
+                debug!(
+                    "Created ephemeral consumer for all messages: {}",
+                    subject_filter
+                );
                 consumer
             }
             Err(e) => {
@@ -280,63 +305,81 @@ impl JetStreamClient {
         };
 
         debug!("Using consumer for all messages: {}", subject_filter);
-        
+
         let mut all_messages = Vec::new();
         let batch_size = 10000;
         let timeout = std::time::Duration::from_secs(10); // Longer timeout for batch processing
         let mut total_fetched = 0;
-        
+
         loop {
-            match tokio::time::timeout(timeout, consumer.batch().max_messages(batch_size).expires(std::time::Duration::from_secs(5)).messages()).await {
-                        Ok(Ok(mut messages)) => {
-                            let mut batch_count = 0;
-                            let mut batch_messages = Vec::new();
-                            
-                            while let Some(msg_result) = messages.next().await {
-                                match msg_result {
-                                    Ok(msg) => {
-                                        // No acknowledgment needed with AckPolicy::None
-                                        batch_messages.push(msg);
-                                        batch_count += 1;
-                                    }
-                                    Err(e) => {
-                                        error!("Error receiving message from JetStream: {}", e);
-                                    }
-                                }
+            match tokio::time::timeout(
+                timeout,
+                consumer
+                    .batch()
+                    .max_messages(batch_size)
+                    .expires(std::time::Duration::from_secs(5))
+                    .messages(),
+            )
+            .await
+            {
+                Ok(Ok(mut messages)) => {
+                    let mut batch_count = 0;
+                    let mut batch_messages = Vec::new();
+
+                    while let Some(msg_result) = messages.next().await {
+                        match msg_result {
+                            Ok(msg) => {
+                                // No acknowledgment needed with AckPolicy::None
+                                batch_messages.push(msg);
+                                batch_count += 1;
                             }
-                            
-                            if batch_count == 0 {
-                                debug!("No more messages available, stopping");
-                                break;
+                            Err(e) => {
+                                error!("Error receiving message from JetStream: {}", e);
                             }
-                            
-                            total_fetched += batch_count;
-                            all_messages.extend(batch_messages);
-                            
-                            // If we got fewer messages than the batch size, we've reached the end
-                            if batch_count < batch_size {
-                                debug!("Received {} messages (less than batch size {}), stopping", batch_count, batch_size);
-                                break;
-                            }
-                            
-                            debug!("Fetched batch of {} messages, total: {}", batch_count, total_fetched);
-                        }
-                        Ok(Err(e)) => {
-                            warn!("Failed to fetch batch: {}", e);
-                            break;
-                        }
-                        Err(_) => {
-                            warn!("Timeout fetching batch from JetStream");
-                            break;
                         }
                     }
+
+                    if batch_count == 0 {
+                        debug!("No more messages available, stopping");
+                        break;
+                    }
+
+                    total_fetched += batch_count;
+                    all_messages.extend(batch_messages);
+
+                    // If we got fewer messages than the batch size, we've reached the end
+                    if batch_count < batch_size {
+                        debug!(
+                            "Received {} messages (less than batch size {}), stopping",
+                            batch_count, batch_size
+                        );
+                        break;
+                    }
+
+                    debug!(
+                        "Fetched batch of {} messages, total: {}",
+                        batch_count, total_fetched
+                    );
+                }
+                Ok(Err(e)) => {
+                    warn!("Failed to fetch batch: {}", e);
+                    break;
+                }
+                Err(_) => {
+                    warn!("Timeout fetching batch from JetStream");
+                    break;
+                }
+            }
         }
-        
-        info!("Fetched total of {} messages across all batches", total_fetched);
-        
+
+        info!(
+            "Fetched total of {} messages across all batches",
+            total_fetched
+        );
+
         // Note: Ephemeral consumers should be automatically cleaned up by JetStream
         // when the client connection is closed or after a timeout period
-        
+
         Ok(all_messages)
     }
 
@@ -358,7 +401,7 @@ impl JetStreamClient {
             }
             Err(_) => {
                 info!("Stream {} not found, attempting to create it", stream_name);
-                
+
                 // Create stream configuration for ritual events
                 let stream_config = jetstream::stream::Config {
                     name: stream_name.to_string(),
@@ -386,7 +429,7 @@ impl JetStreamClient {
         let consumer_config = jetstream::consumer::pull::Config {
             filter_subject: subject_filter.to_string(),
             durable_name: None, // Ephemeral consumer - no state persistence
-            deliver_policy, // Use provided delivery policy
+            deliver_policy,     // Use provided delivery policy
             inactive_threshold: std::time::Duration::from_secs(60), // Auto-delete after 60 seconds of inactivity
             ..Default::default()
         };
@@ -394,7 +437,10 @@ impl JetStreamClient {
         // Create ephemeral consumer (no get-or-create needed since they're temporary)
         let consumer = match stream.create_consumer(consumer_config).await {
             Ok(consumer) => {
-                debug!("Created ephemeral consumer for subject filter: {}", subject_filter);
+                debug!(
+                    "Created ephemeral consumer for subject filter: {}",
+                    subject_filter
+                );
                 consumer
             }
             Err(e) => {
@@ -404,16 +450,25 @@ impl JetStreamClient {
         };
 
         debug!("Using consumer for subject filter: {}", subject_filter);
-        
+
         // Use batch fetch with timeout to prevent hanging on empty streams
         let batch_size = limit.unwrap_or(10000).min(10000);
         let timeout = std::time::Duration::from_secs(5);
-        
-        let result = match tokio::time::timeout(timeout, consumer.batch().max_messages(batch_size).expires(std::time::Duration::from_secs(2)).messages()).await {
+
+        let result = match tokio::time::timeout(
+            timeout,
+            consumer
+                .batch()
+                .max_messages(batch_size)
+                .expires(std::time::Duration::from_secs(2))
+                .messages(),
+        )
+        .await
+        {
             Ok(Ok(mut messages)) => {
                 // Collect all messages from the stream immediately
                 let mut collected_messages = Vec::new();
-                
+
                 while let Some(msg_result) = messages.next().await {
                     match msg_result {
                         Ok(msg) => collected_messages.push(msg),
@@ -422,7 +477,7 @@ impl JetStreamClient {
                         }
                     }
                 }
-                
+
                 Ok(collected_messages)
             }
             Ok(Err(e)) => {
@@ -434,10 +489,10 @@ impl JetStreamClient {
                 Err(anyhow::anyhow!("JetStream operation timed out"))
             }
         };
-        
+
         // Note: Ephemeral consumers should be automatically cleaned up by JetStream
         // when the client connection is closed or after a timeout period
-        
+
         result
     }
 
@@ -461,23 +516,25 @@ impl JetStreamClient {
 
         // Try to extract timestamp and determine status
         let ts = if let Some(ts_str) = payload.get("ts").and_then(|v| v.as_str()) {
-            ts_str.parse::<DateTime<Utc>>()
+            ts_str
+                .parse::<DateTime<Utc>>()
                 .unwrap_or_else(|_| Utc::now())
         } else {
             Utc::now()
         };
 
         // Determine status from event type and if this is a start event
-        let (status, is_start_event) = if let Some(event_type) = payload.get("event").and_then(|v| v.as_str()) {
-            match event_type {
-                "ritual.completed:v1" => (RunStatus::Completed, false),
-                "ritual.failed:v1" => (RunStatus::Failed, false),
-                "ritual.started:v1" => (RunStatus::Running, true),
-                _ => (RunStatus::Running, false),
-            }
-        } else {
-            (RunStatus::Running, false)
-        };
+        let (status, is_start_event) =
+            if let Some(event_type) = payload.get("event").and_then(|v| v.as_str()) {
+                match event_type {
+                    "ritual.completed:v1" => (RunStatus::Completed, false),
+                    "ritual.failed:v1" => (RunStatus::Failed, false),
+                    "ritual.started:v1" => (RunStatus::Running, true),
+                    _ => (RunStatus::Running, false),
+                }
+            } else {
+                (RunStatus::Running, false)
+            };
 
         // Only use this timestamp as start_ts if it's actually a start event
         // Otherwise, use a placeholder (will be overwritten by actual start time)
@@ -504,7 +561,8 @@ impl JetStreamClient {
             .context("Failed to parse message payload as JSON")?;
 
         let ts = if let Some(ts_str) = payload.get("ts").and_then(|v| v.as_str()) {
-            ts_str.parse::<DateTime<Utc>>()
+            ts_str
+                .parse::<DateTime<Utc>>()
                 .context("Failed to parse timestamp")?
         } else {
             return Ok(None); // No timestamp, skip this event

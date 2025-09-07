@@ -1,13 +1,12 @@
-use crate::jetstream::{JetStreamClient, RunDetail, RunSummary};
-use crate::{AppResult, AppState};
-use askama::Template;
+use crate::jetstream::{RunDetail, RunSummary};
+use crate::{AppError, AppState};
+
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::{Html, IntoResponse, Response},
     Json,
 };
-use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use tracing::{debug, error, info};
 
@@ -17,37 +16,16 @@ pub struct ListRunsQuery {
     limit: Option<usize>,
 }
 
-// Askama templates
-#[derive(Template)]
-#[template(path = "runs_list.html")]
-struct RunsListTemplate {
-    runs: Vec<RunSummary>,
-    error: Option<String>,
-    jetstream_available: bool,
-}
-
-#[derive(Template)]
-#[template(path = "run_detail.html")]
-struct RunDetailTemplate {
-    run: Option<RunDetail>,
-    error: Option<String>,
-    jetstream_available: bool,
-    run_id: String,
-}
-
-#[derive(Template)]
-#[template(path = "error.html")]
-struct ErrorTemplate {
-    error_message: String,
-    status_code: u16,
-}
-
 /// List runs - HTML response
+#[axum::debug_handler]
 pub async fn list_runs_html(
     State(state): State<AppState>,
     Query(query): Query<ListRunsQuery>,
-) -> AppResult<Html<String>> {
-    debug!("Handling HTML request to list runs with limit: {:?}", query.limit);
+) -> Html<String> {
+    debug!(
+        "Handling HTML request to list runs with limit: {:?}",
+        query.limit
+    );
 
     let (runs, error) = match &state.jetstream_client {
         Some(client) => match client.list_runs(query.limit).await {
@@ -63,63 +41,80 @@ pub async fn list_runs_html(
         None => (vec![], Some("JetStream is not available".to_string())),
     };
 
-    let template = RunsListTemplate {
-        runs,
-        error,
-        jetstream_available: state.jetstream_client.is_some(),
-    };
+    let mut context = tera::Context::new();
+    context.insert("runs", &runs);
+    context.insert("error", &error);
+    context.insert("jetstream_available", &state.jetstream_client.is_some());
 
-    let html = template.render().map_err(|e| {
-        error!("Template rendering failed: {}", e);
-        e
-    })?;
+    let html = state
+        .tera
+        .render("runs_list.html", &context)
+        .map_err(|e| {
+            error!("Template rendering failed: {}", e);
+            AppError::from(e as tera::Error)
+        })
+        .unwrap_or_else(|e| {
+            error!(
+                "Failed to render error page after template rendering failure: {}",
+                e
+            );
+            // Fallback to a simple error message if rendering the error page also fails
+            format!(
+                "<h1>Internal Server Error</h1><p>Failed to render page: {}</p>",
+                e
+            )
+        });
 
-    Ok(Html(html))
+    Html(html)
 }
 
 /// List runs - JSON API response
+#[axum::debug_handler]
 pub async fn list_runs_api(
     State(state): State<AppState>,
     Query(query): Query<ListRunsQuery>,
-) -> AppResult<Response> {
-    debug!("Handling JSON API request to list runs with limit: {:?}", query.limit);
+) -> Response {
+    debug!(
+        "Handling JSON API request to list runs with limit: {:?}",
+        query.limit
+    );
 
     match &state.jetstream_client {
         Some(client) => match client.list_runs(query.limit).await {
             Ok(runs) => {
                 info!("Successfully retrieved {} runs for API", runs.len());
-                Ok(Json(runs).into_response())
+                Json(runs).into_response()
             }
             Err(e) => {
                 error!("Failed to retrieve runs: {}", e);
-                Ok((
-                    StatusCode::BAD_GATEWAY,
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
                     Json(serde_json::json!({
-                        "error": "Failed to retrieve runs from JetStream",
-                        "details": e.to_string()
+                        "error": format!("Failed to retrieve runs: {}", e)
                     })),
                 )
-                    .into_response())
+                    .into_response()
             }
         },
         None => {
             error!("JetStream client not available");
-            Ok((
-                StatusCode::BAD_GATEWAY,
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({
                     "error": "JetStream is not available"
                 })),
             )
-                .into_response())
+                .into_response()
         }
     }
 }
 
 /// Get run detail - HTML response
+#[axum::debug_handler]
 pub async fn get_run_html(
     State(state): State<AppState>,
     Path(run_id): Path<String>,
-) -> AppResult<Html<String>> {
+) -> Html<String> {
     debug!("Handling HTML request for run detail: {}", run_id);
 
     let (run, error) = match &state.jetstream_client {
@@ -140,66 +135,76 @@ pub async fn get_run_html(
         None => (None, Some("JetStream is not available".to_string())),
     };
 
-    let template = RunDetailTemplate {
-        run,
-        error,
-        jetstream_available: state.jetstream_client.is_some(),
-        run_id: run_id.clone(),
-    };
+    let mut context = tera::Context::new();
+    context.insert("run", &run);
+    context.insert("error", &error);
+    context.insert("jetstream_available", &state.jetstream_client.is_some());
+    context.insert("run_id", &run_id);
 
-    let html = template.render().map_err(|e| {
-        error!("Template rendering failed: {}", e);
-        e
-    })?;
+    let html = state
+        .tera
+        .render("run_detail.html", &context)
+        .map_err(|e| {
+            error!("Template rendering failed: {}", e);
+            AppError::from(e as tera::Error)
+        })
+        .unwrap_or_else(|e| {
+            error!(
+                "Failed to render error page after template rendering failure: {}",
+                e
+            );
+            // Fallback to a simple error message if rendering the error page also fails
+            format!(
+                "<h1>Internal Server Error</h1><p>Failed to render page: {}</p>",
+                e
+            )
+        });
 
-    Ok(Html(html))
+    Html(html)
 }
 
 /// Get run detail - JSON API response
-pub async fn get_run_api(
-    State(state): State<AppState>,
-    Path(run_id): Path<String>,
-) -> AppResult<Response> {
+#[axum::debug_handler]
+pub async fn get_run_api(State(state): State<AppState>, Path(run_id): Path<String>) -> Response {
     debug!("Handling JSON API request for run detail: {}", run_id);
 
     match &state.jetstream_client {
         Some(client) => match client.get_run_detail(&run_id).await {
             Ok(Some(run)) => {
                 info!("Successfully retrieved run detail for API: {}", run_id);
-                Ok(Json(run).into_response())
+                Json(run).into_response()
             }
             Ok(None) => {
                 info!("Run not found: {}", run_id);
-                Ok((
+                (
                     StatusCode::NOT_FOUND,
                     Json(serde_json::json!({
                         "error": "Run not found",
                         "runId": run_id
                     })),
                 )
-                    .into_response())
+                    .into_response()
             }
             Err(e) => {
                 error!("Failed to retrieve run detail: {}", e);
-                Ok((
-                    StatusCode::BAD_GATEWAY,
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
                     Json(serde_json::json!({
-                        "error": "Failed to retrieve run from JetStream",
-                        "details": e.to_string()
+                        "error": format!("Failed to retrieve run detail: {}", e)
                     })),
                 )
-                    .into_response())
+                    .into_response()
             }
         },
         None => {
             error!("JetStream client not available");
-            Ok((
-                StatusCode::BAD_GATEWAY,
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({
                     "error": "JetStream is not available"
                 })),
             )
-                .into_response())
+                .into_response()
         }
     }
 }
@@ -311,15 +316,13 @@ mod tests {
 
     #[test]
     fn test_run_detail_status_determination() {
-        let mut events = vec![
-            RitualEvent {
-                ts: Utc::now(),
-                event: "ritual.started:v1".to_string(),
-                state_from: None,
-                state_to: None,
-                extra: HashMap::new(),
-            }
-        ];
+        let mut events = vec![RitualEvent {
+            ts: Utc::now(),
+            event: "ritual.started:v1".to_string(),
+            state_from: None,
+            state_to: None,
+            extra: HashMap::new(),
+        }];
 
         let run = RunDetail {
             run_id: "test".to_string(),

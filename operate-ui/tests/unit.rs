@@ -1,5 +1,5 @@
-use operate_ui::jetstream::{RitualEvent, RunDetail, RunStatus, RunSummary};
 use chrono::Utc;
+use operate_ui::jetstream::{RitualEvent, RunDetail, RunStatus, RunSummary};
 use std::collections::HashMap;
 
 #[test]
@@ -14,7 +14,7 @@ fn test_run_status_equality() {
     assert_eq!(RunStatus::Running, RunStatus::Running);
     assert_eq!(RunStatus::Completed, RunStatus::Completed);
     assert_eq!(RunStatus::Failed, RunStatus::Failed);
-    
+
     assert_ne!(RunStatus::Running, RunStatus::Completed);
     assert_ne!(RunStatus::Completed, RunStatus::Failed);
 }
@@ -107,15 +107,13 @@ fn test_serde_serialization() {
 
 #[test]
 fn test_run_detail_serde() {
-    let events = vec![
-        RitualEvent {
-            ts: Utc::now(),
-            event: "ritual.started:v1".to_string(),
-            state_from: None,
-            state_to: Some("running".to_string()),
-            extra: HashMap::new(),
-        }
-    ];
+    let events = vec![RitualEvent {
+        ts: Utc::now(),
+        event: "ritual.started:v1".to_string(),
+        state_from: None,
+        state_to: Some("running".to_string()),
+        extra: HashMap::new(),
+    }];
 
     let run = RunDetail {
         run_id: "test-run".to_string(),
@@ -168,13 +166,13 @@ fn test_ritual_event_serde_with_optional_fields() {
 
 #[test]
 fn test_error_handling_types() {
-    use operate_ui::{AppError, AppResult};
     use anyhow::anyhow;
+    use operate_ui::{AppError, AppResult};
 
     // Test AppError creation from anyhow::Error
     let original_error = anyhow!("Test error message");
     let app_error = AppError::from(original_error);
-    
+
     // AppError should wrap the original error
     assert!(format!("{:?}", app_error).contains("Test error message"));
 
@@ -191,7 +189,10 @@ fn test_json_flattening_in_ritual_event() {
     let mut extra = HashMap::new();
     extra.insert("customField1".to_string(), serde_json::json!("value1"));
     extra.insert("customField2".to_string(), serde_json::json!(42));
-    extra.insert("customField3".to_string(), serde_json::json!({"nested": "object"}));
+    extra.insert(
+        "customField3".to_string(),
+        serde_json::json!({"nested": "object"}),
+    );
 
     let event = RitualEvent {
         ts: Utc::now(),
@@ -202,7 +203,7 @@ fn test_json_flattening_in_ritual_event() {
     };
 
     let json = serde_json::to_string(&event).unwrap();
-    
+
     // Extra fields should be flattened into the main JSON object
     assert!(json.contains("customField1"));
     assert!(json.contains("customField2"));
@@ -219,12 +220,12 @@ fn test_jetstream_subject_parsing() {
     // For now, we'll test the expected format
     let expected_subject = "demon.ritual.v1.my-ritual.run-123.events";
     let parts: Vec<&str> = expected_subject.split('.').collect();
-    
+
     assert_eq!(parts.len(), 6);
     assert_eq!(parts[0], "demon");
     assert_eq!(parts[1], "ritual");
     assert_eq!(parts[2], "v1");
     assert_eq!(parts[3], "my-ritual"); // ritual_id
-    assert_eq!(parts[4], "run-123");   // run_id
+    assert_eq!(parts[4], "run-123"); // run_id
     assert_eq!(parts[5], "events");
 }

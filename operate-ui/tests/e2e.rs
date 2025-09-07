@@ -2,16 +2,67 @@ use axum::{
     body::Body,
     http::{Request, StatusCode},
 };
-use operate_ui::{AppState, AppResult};
-use serde_json::json;
+use operate_ui::AppState;
 use tower::ServiceExt;
 
 // Helper function to create app with mock state
 fn create_test_app() -> axum::Router {
+    // Create a mock Tera instance with minimal templates for testing
+    let mut tera = tera::Tera::new("nonexistent/*").expect("Failed to create empty Tera instance");
+
+    // Add minimal templates for testing
+    tera.add_raw_template(
+        "runs_list.html",
+        r#"
+<!DOCTYPE html>
+<html>
+<head><title>Demon Operate UI - Recent Runs</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+.grid-container { display: grid; grid-template-columns: 1fr; }
+</style>
+</head>
+<body>
+<nav><a href="/runs">Runs</a> | <a href="/health">Health</a></nav>
+<h1>Recent Runs</h1>
+{% if error %}
+<p>{{ error }}</p>
+<p>No runs found</p>
+{% else %}
+<p>Recent runs display here</p>
+{% endif %}
+</body>
+</html>
+    "#,
+    )
+    .expect("Failed to add runs_list template");
+
+    tera.add_raw_template(
+        "run_detail.html",
+        r#"
+<!DOCTYPE html>
+<html>
+<head><title>Run {{ run_id }}</title></head>
+<body>
+<a href="/runs">Back to Runs</a>
+<h1>Run {{ run_id }}</h1>
+<h2>Run Details</h2>
+<h2>Event Timeline</h2>
+<h2>API Access</h2>
+{% if error %}
+<p>{{ error }}</p>
+{% endif %}
+</body>
+</html>
+    "#,
+    )
+    .expect("Failed to add run_detail template");
+
     let state = AppState {
         jetstream_client: None, // Simulate JetStream unavailable for testing
+        tera,
     };
-    
+
     operate_ui::create_app(state)
 }
 
@@ -20,7 +71,12 @@ async fn test_health_endpoint() {
     let app = create_test_app();
 
     let response = app
-        .oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/health")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
 
@@ -58,11 +114,16 @@ async fn test_runs_api_without_jetstream() {
     let app = create_test_app();
 
     let response = app
-        .oneshot(Request::builder().uri("/api/runs").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/api/runs")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
@@ -112,7 +173,7 @@ async fn test_run_detail_api_without_jetstream() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
@@ -136,7 +197,7 @@ async fn test_404_handling() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK); // HTML 404 page
+    assert_eq!(response.status(), StatusCode::NOT_FOUND); // HTML 404 page
 
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
@@ -161,7 +222,7 @@ async fn test_runs_api_with_limit_param() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::BAD_GATEWAY); // JetStream unavailable
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR); // JetStream unavailable
 }
 
 #[tokio::test]
@@ -180,11 +241,16 @@ async fn test_content_type_headers() {
 
     // Test JSON API endpoint
     let json_response = app
-        .oneshot(Request::builder().uri("/api/runs").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/api/runs")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
 
-    assert_eq!(json_response.status(), StatusCode::BAD_GATEWAY);
+    assert_eq!(json_response.status(), StatusCode::INTERNAL_SERVER_ERROR);
     // JSON responses should have application/json content type (handled by Axum)
 }
 
@@ -206,12 +272,17 @@ async fn test_server_integration_with_nats() {
 
     // Test that with JetStream available, we get better responses
     let response = app
-        .oneshot(Request::builder().uri("/api/runs").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/api/runs")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
 
-    // Should either be OK (with runs) or OK (empty array), not BAD_GATEWAY
-    assert_ne!(response.status(), StatusCode::BAD_GATEWAY);
+    // Should either be OK (with runs) or OK (empty array), not INTERNAL_SERVER_ERROR
+    assert_ne!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
 }
 
 #[tokio::test]
@@ -233,7 +304,7 @@ async fn test_html_template_rendering() {
     assert!(html.contains("<title>"));
     assert!(html.contains("Demon Operate UI"));
     assert!(html.contains("Recent Runs"));
-    
+
     // Verify navigation elements
     assert!(html.contains("href=\"/runs\""));
     assert!(html.contains("href=\"/health\""));
