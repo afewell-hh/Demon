@@ -171,9 +171,10 @@ impl JetStreamClient {
         let mut events = Vec::new();
         let mut ritual_id: Option<String> = None;
 
-        match self.query_stream_messages(subject_filter, None).await {
-            Ok(mut messages) => {
-                while let Some(message) = messages.next().await {
+        // Use multiple batches to get complete event history for long-running rituals
+        match self.query_all_stream_messages(subject_filter).await {
+            Ok(messages) => {
+                for message in messages {
                     match self.parse_message_for_event(&message) {
                         Ok(Some(event)) => {
                             events.push(event);
@@ -192,8 +193,6 @@ impl JetStreamClient {
                             ritual_id = Some(extracted);
                         }
                     }
-
-                    // No need to acknowledge with non-durable consumers
                 }
             }
             Err(e) => {
@@ -216,6 +215,123 @@ impl JetStreamClient {
             ritual_id,
             events,
         }))
+    }
+
+    /// Query all stream messages without limit using multiple batches
+    async fn query_all_stream_messages(
+        &self,
+        subject_filter: &str,
+    ) -> Result<Vec<async_nats::jetstream::Message>> {
+        debug!("Querying all messages with subject filter: {}", subject_filter);
+
+        // Try to get or create the stream for ritual events
+        let stream_name = "RITUAL_EVENTS";
+        let stream = match self.jetstream.get_stream(stream_name).await {
+            Ok(stream) => {
+                debug!("Found existing stream: {}", stream_name);
+                stream
+            }
+            Err(_) => {
+                info!("Stream {} not found, attempting to create it", stream_name);
+                
+                // Create stream configuration for ritual events
+                let stream_config = jetstream::stream::Config {
+                    name: stream_name.to_string(),
+                    subjects: vec!["demon.ritual.v1.>".to_string()],
+                    max_messages: 10_000,
+                    max_bytes: 100_000_000, // 100MB
+                    ..Default::default()
+                };
+
+                match self.jetstream.create_stream(stream_config).await {
+                    Ok(stream) => {
+                        info!("Successfully created stream: {}", stream_name);
+                        stream
+                    }
+                    Err(e) => {
+                        warn!("Failed to create stream {}: {}", stream_name, e);
+                        // Return empty list if we can't create it
+                        return Ok(vec![]);
+                    }
+                }
+            }
+        };
+
+        // Create a durable consumer for read-only queries
+        // Use a unique durable name based on the subject filter to ensure idempotency
+        let sanitized_subject = subject_filter.replace("*", "wildcard").replace(".", "_");
+        let durable_name = format!("operate-ui-all-{}", sanitized_subject);
+        
+        let consumer_config = jetstream::consumer::pull::Config {
+            filter_subject: subject_filter.to_string(),
+            durable_name: Some(durable_name), // Required for pull consumers
+            deliver_policy: DeliverPolicy::All, // Get all historical messages
+            ..Default::default()
+        };
+
+        match stream.create_consumer(consumer_config).await {
+            Ok(consumer) => {
+                debug!("Created consumer for subject filter: {}", subject_filter);
+                
+                let mut all_messages = Vec::new();
+                let batch_size = 10000;
+                let timeout = std::time::Duration::from_secs(10); // Longer timeout for batch processing
+                let mut total_fetched = 0;
+                
+                loop {
+                    match tokio::time::timeout(timeout, consumer.batch().max_messages(batch_size).expires(std::time::Duration::from_secs(5)).messages()).await {
+                        Ok(Ok(mut messages)) => {
+                            let mut batch_count = 0;
+                            let mut batch_messages = Vec::new();
+                            
+                            while let Some(msg_result) = messages.next().await {
+                                match msg_result {
+                                    Ok(msg) => {
+                                        batch_messages.push(msg);
+                                        batch_count += 1;
+                                    }
+                                    Err(e) => {
+                                        error!("Error receiving message from JetStream: {}", e);
+                                    }
+                                }
+                            }
+                            
+                            if batch_count == 0 {
+                                debug!("No more messages available, stopping");
+                                break;
+                            }
+                            
+                            total_fetched += batch_count;
+                            all_messages.extend(batch_messages);
+                            
+                            // If we got fewer messages than the batch size, we've reached the end
+                            if batch_count < batch_size {
+                                debug!("Received {} messages (less than batch size {}), stopping", batch_count, batch_size);
+                                break;
+                            }
+                            
+                            debug!("Fetched batch of {} messages, total: {}", batch_count, total_fetched);
+                        }
+                        Ok(Err(e)) => {
+                            warn!("Failed to fetch batch: {}", e);
+                            break;
+                        }
+                        Err(_) => {
+                            warn!("Timeout fetching batch from JetStream");
+                            break;
+                        }
+                    }
+                }
+                
+                info!("Fetched total of {} messages across all batches", total_fetched);
+                Ok(all_messages)
+            }
+            Err(e) => {
+                error!("Failed to create consumer: {}", e);
+                // Return empty list on error
+                Ok(vec![])
+            }
+        }
     }
 
     /// Query stream messages with optional limit
