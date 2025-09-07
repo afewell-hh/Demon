@@ -246,6 +246,10 @@ impl RunDetail {
         }
     }
 
+    pub fn is_running(&self) -> bool {
+        matches!(self.status(), crate::jetstream::RunStatus::Running)
+    }
+
     pub fn status_class(&self) -> &'static str {
         match self.status() {
             crate::jetstream::RunStatus::Running => "status-running",
