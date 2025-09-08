@@ -27,17 +27,17 @@
 <div class="card">
     <div class="card-header">
         <h2 class="card-title">Run Details</h2>
-        <span class="status-indicator {{ run_status_class }}">{{ run_status }}</span>
+        <span class="status-indicator {{ run_status_class | default(value="status-running") }}">{{ run_status | default(value="Running") }}</span>
     </div>
 
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
         <div>
             <strong>Run ID:</strong><br>
-            <code>{{ run.run_id }}</code>
+            <code>{{ run.runId }}</code>
         </div>
         <div>
             <strong>Ritual ID:</strong><br>
-            <code>{{ run.ritual_id }}</code>
+            <code>{{ run.ritualId }}</code>
         </div>
         <div>
             <strong>Started:</strong><br>
