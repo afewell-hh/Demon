@@ -39,6 +39,15 @@ jobs:
       - name: Unit tests
         run: cargo test --workspace --all-features -- --nocapture
 
+      - name: Guard: no snake_case in approvals template usage
+        run: |
+          set -e
+          ! grep -R --line-number -E '\\.(run_id|ritual_id|state_from|state_to)\\b' operate-ui/templates || \
+            (echo "Snake_case fields found in templates; use camelCase VM fields."; exit 1)
+
+      - name: Validate approval contract fixtures
+        run: cargo test -p engine --test approval_contracts_spec -- --nocapture
+
       # M0 smoke: run echo ritual; NATS not required yet, but we bring it up to match dev profile
       - name: Start NATS (JetStream)
         run: |
@@ -49,6 +58,24 @@ jobs:
             sleep 0.5
           done
           echo "NATS did not report ready in time"; docker logs nats; exit 1
+
+      - name: Engine approvals integration (NATS)
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS
+        run: |
+          cargo test -p engine --test approvals_integration -- --ignored --nocapture
+
+      - name: Operate UI approvals routes (NATS)
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS
+        run: |
+          cargo test -p operate-ui --test approvals_routes_spec -- --ignored --nocapture
+
+      - name: Engine per-cap quotas integration (NATS)
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS
+        run: |
+          cargo test -p engine --test per_cap_quota_integration -- --ignored --nocapture
 
       - name: Smoke run (demonctl)
         run: |

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demon.meta/contracts/approval.requested.v1.json",
+  "title": "ApprovalRequestedV1",
+  "type": "object",
+  "required": [
+    "event",
+    "ts",
+    "tenantId",
+    "runId",
+    "ritualId",
+    "gateId",
+    "requester",
+    "reason"
+  ],
+  "properties": {
+    "event": { "const": "approval.requested:v1" },
+    "ts": { "type": "string", "format": "date-time" },
+    "tenantId": { "type": "string" },
+    "runId": { "type": "string" },
+    "ritualId": { "type": "string" },
+    "gateId": { "type": "string" },
+    "requester": { "type": "string" },
+    "reason": { "type": "string" },
+    "traceId": { "type": "string" }
+  },
+  "additionalProperties": false
+}
