@@ -65,6 +65,18 @@ jobs:
         run: |
           cargo test -p engine --test approvals_integration -- --ignored --nocapture
 
+      - name: Operate UI approvals routes (NATS)
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS
+        run: |
+          cargo test -p operate-ui --test approvals_routes_spec -- --ignored --nocapture
+
+      - name: Engine per-cap quotas integration (NATS)
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS
+        run: |
+          cargo test -p engine --test per_cap_quota_integration -- --ignored --nocapture
+
       - name: Smoke run (demonctl)
         run: |
           set -euo pipefail
