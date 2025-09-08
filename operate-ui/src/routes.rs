@@ -476,10 +476,61 @@ pub async fn grant_approval_api(
         return (StatusCode::FORBIDDEN, "approver not allowed").into_response();
     }
 
-    // Discover ritualId by looking up run
+    // Ensure stream exists before attempting to read (if explicit name set)
+    if let Ok(name) = std::env::var("RITUAL_STREAM_NAME") {
+        if let Ok(client) = async_nats::connect(
+            &std::env::var("NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".to_string()),
+        )
+        .await
+        {
+            let js = async_nats::jetstream::new(client);
+            let _ = js
+                .get_or_create_stream(async_nats::jetstream::stream::Config {
+                    name,
+                    subjects: vec!["demon.ritual.v1.>".to_string()],
+                    ..Default::default()
+                })
+                .await;
+        }
+    }
+
+    // Discover ritualId by looking up run and enforce first-writer-wins on approvals
     let ritual_id = match &state.jetstream_client {
         Some(js) => match js.get_run_detail(&run_id).await {
-            Ok(Some(rd)) => rd.ritual_id,
+            Ok(Some(rd)) => {
+                // Enforce: if a terminal approval already exists for this gate, prevent conflicting writes
+                if let Some(last) = rd.events.iter().rev().find(|e| {
+                    (e.event == "approval.granted:v1" || e.event == "approval.denied:v1")
+                        && e.extra
+                            .get("gateId")
+                            .and_then(|v| v.as_str())
+                            .map(|g| g == gate_id)
+                            .unwrap_or(false)
+                }) {
+                    // If already granted, duplicate grant is a no-op (200); deny is rejected (409)
+                    if last.event == "approval.granted:v1" {
+                        // same terminal -> no-op
+                        return (
+                            StatusCode::OK,
+                            Json(serde_json::json!({
+                                "status": "noop",
+                                "reason": "gate already granted"
+                            })),
+                        )
+                            .into_response();
+                    }
+                    // Already denied => reject grant
+                    return (
+                        StatusCode::CONFLICT,
+                        Json(serde_json::json!({
+                            "error": "gate already resolved",
+                            "state": if last.event == "approval.granted:v1" { "granted" } else { "denied" }
+                        })),
+                    )
+                        .into_response();
+                }
+                rd.ritual_id
+            }
             Ok(None) => return (StatusCode::NOT_FOUND, "run not found").into_response(),
             Err(e) => {
                 error!("get_run_detail failed: {}", e);
@@ -534,9 +585,61 @@ pub async fn deny_approval_api(
         return (StatusCode::FORBIDDEN, "approver not allowed").into_response();
     }
 
+    // Ensure stream exists before attempting to read
+    if let Some(_jsctx) = &state.jetstream_client {
+        let desired = std::env::var("RITUAL_STREAM_NAME").ok();
+        if let Some(name) = desired {
+            let client = async_nats::connect(
+                &std::env::var("NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".to_string()),
+            )
+            .await
+            .ok();
+            if let Some(client) = client {
+                let _ = async_nats::jetstream::new(client)
+                    .get_or_create_stream(async_nats::jetstream::stream::Config {
+                        name,
+                        subjects: vec!["demon.ritual.v1.>".to_string()],
+                        ..Default::default()
+                    })
+                    .await;
+            }
+        }
+    }
+
     let ritual_id = match &state.jetstream_client {
         Some(js) => match js.get_run_detail(&run_id).await {
-            Ok(Some(rd)) => rd.ritual_id,
+            Ok(Some(rd)) => {
+                if let Some(last) = rd.events.iter().rev().find(|e| {
+                    (e.event == "approval.granted:v1" || e.event == "approval.denied:v1")
+                        && e.extra
+                            .get("gateId")
+                            .and_then(|v| v.as_str())
+                            .map(|g| g == gate_id)
+                            .unwrap_or(false)
+                }) {
+                    // Already denied -> duplicate deny is a no-op (200); grant is rejected (409)
+                    if last.event == "approval.denied:v1" {
+                        return (
+                            StatusCode::OK,
+                            Json(serde_json::json!({
+                                "status": "noop",
+                                "reason": "gate already denied"
+                            })),
+                        )
+                            .into_response();
+                    }
+                    // Already granted => reject deny
+                    return (
+                        StatusCode::CONFLICT,
+                        Json(serde_json::json!({
+                            "error": "gate already resolved",
+                            "state": if last.event == "approval.granted:v1" { "granted" } else { "denied" }
+                        })),
+                    )
+                        .into_response();
+                }
+                rd.ritual_id
+            }
             Ok(None) => return (StatusCode::NOT_FOUND, "run not found").into_response(),
             Err(e) => {
                 error!("get_run_detail failed: {}", e);
