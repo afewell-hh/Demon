@@ -1,0 +1,11 @@
+{
+  "event": "approval.granted:v1",
+  "ts": "2024-01-01T00:05:00Z",
+  "tenantId": "tenant-1",
+  "runId": "run-123",
+  "ritualId": "ritual-abc",
+  "gateId": "gate-1",
+  "approver": "bob@example.com",
+  "note": "Looks good",
+  "traceId": "trace-001"
+}
