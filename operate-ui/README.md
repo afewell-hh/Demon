@@ -2,6 +2,98 @@
 
 A read-only web UI for monitoring and inspecting ritual runs in the Demon Meta-PaaS system.
 
+## Runbook: Diagnosing Operate UI Template / Data Issues
+
+Use this flow on a clean machine before filing an issue.
+
+1) Is the UI healthy?
+
+Start the UI without stream bootstrap so you see the empty-state path:
+
+```
+export DEMON_SKIP_STREAM_BOOTSTRAP=1
+RUST_LOG=info cargo run -p operate-ui
+```
+
+Check the health report:
+
+```
+curl -s http://127.0.0.1:3000/admin/templates/report | jq .
+```
+
+You should see:
+
+template_ready: true
+
+has_filter_tojson: true
+
+templates includes: base.html, runs_list.html, run_detail.html
+
+If template_ready is false, see Common Causes below.
+
+2) Expected behavior with no stream
+```
+curl -i http://127.0.0.1:3000/api/runs | sed -n '1,15p'
+```
+
+Expected:
+
+HTTP/1.1 200 OK
+
+Header X-Demon-Warn: JetStreamUnavailable (or similar)
+
+Body {"runs":[]}
+
+Visit http://localhost:3000/runs — you should see a banner:
+
+“No event stream found. See Runbook: setup.”
+
+3) Create the stream and seed two events
+
+Defaults (override via env):
+
+RITUAL_STREAM_NAME=RITUAL_EVENTS
+
+RITUAL_SUBJECTS=demon.ritual.v1.>
+
+Create stream and publish fixtures:
+
+```
+# Create stream (once per environment)
+nats stream add $RITUAL_STREAM_NAME --subjects="$RITUAL_SUBJECTS" --retention=limits --storage=file --dupe-window=2m --discard=new
+
+# Seed a run with 2 events
+export RITUAL="echo-ritual"; export RUN="local-run-1"
+nats pub "demon.ritual.v1.$RITUAL.$RUN.events" '{"event":"ritual.started:v1","ritualId":"'"$RITUAL"'","runId":"'"$RUN"'","ts":"2025-01-01T00:00:00Z"}' --header Nats-Msg-Id:"$RUN:1"
+nats pub "demon.ritual.v1.$RITUAL.$RUN.events" '{"event":"ritual.completed:v1","ritualId":"'"$RITUAL"'","runId":"'"$RUN"'","ts":"2025-01-01T00:00:05Z","outputs":{"printed":"Hello"}}' --header Nats-Msg-Id:"$RUN:2"
+```
+
+Now:
+
+```
+curl -s http://127.0.0.1:3000/api/runs | jq .
+curl -s http://127.0.0.1:3000/api/runs/$RUN | jq .
+```
+
+Visit http://localhost:3000/runs and http://localhost:3000/runs/$RUN — both should render without 500s.
+
+Common Causes (and fixes)
+
+Templates not found
+Ensure crate-absolute glob is used; confirm /admin/templates/report lists the expected files. If not, re-run build and verify working dir.
+
+Filter not registered
+has_filter_tojson must be true. Filters are registered at boot in one place; if false, check startup logs.
+
+Context shape drift (snake vs camel case)
+Templates consume view-models with #[serde(rename_all="camelCase")]. If you see run.run_id in templates, replace with run.runId.
+
+Missing stream
+The API should return 200 with empty runs and a warning header. Create the stream (above) or run with auto-bootstrap enabled.
+
+JetStream unavailable
+You’ll still see /runs with a banner and /api/runs 200 + warning. Check your NATS/JetStream (make dev), then seed events.
+
 ## Overview
 
 The Operate UI provides:
