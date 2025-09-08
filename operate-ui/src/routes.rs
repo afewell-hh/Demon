@@ -419,14 +419,32 @@ async fn publish_approval_event(
     let url = std::env::var("NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".to_string());
     let client = async_nats::connect(&url).await?;
     let js = jetstream::new(client.clone());
-    // Align with engine stream config
-    let _stream = js
-        .get_or_create_stream(jetstream::stream::Config {
-            name: "DEMON_RITUAL_EVENTS".to_string(),
-            subjects: vec!["demon.ritual.v1.>".to_string()],
-            ..Default::default()
-        })
-        .await?;
+    // Resolve stream name with precedence
+    let desired = std::env::var("RITUAL_STREAM_NAME").ok();
+    if let Some(name) = desired {
+        let _ = js
+            .get_or_create_stream(jetstream::stream::Config {
+                name,
+                subjects: vec!["demon.ritual.v1.>".to_string()],
+                ..Default::default()
+            })
+            .await?;
+    } else {
+        // Prefer default; fall back to deprecated if it exists
+        if js.get_stream("RITUAL_EVENTS").await.is_err() {
+            if js.get_stream("DEMON_RITUAL_EVENTS").await.is_ok() {
+                tracing::warn!("Using deprecated stream 'DEMON_RITUAL_EVENTS'; set RITUAL_STREAM_NAME or migrate to 'RITUAL_EVENTS'");
+            } else {
+                let _ = js
+                    .get_or_create_stream(jetstream::stream::Config {
+                        name: "RITUAL_EVENTS".to_string(),
+                        subjects: vec!["demon.ritual.v1.>".to_string()],
+                        ..Default::default()
+                    })
+                    .await?;
+            }
+        }
+    }
 
     let subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
     let mut headers = async_nats::HeaderMap::new();

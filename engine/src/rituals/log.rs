@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{debug, info};
 
-const STREAM_NAME: &str = "DEMON_RITUAL_EVENTS";
+const DEFAULT_STREAM_NAME: &str = "RITUAL_EVENTS";
+const DEPRECATED_STREAM_NAME: &str = "DEMON_RITUAL_EVENTS"; // kept for compatibility
 const STREAM_SUBJECTS: &str = "demon.ritual.v1.>";
 
 #[derive(Debug, Clone)]
@@ -66,20 +67,51 @@ impl EventLog {
 
         let jetstream = jetstream::new(client.clone());
 
-        // Create or get the stream
-        let stream = jetstream
-            .get_or_create_stream(jetstream::stream::Config {
-                name: STREAM_NAME.to_string(),
-                subjects: vec![STREAM_SUBJECTS.to_string()],
-                retention: jetstream::stream::RetentionPolicy::Limits,
-                storage: jetstream::stream::StorageType::File,
-                duplicate_window: std::time::Duration::from_secs(120), // 2 minute dedup window
-                ..Default::default()
-            })
-            .await
-            .context("Failed to create/get stream")?;
+        // Resolve stream name with precedence:
+        // RITUAL_STREAM_NAME env -> existing DEMON_RITUAL_EVENTS (deprecated) -> default RITUAL_EVENTS
+        let env_name = std::env::var("RITUAL_STREAM_NAME").ok();
+        let mut stream = if let Some(name) = env_name {
+            // Respect explicit name
+            jetstream
+                .get_or_create_stream(jetstream::stream::Config {
+                    name: name.clone(),
+                    subjects: vec![STREAM_SUBJECTS.to_string()],
+                    retention: jetstream::stream::RetentionPolicy::Limits,
+                    storage: jetstream::stream::StorageType::File,
+                    duplicate_window: std::time::Duration::from_secs(120),
+                    ..Default::default()
+                })
+                .await
+                .with_context(|| format!("Failed to create/get stream '{}'", name))?
+        } else {
+            // No env override: prefer RITUAL_EVENTS; if a deprecated stream exists, use it with a warning
+            match jetstream.get_stream(DEFAULT_STREAM_NAME).await {
+                Ok(s) => s,
+                Err(_) => match jetstream.get_stream(DEPRECATED_STREAM_NAME).await {
+                    Ok(s) => {
+                        info!(
+                            "Using deprecated stream name '{}'; set RITUAL_STREAM_NAME or migrate to '{}'",
+                            DEPRECATED_STREAM_NAME, DEFAULT_STREAM_NAME
+                        );
+                        s
+                    }
+                    Err(_) => jetstream
+                        .get_or_create_stream(jetstream::stream::Config {
+                            name: DEFAULT_STREAM_NAME.to_string(),
+                            subjects: vec![STREAM_SUBJECTS.to_string()],
+                            retention: jetstream::stream::RetentionPolicy::Limits,
+                            storage: jetstream::stream::StorageType::File,
+                            duplicate_window: std::time::Duration::from_secs(120),
+                            ..Default::default()
+                        })
+                        .await
+                        .context("Failed to create/get default stream")?,
+                },
+            }
+        };
 
-        info!("Connected to JetStream stream: {}", STREAM_NAME);
+        let stream_info = stream.info().await.context("Failed to fetch stream info")?;
+        info!("Connected to JetStream stream: {}", stream_info.config.name);
 
         Ok(Self {
             client,
