@@ -61,6 +61,20 @@ jobs:
           echo "$OUT" | grep -q '"event": "ritual.completed:v1"'
           echo "$OUT" | grep -q 'Hello from Demon!' || true  # printed to stdout by capsule; may be interleaved
 
+      - name: Playwright smoke (Operate UI banner)
+        working-directory: operate-ui/playwright
+        env:
+          BASE_URL: http://127.0.0.1:3000
+        run: |
+          # Start server on 3000 without stream bootstrap
+          export DEMON_SKIP_STREAM_BOOTSTRAP=1
+          (cd ../.. && RUST_LOG=info cargo run -p operate-ui --quiet &) 
+          # Wait for port 3000 to open
+          for i in {1..60}; do nc -z 127.0.0.1 3000 && break; sleep 0.5; done
+          npm install
+          npx playwright install --with-deps
+          npm test
+
       - name: Teardown NATS
         if: always()
         run: docker rm -f nats || true
