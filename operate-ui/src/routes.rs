@@ -1,4 +1,5 @@
 use crate::jetstream::{RunDetail, RunSummary};
+use crate::templates::{EventVm, RunDetailVm, RunListItemVm};
 use crate::{AppError, AppState};
 
 use axum::{

@@ -2,6 +2,7 @@
 
 pub mod jetstream;
 pub mod routes;
+pub mod templates;
 
 use anyhow::Result;
 use axum::{
