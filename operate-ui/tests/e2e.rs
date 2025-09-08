@@ -61,6 +61,7 @@ fn create_test_app() -> axum::Router {
     let state = AppState {
         jetstream_client: None, // Simulate JetStream unavailable for testing
         tera,
+        template_ready: true,
     };
 
     operate_ui::create_app(state)
