@@ -1,5 +1,6 @@
 //! Minimal ritual interpreter for Milestone 0 (single task with end=true)
 
+pub mod approvals;
 pub mod log;
 pub mod state;
 pub mod timers;
