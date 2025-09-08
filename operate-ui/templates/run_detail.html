@@ -33,11 +33,11 @@
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
         <div>
             <strong>Run ID:</strong><br>
-            <code>{{ run.run_id }}</code>
+            <code>{{ run.runId }}</code>
         </div>
         <div>
             <strong>Ritual ID:</strong><br>
-            <code>{{ run.ritual_id }}</code>
+            <code>{{ run.ritualId }}</code>
         </div>
         <div>
             <strong>Started:</strong><br>
@@ -86,14 +86,14 @@
                         <td>
                             {% if event.stateFrom or event.stateTo %}
                                 <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                    {% if event.state_from %}
-                                        <code>{{ event.state_from }}</code>
+                                    {% if event.stateFrom %}
+                                        <code>{{ event.stateFrom }}</code>
                                     {% else %}
                                         <span style="color: var(--text-secondary);">-</span>
                                     {% endif %}
                                     <span>→</span>
-                                    {% if event.state_to %}
-                                        <code>{{ event.state_to }}</code>
+                                    {% if event.stateTo %}
+                                        <code>{{ event.stateTo }}</code>
                                     {% else %}
                                         <span style="color: var(--text-secondary);">-</span>
                                     {% endif %}
