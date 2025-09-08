@@ -50,6 +50,45 @@
     </div>
 </div>
 
+{% if approvals %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Approvals</h3>
+        <span class="status-indicator {{ approvals.statusClass }}">{{ approvals.status }}</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+        <div>
+            <strong>Gate</strong><br>
+            <code>{{ approvals.gateId }}</code>
+        </div>
+        {% if approvals.requester %}
+        <div>
+            <strong>Requester</strong><br>
+            <code>{{ approvals.requester }}</code>
+        </div>
+        {% endif %}
+        {% if approvals.approver %}
+        <div>
+            <strong>Approver</strong><br>
+            <code>{{ approvals.approver }}</code>
+        </div>
+        {% endif %}
+        {% if approvals.reason %}
+        <div>
+            <strong>Reason</strong><br>
+            <span>{{ approvals.reason }}</span>
+        </div>
+        {% endif %}
+        {% if approvals.note %}
+        <div>
+            <strong>Note</strong><br>
+            <span>{{ approvals.note }}</span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">Event Timeline</h3>

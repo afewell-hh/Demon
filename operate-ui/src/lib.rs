@@ -8,7 +8,7 @@ use axum::{
     handler::HandlerWithoutStateExt,
     http::StatusCode,
     response::{Html, IntoResponse, Response},
-    routing::{get, get_service},
+    routing::{get, get_service, post},
     Router,
 };
 use tera::Tera;
@@ -160,6 +160,15 @@ pub fn create_app(state: AppState) -> Router {
         .route("/runs/:run_id", get(routes::get_run_html))
         .route("/api/runs", get(routes::list_runs_api))
         .route("/api/runs/:run_id", get(routes::get_run_api))
+        // Approvals endpoints (publish Granted/Denied)
+        .route(
+            "/api/approvals/:run_id/:gate_id/grant",
+            post(routes::grant_approval_api),
+        )
+        .route(
+            "/api/approvals/:run_id/:gate_id/deny",
+            post(routes::deny_approval_api),
+        )
         .route(
             "/static/*path",
             get_service(
