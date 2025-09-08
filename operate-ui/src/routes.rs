@@ -42,8 +42,19 @@ pub async fn list_runs_html(
         None => (vec![], Some("JetStream is not available".to_string())),
     };
 
+    // Map to view models (camelCase)
+    let runs_vm: Vec<RunListItemVm> = runs
+        .into_iter()
+        .map(|r| RunListItemVm {
+            run_id: r.run_id,
+            ritual_id: r.ritual_id,
+            start_ts: r.start_ts.to_rfc3339(),
+            status: r.status.to_string(),
+        })
+        .collect();
+
     let mut context = tera::Context::new();
-    context.insert("runs", &runs);
+    context.insert("runs", &runs_vm);
     context.insert("error", &error);
     context.insert("jetstream_available", &state.jetstream_client.is_some());
 
@@ -87,25 +98,24 @@ pub async fn list_runs_api(
                 Json(runs).into_response()
             }
             Err(e) => {
+                // Fallback: serve 200 with empty runs and a warning header
                 error!("Failed to retrieve runs: {}", e);
-                (
-                    StatusCode::BAD_GATEWAY,
-                    Json(serde_json::json!({
-                        "error": format!("Failed to retrieve runs: {}", e)
-                    })),
-                )
-                    .into_response()
+                let mut headers = axum::http::HeaderMap::new();
+                headers.insert(
+                    "X-Demon-Warn",
+                    axum::http::HeaderValue::from_static("JetStreamUnavailable"),
+                );
+                (StatusCode::OK, headers, Json(serde_json::json!({ "runs": [] }))).into_response()
             }
         },
         None => {
-            error!("JetStream client not available");
-            (
-                StatusCode::BAD_GATEWAY,
-                Json(serde_json::json!({
-                    "error": "JetStream is not available"
-                })),
-            )
-                .into_response()
+            // Fallback when JetStream isn't configured
+            let mut headers = axum::http::HeaderMap::new();
+            headers.insert(
+                "X-Demon-Warn",
+                axum::http::HeaderValue::from_static("JetStreamUnavailable"),
+            );
+            (StatusCode::OK, headers, Json(serde_json::json!({ "runs": [] }))).into_response()
         }
     }
 }
@@ -118,7 +128,7 @@ pub async fn get_run_html(
 ) -> Html<String> {
     debug!("Handling HTML request for run detail: {}", run_id);
 
-    let (run, error) = match &state.jetstream_client {
+    let (run_vm, error) = match &state.jetstream_client {
         Some(client) => match client.get_run_detail(&run_id).await {
             Ok(run) => {
                 if run.is_some() {
@@ -126,26 +136,26 @@ pub async fn get_run_html(
                 } else {
                     info!("Run not found: {}", run_id);
                 }
-                (run, None)
+                (run.map(map_run_detail), None)
             }
             Err(e) => {
                 error!("Failed to retrieve run detail: {}", e);
-                (None, Some(format!("Failed to retrieve run: {}", e)))
+                (None, Some(format!("Failed to retrieve run detail: {}", e)))
             }
         },
         None => (None, Some("JetStream is not available".to_string())),
     };
 
     let mut context = tera::Context::new();
-    context.insert("run", &run);
+    context.insert("run", &run_vm);
     context.insert("error", &error);
     context.insert("jetstream_available", &state.jetstream_client.is_some());
     context.insert("run_id", &run_id);
 
     // View helpers to avoid template method calls
-    if let Some(ref rd) = run {
+    if let Some(ref rd) = run_vm {
         // started timestamp: first event ts if present
-        let started = rd.events.first().map(|e| e.ts.to_rfc3339());
+        let started = rd.events.first().map(|e| e.ts.clone());
         context.insert("run_started", &started);
 
         // status and class based on last event
@@ -303,6 +313,51 @@ impl crate::jetstream::RitualEvent {
     pub fn has_state_transition(&self) -> bool {
         self.state_from.is_some() || self.state_to.is_some()
     }
+}
+
+// Convert domain types into stable view models (camelCase)
+fn map_run_detail(rd: RunDetail) -> RunDetailVm {
+    let events = rd
+        .events
+        .into_iter()
+        .map(|e| EventVm {
+            ts: e.ts.to_rfc3339(),
+            event: e.event,
+            state_from: e.state_from,
+            state_to: e.state_to,
+            extra: if e.extra.is_empty() {
+                None
+            } else {
+                Some(serde_json::to_value(e.extra).unwrap_or(serde_json::json!({})))
+            },
+        })
+        .collect();
+    RunDetailVm {
+        run_id: rd.run_id,
+        ritual_id: rd.ritual_id,
+        events,
+    }
+}
+
+// Admin: template report endpoint
+#[derive(serde::Serialize)]
+pub struct TemplateReport {
+    templates: Vec<String>,
+    has_filter_tojson: bool,
+    template_ready: bool,
+}
+
+pub async fn template_report(State(state): State<AppState>) -> axum::Json<TemplateReport> {
+    let list = state
+        .tera
+        .get_template_names()
+        .map(|s| s.to_string())
+        .collect();
+    axum::Json(TemplateReport {
+        templates: list,
+        has_filter_tojson: state.tera.get_filter("tojson").is_ok(),
+        template_ready: state.template_ready,
+    })
 }
 
 #[cfg(test)]

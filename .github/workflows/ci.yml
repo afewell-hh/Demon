@@ -50,6 +50,17 @@ jobs:
           done
           echo "NATS did not report ready in time"; docker logs nats; exit 1
 
+      - name: Template readiness guard (no stream bootstrap)
+        env:
+          DEMON_SKIP_STREAM_BOOTSTRAP: "1"
+        run: |
+          ( RUST_LOG=info cargo run -p operate-ui --quiet & echo $! > /tmp/ui_pid )
+          for i in {1..60}; do nc -z 127.0.0.1 3000 && break; sleep 0.5; done
+          OUT=$(curl -s http://127.0.0.1:3000/admin/templates/report)
+          echo "$OUT" | jq .
+          echo "$OUT" | jq -e '.template_ready == true' >/dev/null
+          kill $(cat /tmp/ui_pid) || true
+
       - name: Smoke run (demonctl)
         run: |
           set -euo pipefail
