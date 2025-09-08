@@ -94,6 +94,95 @@ The API should return 200 with empty runs and a warning header. Create the strea
 JetStream unavailable
 You’ll still see /runs with a banner and /api/runs 200 + warning. Check your NATS/JetStream (make dev), then seed events.
 
+### Admin Templates Report — Field reference
+
+Use this to confirm the UI is wired correctly before debugging anything else.
+
+Example response:
+
+{
+  "templates": ["base.html", "runs_list.html", "run_detail.html", "error.html"],
+  "has_filter_tojson": true,
+  "template_ready": true
+}
+
+
+templates: The set Tera loaded at boot. Missing files here means a glob/path issue.
+
+has_filter_tojson: true iff custom filters were registered before first render.
+
+template_ready: true iff the boot self-test successfully rendered minimal contexts for runs_list.html and run_detail.html.
+
+### Environment quick reference
+```
+# NATS connection
+export NATS_URL="nats://127.0.0.1:4222"
+
+# Ritual event stream configuration
+export RITUAL_STREAM_NAME="RITUAL_EVENTS"
+export RITUAL_SUBJECTS="demon.ritual.v1.>"
+
+# Dev/test toggles
+export DEMON_SKIP_STREAM_BOOTSTRAP=0   # 1 = don't auto-create stream on boot
+export WARDS_ENABLED=0                 # 1 = enable engine policy guard (deny-by-default)
+```
+
+### HTTP expectations (sanity map)
+
+/health → 200 Ok
+
+/admin/templates/report → 200 JSON with template_ready and has_filter_tojson
+
+/api/runs
+
+No stream or NATS down: 200 with body {"runs":[]} and header X-Demon-Warn: JetStreamUnavailable (or similar)
+
+Stream exists: 200 with one or more runs
+
+/api/runs/:runId
+
+Unknown run: 404 {"error":"not found"} (non-fatal)
+
+Known run: 200 with ordered history
+
+/runs
+
+No stream: banner “No event stream found. See Runbook: setup.”
+
+Stream exists: renders list without 500s
+
+/runs/:runId
+
+Renders detail without 500s; shows timeline/table
+
+### Quick reset (local NATS/JetStream)
+```
+# Drop and recreate the ritual events stream (DANGEROUS: deletes local events!)
+nats stream rm "$RITUAL_STREAM_NAME" -f || true
+nats stream add "$RITUAL_STREAM_NAME" --subjects="$RITUAL_SUBJECTS" --retention=limits --storage=file --dupe-window=2m --discard=new
+```
+
+### Common causes → fixes
+
+template_ready=false
+Globs or filters not loaded. Confirm crate-absolute glob, re-run, and check has_filter_tojson.
+
+Banner shows / API warns (X-Demon-Warn)
+Stream missing or NATS down. Create the stream (see reset) or start NATS (make dev), then seed events.
+
+Templates reference snake_case
+Replace with camelCase VM fields (run.runId, event.stateFrom/stateTo).
+
+Wrong stream name
+App expects RITUAL_STREAM_NAME; either set the env or recreate the stream with that name.
+
+Known-good one-liner (seed two events)
+```
+export RITUAL="echo-ritual"; export RUN="local-run-1"
+nats pub "demon.ritual.v1.$RITUAL.$RUN.events" '{"event":"ritual.started:v1","ritualId":"'"$RITUAL"'","runId":"'"$RUN"'","ts":"2025-01-01T00:00:00Z"}' --header Nats-Msg-Id:"$RUN:1"
+nats pub "demon.ritual.v1.$RITUAL.$RUN.events" '{"event":"ritual.completed:v1","ritualId":"'"$RITUAL"'","runId":"'"$RUN"'","ts":"2025-01-01T00:00:05Z","outputs":{"printed":"Hello"}}' --header Nats-Msg-Id:"$RUN:2"
+```
+
 ## Overview
 
 The Operate UI provides:
