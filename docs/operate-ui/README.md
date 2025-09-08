@@ -65,6 +65,19 @@ asyncio.run(main())
 PY
 ```
 
+Manual seeding (one‑liners)
+```bash
+# Started
+nats pub -H 'Nats-Msg-Id: e2e-run:1' \
+  demon.ritual.v1.e2e-ritual.e2e-run.events \
+  '{"event":"ritual.started:v1","ritualId":"e2e-ritual","runId":"e2e-run","ts":"2025-01-01T00:00:00Z"}'
+
+# Completed
+nats pub -H 'Nats-Msg-Id: e2e-run:2' \
+  demon.ritual.v1.e2e-ritual.e2e-run.events \
+  '{"event":"ritual.completed:v1","ritualId":"e2e-ritual","runId":"e2e-run","ts":"2025-01-01T00:00:05Z","outputs":{"printed":"Hello from test"}}'
+```
+
 5) Refresh UI
 - /api/runs now lists the run
 - /api/runs/e2e-run shows ordered events
