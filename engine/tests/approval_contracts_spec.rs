@@ -1,0 +1,53 @@
+use jsonschema::{Draft, JSONSchema};
+use std::{fs, path::Path};
+
+fn load(p: &str) -> serde_json::Value {
+    serde_json::from_str(&fs::read_to_string(p).expect(p)).expect(p)
+}
+
+#[test]
+fn approval_fixtures_validate_against_schemas() {
+    let schemas = [
+        (
+            "contracts/schemas/approval.requested.v1.json",
+            "contracts/fixtures/approvals/approval.requested.v1.json",
+        ),
+        (
+            "contracts/schemas/approval.granted.v1.json",
+            "contracts/fixtures/approvals/approval.granted.v1.json",
+        ),
+        (
+            "contracts/schemas/approval.denied.v1.json",
+            "contracts/fixtures/approvals/approval.denied.v1.json",
+        ),
+    ];
+
+    for (schema_path, fixture_path) in schemas {
+        assert!(Path::new(schema_path).exists(), "missing {schema_path}");
+        assert!(Path::new(fixture_path).exists(), "missing {fixture_path}");
+
+        let schema_text = fs::read_to_string(schema_path).expect(schema_path);
+        let fixture_text = fs::read_to_string(fixture_path).expect(fixture_path);
+
+        if schema_text.trim().is_empty() || fixture_text.trim().is_empty() {
+            eprintln!(
+                "skipping validation for placeholders: {} / {}",
+                schema_path, fixture_path
+            );
+            continue; // allow bootstrap placeholders until agent fills them
+        }
+
+        let schema = JSONSchema::options()
+            .with_draft(Draft::Draft202012)
+            .compile(&serde_json::from_str(&schema_text).expect("parse schema"))
+            .expect("schema compiles");
+        let instance: serde_json::Value =
+            serde_json::from_str(&fixture_text).expect("parse fixture");
+
+        if let Err(e) = schema.validate(&instance) {
+            let errs: Vec<String> = e.map(|e| e.to_string()).collect();
+            panic!("fixture {} failed:\n{}", fixture_path, errs.join("\n"));
+        }
+    }
+}
+
