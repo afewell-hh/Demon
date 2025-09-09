@@ -19,6 +19,7 @@ async-nats = { workspace = true }
 tokio = { workspace = true }
 futures-util = { workspace = true }
 wards = { path = "../wards" }
+tracing-subscriber = { workspace = true }
 
 [dev-dependencies]
 jsonschema = { workspace = true }

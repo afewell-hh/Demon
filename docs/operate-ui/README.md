@@ -25,6 +25,23 @@ Then visit:
 - Review protocol: open PR as Draft, satisfy the Evidence Checklist, then freeze at a commit SHA for review.
 - Stream selection: set `RITUAL_STREAM_NAME` (default `RITUAL_EVENTS`). If absent, the UI will fall back to the legacy `DEMON_RITUAL_EVENTS` stream and log a deprecation warning.
 
+## Approval TTL
+
+- Env: `APPROVAL_TTL_SECONDS` (default `0`, disabled). Example: `export APPROVAL_TTL_SECONDS=5`.
+- Behavior: when `approval.requested:v1` is appended (via engine hook), a timer is scheduled for `requested_ts + TTL` with ID `"{runId}:approval:{gateId}:expiry"`.
+- On expiry: if no terminal exists for the gate, the system appends `approval.denied:v1` with `{"reason":"expired","approver":"system"}` using idempotency key `"{runId}:approval:{gateId}:denied"`.
+- UI: shows status as `Denied — expired` when the denial reason is `expired`.
+
+## TTL Worker (approvals expiry)
+
+- Start: `TTL_WORKER_ENABLED=1 cargo run -p engine --bin demon-ttl-worker`
+- Env:
+  - `NATS_URL` (default `nats://127.0.0.1:4222`)
+  - `RITUAL_STREAM_NAME` (optional; else `RITUAL_EVENTS` then `DEMON_RITUAL_EVENTS`)
+  - `TTL_CONSUMER_NAME` (default `ttl-worker`), `TTL_BATCH` (100), `TTL_PULL_TIMEOUT_MS` (1500)
+- Behavior: consumes `timer.scheduled:v1` on `demon.ritual.v1.*.*.events`, calls auto-expiry, acks on success/no-op.
+- Monitoring: logs `ttl_worker` events and in-process counters.
+
 ## Approvals Endpoints — HTTP Semantics
 
 Endpoints:

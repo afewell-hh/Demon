@@ -40,6 +40,17 @@ pub fn preempt_expiry_if_terminal(
     false
 }
 
+/// Parse an approvals expiry timer id of the form "{runId}:approval:{gateId}:expiry".
+/// Returns Some((run_id, gate_id)) if the format matches, otherwise None.
+pub fn parse_approval_expiry_timer_id(timer_id: &str) -> Option<(String, String)> {
+    let parts: Vec<&str> = timer_id.split(':').collect();
+    if parts.len() == 4 && parts[1] == "approval" && parts[3] == "expiry" {
+        Some((parts[0].to_string(), parts[2].to_string()))
+    } else {
+        None
+    }
+}
+
 /// Emit approval.requested:v1 exactly once for a given (runId, gateId).
 /// Subject: demon.ritual.v1.<ritualId>.<runId>.events
 /// Idempotency: Nats-Msg-Id = "<runId>:approval:<gateId>"
