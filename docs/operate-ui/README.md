@@ -45,7 +45,10 @@ Then visit:
 ## Preview Mode
 
 - See docs/preview/alpha/runbook.md for a 10‑minute, one‑command demo.
-- After starting the UI and TTL worker, run `./examples/seed/seed_preview.sh` and open `/runs`.
+ - After starting the UI and TTL worker, run `./examples/seed/seed_preview.sh` and open `/runs`.
+ - Preview Mode links:
+   - Runbook (One‑Pager): `docs/preview/alpha/runbook.md`
+   - Client Deck (5 slides): `docs/preview/alpha/deck.md`
 - Admin: `/admin/templates/report` shows `template_ready=true` and `has_filter_tojson=true`.
 
 ## Approvals Endpoints — HTTP Semantics
