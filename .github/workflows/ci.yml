@@ -133,8 +133,9 @@ jobs:
       - name: Start Operate UI (background)
         env:
           RITUAL_STREAM_NAME: RITUAL_EVENTS
+          APPROVER_ALLOWLIST: ops@example.com
         run: |
-          nohup bash -c 'RITUAL_STREAM_NAME=RITUAL_EVENTS cargo run -q -p operate-ui' >/tmp/ui.log 2>&1 &
+          nohup bash -c 'APPROVER_ALLOWLIST=ops@example.com RITUAL_STREAM_NAME=RITUAL_EVENTS cargo run -q -p operate-ui' >/tmp/ui.log 2>&1 &
           for i in {1..60}; do
             curl -sf http://127.0.0.1:3000/api/runs >/dev/null 2>&1 && break || true
             sleep 0.5
