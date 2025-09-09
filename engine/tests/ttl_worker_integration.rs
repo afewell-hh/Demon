@@ -1,5 +1,6 @@
 //! Ignored by default; requires NATS dev environment.
 use chrono::{Duration, Utc};
+use futures_util::StreamExt;
 
 #[tokio::test]
 #[ignore]

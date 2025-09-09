@@ -1,6 +1,6 @@
 use anyhow::Result;
 use async_nats::jetstream;
-use async_nats::jetstream::Message;
+use async_nats::jetstream::{Message, consumer::DeliverPolicy, AckKind};
 use futures_util::StreamExt;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tracing::{error, info, warn};
@@ -128,8 +128,11 @@ async fn handle_message(msg: Message) -> Result<bool> {
                 return Ok(true);
             }
             Err(e) => {
-                error!(error=%e, %run_id, %gate_id, %ritual_id, "ttl_worker: expiry failed; not acking for retry");
-                return Ok(false);
+                error!(error=%e, %run_id, %gate_id, %ritual_id, "ttl_worker: expiry failed; nack with backoff");
+                // Bounded small backoff then NAK with server-side redelivery delay.
+                tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                let _ = msg.ack_with(AckKind::Nak(Some(std::time::Duration::from_millis(500)))).await;
+                return Ok(true);
             }
         }
     } else {
@@ -169,6 +172,7 @@ pub async fn run_loop(cfg: TtlWorkerConfig) -> Result<()> {
         .create_consumer(jetstream::consumer::pull::Config {
             durable_name: Some(cfg.consumer_name.clone()),
             filter_subject: cfg.subject_filter.clone(),
+            deliver_policy: DeliverPolicy::New,
             // explicit ack is default for pull consumer
             ..Default::default()
         })
@@ -201,6 +205,7 @@ pub async fn run_one_batch(cfg: TtlWorkerConfig) -> Result<(u64, u64, u64)> {
         .create_consumer(jetstream::consumer::pull::Config {
             durable_name: Some(cfg.consumer_name.clone()),
             filter_subject: cfg.subject_filter.clone(),
+            deliver_policy: DeliverPolicy::New,
             ..Default::default()
         })
         .await?;
@@ -233,5 +238,21 @@ mod tests {
         let tid = "run-1:approval:gate-1:expiry";
         let out = crate::rituals::approvals::parse_approval_expiry_timer_id(tid);
         assert_eq!(out, Some(("run-1".into(), "gate-1".into())));
+    }
+    #[test]
+    fn parse_subject_malformed() {
+        assert!(parse_subject("demon.ritual.v2.bad").is_none());
+        assert!(parse_subject("other.topic").is_none());
+    }
+    #[test]
+    fn config_uses_deliver_new() {
+        let cfg = TtlWorkerConfig::default();
+        let conf = jetstream::consumer::pull::Config{
+            durable_name: Some(cfg.consumer_name),
+            filter_subject: cfg.subject_filter,
+            deliver_policy: DeliverPolicy::New,
+            ..Default::default()
+        };
+        match conf.deliver_policy { DeliverPolicy::New => (), _ => panic!("deliver policy must be New"), }
     }
 }

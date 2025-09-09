@@ -1,5 +1,7 @@
 //! Ignored by default; requires NATS and simulates restart.
 
+use futures_util::StreamExt;
+
 #[tokio::test]
 #[ignore]
 async fn restart_resume_exactly_once() {
