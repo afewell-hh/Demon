@@ -82,3 +82,7 @@ curl -s http://127.0.0.1:3000/api/runs | jq 'length >= 1'
 curl -s http://127.0.0.1:3000/api/runs/<grantRun> | jq '.events | map(.event) | index("approval.granted:v1") != null'
 curl -s http://127.0.0.1:3000/api/runs/<ttlRun> | jq '.events | map(select(.event=="approval.denied:v1" and .reason=="expired")) | length == 1'
 ```
+
+Presenter & Dry‑Run
+- Presenter Script (60‑sec): `docs/preview/alpha/presenter_script.md`
+- Dry‑Run Checklist: `docs/preview/alpha/dry_run_checklist.md`

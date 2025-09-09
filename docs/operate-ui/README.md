@@ -49,6 +49,8 @@ Then visit:
  - Preview Mode links:
    - Runbook (One‑Pager): `docs/preview/alpha/runbook.md`
    - Client Deck (5 slides): `docs/preview/alpha/deck.md`
+   - Presenter Script (60‑sec): `docs/preview/alpha/presenter_script.md`
+   - Dry‑Run Checklist: `docs/preview/alpha/dry_run_checklist.md`
 - Admin: `/admin/templates/report` shows `template_ready=true` and `has_filter_tojson=true`.
 
 ## Approvals Endpoints — HTTP Semantics
