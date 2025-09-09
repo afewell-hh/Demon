@@ -99,4 +99,3 @@ pub fn quota_json(decision: &KernelDecision) -> Value {
         "remaining": decision.remaining,
     })
 }
-

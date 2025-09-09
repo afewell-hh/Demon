@@ -29,20 +29,44 @@ fn precedence_cap_overrides_tenant_and_global() {
     let cfg = load_from_env();
 
     let q = cfg.effective_quota("tenant-a", "capsule.http");
-    assert_eq!(q, QuotaCfg { limit: 1, window_seconds: 60 });
+    assert_eq!(
+        q,
+        QuotaCfg {
+            limit: 1,
+            window_seconds: 60
+        }
+    );
 
     let q = cfg.effective_quota("tenant-a", "capsule.unknown");
-    assert_eq!(q, QuotaCfg { limit: 2, window_seconds: 60 });
+    assert_eq!(
+        q,
+        QuotaCfg {
+            limit: 2,
+            window_seconds: 60
+        }
+    );
 
     let q = cfg.effective_quota("unknown", "capsule.any");
-    assert_eq!(q, QuotaCfg { limit: 100, window_seconds: 300 });
+    assert_eq!(
+        q,
+        QuotaCfg {
+            limit: 100,
+            window_seconds: 300
+        }
+    );
 
     std::env::remove_var("WARDS_CAP_QUOTAS");
     std::env::remove_var("WARDS_QUOTAS");
     std::env::remove_var("WARDS_GLOBAL_QUOTA");
     let cfg2 = load_from_env();
     let q = cfg2.effective_quota("t", "c");
-    assert_eq!(q, QuotaCfg { limit: 0, window_seconds: 60 });
+    assert_eq!(
+        q,
+        QuotaCfg {
+            limit: 0,
+            window_seconds: 60
+        }
+    );
 }
 
 #[test]
@@ -83,4 +107,3 @@ fn two_caps_independent_counters_property() {
     }
     assert_eq!(ok2, 1);
 }
-

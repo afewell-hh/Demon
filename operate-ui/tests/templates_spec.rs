@@ -6,4 +6,3 @@ fn run_detail_renders_approval_rows() {
     // Then HTML contains "Pending approval", "Granted", "Denied" badges without 500s
     unreachable!("agent will implement");
 }
-

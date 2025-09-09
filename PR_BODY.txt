@@ -1,0 +1,9 @@
+Implements REQUEST-M2C-3: minimal durable TTL worker.
+
+- Durable pull consumer (`TTL_CONSUMER_NAME`, default `ttl-worker`), subject filter `demon.ritual.v1.*.*.events`.
+- Filters `timer.scheduled:v1` where `timerId == "{runId}:approval:{gateId}:expiry"`.
+- Calls `process_expiry_if_pending(..)`; acks on success/no-op, leaves unacked on error.
+- Binary: `demon-ttl-worker` (guarded by `TTL_WORKER_ENABLED=1`).
+- Unit helpers + ignored NATS integrations.
+
+Review-lock: 0840265 (084026586c1bbf8784b0f525d17aa745a64222c5)

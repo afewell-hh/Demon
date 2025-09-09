@@ -33,4 +33,3 @@ fn decision_reason_omitted_when_allowed() {
         serde_json::json!("limit_exceeded")
     );
 }
-

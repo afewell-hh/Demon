@@ -1,0 +1,24 @@
+
+Evidence update (worker polish)
+
+Build/lint/format
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+Unit tests
+```
+
+```
+
+Next in CI after NATS up:
+- cargo test -p engine --test ttl_worker_integration -- --ignored --nocapture
+- cargo test -p engine --test ttl_worker_restart    -- --ignored --nocapture

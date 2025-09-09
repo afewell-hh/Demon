@@ -70,9 +70,19 @@ impl PolicyKernel {
         if state.count < quota.limit {
             state.count += 1;
             let remaining = quota.limit - state.count;
-            Decision { allowed: true, limit: quota.limit, window_seconds: quota.window_seconds, remaining }
+            Decision {
+                allowed: true,
+                limit: quota.limit,
+                window_seconds: quota.window_seconds,
+                remaining,
+            }
         } else {
-            Decision { allowed: false, limit: quota.limit, window_seconds: quota.window_seconds, remaining: 0 }
+            Decision {
+                allowed: false,
+                limit: quota.limit,
+                window_seconds: quota.window_seconds,
+                remaining: 0,
+            }
         }
     }
 }
@@ -85,7 +95,10 @@ mod tests {
 
     #[test]
     fn counter_key_scopes_by_capability() {
-        assert_eq!(super::counter_key("t1", "capsule.echo"), "ten:t1|cap:capsule.echo");
+        assert_eq!(
+            super::counter_key("t1", "capsule.echo"),
+            "ten:t1|cap:capsule.echo"
+        );
     }
 
     #[test]
@@ -96,11 +109,17 @@ mod tests {
             HashMap::from([
                 (
                     "capsule.http".into(),
-                    QuotaCfg { limit: 1, window_seconds: 60 },
+                    QuotaCfg {
+                        limit: 1,
+                        window_seconds: 60,
+                    },
                 ),
                 (
                     "capsule.echo".into(),
-                    QuotaCfg { limit: 3, window_seconds: 60 },
+                    QuotaCfg {
+                        limit: 3,
+                        window_seconds: 60,
+                    },
                 ),
             ]),
         );
@@ -121,4 +140,3 @@ mod tests {
         assert_eq!(ok, 3);
     }
 }
-

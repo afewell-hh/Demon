@@ -1,6 +1,7 @@
 use jsonschema::JSONSchema;
 use std::{fs, path::Path};
 
+#[allow(dead_code)]
 fn load(p: &str) -> serde_json::Value {
     serde_json::from_str(&fs::read_to_string(p).expect(p)).expect(p)
 }
@@ -19,6 +20,10 @@ fn approval_fixtures_validate_against_schemas() {
         (
             "../contracts/schemas/approval.denied.v1.json",
             "../contracts/fixtures/approvals/approval.denied.v1.json",
+        ),
+        (
+            "../contracts/schemas/approval.denied.v1.json",
+            "../contracts/fixtures/approvals/approval.denied.expired.v1.json",
         ),
     ];
 
@@ -39,10 +44,9 @@ fn approval_fixtures_validate_against_schemas() {
                 continue; // allow bootstrap placeholders until agent fills them
             }
 
-            let schema = JSONSchema::compile(
-                &serde_json::from_str(&schema_text).expect("parse schema"),
-            )
-            .expect("schema compiles");
+            let schema =
+                JSONSchema::compile(&serde_json::from_str(&schema_text).expect("parse schema"))
+                    .expect("schema compiles");
             let instance: serde_json::Value =
                 serde_json::from_str(&fixture_text).expect("parse fixture");
 

@@ -63,7 +63,10 @@ async fn per_cap_quotas_are_independent_and_enforced() {
 
     let http_first = &http_events[0];
     let http_first_rem = http_first["quota"]["remaining"].as_u64().unwrap();
-    assert_eq!(http_first_rem, 0, "first http remaining must be 0 (limit 1)");
+    assert_eq!(
+        http_first_rem, 0,
+        "first http remaining must be 0 (limit 1)"
+    );
     let http_denied = http_events
         .iter()
         .find(|e| e["decision"]["allowed"] == Value::Bool(false))
@@ -81,4 +84,3 @@ async fn per_cap_quotas_are_independent_and_enforced() {
         "echo remaining should decrement from 5"
     );
 }
-
