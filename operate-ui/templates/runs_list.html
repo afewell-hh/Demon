@@ -43,11 +43,11 @@
                     {% for run in runs %}
                     <tr>
                         <td>
-                            <a href="/runs/{{ run.run_id }}">
-                                <code>{{ run.run_id }}</code>
+                            <a href="/runs/{{ run.runId }}">
+                                <code>{{ run.runId }}</code>
                             </a>
                         </td>
-                        <td><code>{{ run.ritual_id }}</code></td>
+                        <td><code>{{ run.ritualId }}</code></td>
                         <td>{{ run.startTs }}</td>
                         <td>
                             {% set status_class = "status-running" %}
@@ -59,7 +59,7 @@
                             <span class="status-indicator {{ status_class }}">{{ run.status }}</span>
                         </td>
                         <td>
-                            <a href="/runs/{{ run.run_id }}" class="btn btn-secondary btn-sm">View Details</a>
+                            <a href="/runs/{{ run.runId }}" class="btn btn-secondary btn-sm">View Details</a>
                         </td>
                     </tr>
                     {% endfor %}

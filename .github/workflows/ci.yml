@@ -158,11 +158,11 @@ jobs:
         run: |
           set -euo pipefail
           # Runs list
-          curl -s http://127.0.0.1:3000/api/runs | jq '.runs | length >= 1' | grep -q true
+          curl -s http://127.0.0.1:3000/api/runs | jq 'length >= 1' | grep -q true
           # Granted present
-          curl -s http://127.0.0.1:3000/api/runs/run-preview-b | jq '.history | map(.event) | index("approval.granted:v1") != null' | grep -q true
+          curl -s http://127.0.0.1:3000/api/runs/run-preview-b | jq '.events | map(.event) | index("approval.granted:v1") != null' | grep -q true
           # TTL expired present once
-          curl -s http://127.0.0.1:3000/api/runs/run-preview-c | jq '.history | map(select(.event=="approval.denied:v1" and .reason=="expired")) | length == 1' | grep -q true
+          curl -s http://127.0.0.1:3000/api/runs/run-preview-c | jq '.events | map(select(.event=="approval.denied:v1" and .reason=="expired")) | length == 1' | grep -q true
           # HTML renders
           curl -s http://127.0.0.1:3000/runs | grep -qi '<!doctype html>'
           curl -s http://127.0.0.1:3000/runs/run-preview-b | grep -qi '<!doctype html>'

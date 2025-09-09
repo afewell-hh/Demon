@@ -32,10 +32,11 @@ async fn main() -> Result<()> {
         .await?;
 
     if let Some(h) = headers {
-        js.publish_with_headers(subject, h, json.into()).await?.await?;
+        js.publish_with_headers(subject, h, json.into())
+            .await?
+            .await?;
     } else {
         js.publish(subject, json.into()).await?.await?;
     }
     Ok(())
 }
-

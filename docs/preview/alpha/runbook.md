@@ -30,11 +30,11 @@ Expected output ends with three subjects and run IDs.
 
 Verify via API
 ```bash
-curl -s http://127.0.0.1:3000/api/runs | jq '.runs | length >= 1'
+curl -s http://127.0.0.1:3000/api/runs | jq 'length >= 1'
 RUN_B=run-preview-b
 RUN_C=run-preview-c
-curl -s http://127.0.0.1:3000/api/runs/$RUN_B | jq '.history | map(.event) | index("approval.granted:v1") != null'
-curl -s http://127.0.0.1:3000/api/runs/$RUN_C | jq '.history | map(select(.event=="approval.denied:v1" and .reason=="expired")) | length == 1'
+curl -s http://127.0.0.1:3000/api/runs/$RUN_B | jq '.events | map(.event) | index("approval.granted:v1") != null'
+curl -s http://127.0.0.1:3000/api/runs/$RUN_C | jq '.events | map(select(.event=="approval.denied:v1" and .reason=="expired")) | length == 1'
 ```
 
 UI walkthrough
@@ -52,4 +52,3 @@ export WARDS_CAP_QUOTAS='{"capsule.http":"1/min","capsule.echo":"5/min"}'
 Troubleshooting
 - Port clash: set `NATS_PORT` and `NATS_URL` accordingly; re‑run `make dev`.
 - Empty UI: ensure stream exists; seed script creates `RITUAL_EVENTS` with `demon.ritual.v1.>` subject.
-

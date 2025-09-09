@@ -7,7 +7,7 @@ Entry
 
 Exit (acceptance)
 - Seed script completes with run IDs and subjects
-- /api/runs returns 200 and lists runs
+- /api/runs returns 200 and lists runs (array; `jq 'length >= 1'`)
 - Granted flow present (approval.requested -> approval.granted)
 - TTL auto-deny present (exactly one approval.denied with reason:"expired")
 - /runs and /runs/<id> render without error banners

@@ -2,6 +2,10 @@
 set -euo pipefail
 
 # Config
+# Honor NATS_PORT if provided; default 4222
+if [[ -z "${NATS_URL:-}" && -n "${NATS_PORT:-}" ]]; then
+  NATS_URL="nats://127.0.0.1:${NATS_PORT}"
+fi
 NATS_URL=${NATS_URL:-nats://127.0.0.1:4222}
 RITUAL_STREAM_NAME=${RITUAL_STREAM_NAME:-RITUAL_EVENTS}
 UI_URL=${UI_URL:-http://127.0.0.1:3000}
@@ -36,14 +40,14 @@ cargo run -q -p engine --bin demon-seed -- "$(subject $ritual $RUN_A)" "$pol_all
 cargo run -q -p engine --bin demon-seed -- "$(subject $ritual $RUN_A)" "$pol_deny"   "$RUN_A:policy:2"
 
 echo "Seeding Run B (approval requested -> grant via REST)"
-req_b=$(jq -n --arg ts "$(now)" --arg t "$tenant" --arg run "$RUN_B" --arg rit "$ritual" --arg gate "$GATE_B" '{event:"approval.requested:v1",ts:$ts,tenantId:$t,runId:$run,ritualId:$ritual,gateId:$gate,requester:"dev@example.com",reason:"promote"}')
+req_b=$(jq -n --arg ts "$(now)" --arg t "$tenant" --arg run "$RUN_B" --arg rit "$ritual" --arg gate "$GATE_B" '{event:"approval.requested:v1",ts:$ts,tenantId:$t,runId:$run,ritualId:$rit,gateId:$gate,requester:"dev@example.com",reason:"promote"}')
 cargo run -q -p engine --bin demon-seed -- "$(subject $ritual $RUN_B)" "$req_b" "$RUN_B:approval:$GATE_B"
 curl -sS -X POST "$UI_URL/api/approvals/$RUN_B/$GATE_B/grant" \
   -H 'content-type: application/json' \
   -d '{"approver":"ops@example.com","note":"ok"}' >/dev/null
 
 echo "Seeding Run C (approval requested -> TTL scheduled; worker will auto-deny)"
-req_c=$(jq -n --arg ts "$(now)" --arg t "$tenant" --arg run "$RUN_C" --arg rit "$ritual" --arg gate "$GATE_C" '{event:"approval.requested:v1",ts:$ts,tenantId:$t,runId:$run,ritualId:$ritual,gateId:$gate,requester:"dev@example.com",reason:"promote"}')
+req_c=$(jq -n --arg ts "$(now)" --arg t "$tenant" --arg run "$RUN_C" --arg rit "$ritual" --arg gate "$GATE_C" '{event:"approval.requested:v1",ts:$ts,tenantId:$t,runId:$run,ritualId:$rit,gateId:$gate,requester:"dev@example.com",reason:"promote"}')
 cargo run -q -p engine --bin demon-seed -- "$(subject $ritual $RUN_C)" "$req_c" "$RUN_C:approval:$GATE_C"
 timer_id=$(expiry_key "$RUN_C" "$GATE_C")
 scheduled_for=$(date -u -d "+5 seconds" +%Y-%m-%dT%H:%M:%SZ)
@@ -54,4 +58,3 @@ echo "Preview seed complete. Summary:"
 echo "- Subject: $(subject $ritual $RUN_A) | Run A: $RUN_A (policy allow -> deny)"
 echo "- Subject: $(subject $ritual $RUN_B) | Run B: $RUN_B (approvals grant)"
 echo "- Subject: $(subject $ritual $RUN_C) | Run C: $RUN_C (approvals TTL auto-deny)"
-

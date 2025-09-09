@@ -45,6 +45,7 @@ pub async fn list_runs_html(
     context.insert("runs", &runs);
     context.insert("error", &error);
     context.insert("jetstream_available", &state.jetstream_client.is_some());
+    context.insert("current_page", &"runs");
 
     let html = state
         .tera
@@ -140,6 +141,7 @@ pub async fn get_run_html(
     context.insert("error", &error);
     context.insert("jetstream_available", &state.jetstream_client.is_some());
     context.insert("run_id", &run_id);
+    context.insert("current_page", &"runs");
 
     // View helpers to avoid template method calls
     if let Some(ref rd) = run {
