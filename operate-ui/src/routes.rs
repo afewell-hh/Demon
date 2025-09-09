@@ -45,6 +45,7 @@ pub async fn list_runs_html(
     context.insert("runs", &runs);
     context.insert("error", &error);
     context.insert("jetstream_available", &state.jetstream_client.is_some());
+    context.insert("current_page", &"runs");
 
     let html = state
         .tera
@@ -140,6 +141,7 @@ pub async fn get_run_html(
     context.insert("error", &error);
     context.insert("jetstream_available", &state.jetstream_client.is_some());
     context.insert("run_id", &run_id);
+    context.insert("current_page", &"runs");
 
     // View helpers to avoid template method calls
     if let Some(ref rd) = run {
@@ -356,23 +358,31 @@ impl ApprovalsSummary {
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string()),
             }),
-            "approval.denied:v1" => Some(Self {
-                status: "Denied".to_string(),
-                status_class: "status-failed".to_string(),
-                gate_id,
-                requester: None,
-                approver: evt
-                    .extra
-                    .get("approver")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string()),
-                reason: evt
+            "approval.denied:v1" => {
+                let reason = evt
                     .extra
                     .get("reason")
                     .and_then(|v| v.as_str())
-                    .map(|s| s.to_string()),
-                note: None,
-            }),
+                    .map(|s| s.to_string());
+                let status = if matches!(reason.as_deref(), Some("expired")) {
+                    "Denied — expired".to_string()
+                } else {
+                    "Denied".to_string()
+                };
+                Some(Self {
+                    status,
+                    status_class: "status-failed".to_string(),
+                    gate_id,
+                    requester: None,
+                    approver: evt
+                        .extra
+                        .get("approver")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string()),
+                    reason,
+                    note: None,
+                })
+            }
             "approval.requested:v1" => Some(Self {
                 status: "Pending".to_string(),
                 status_class: "status-running".to_string(),

@@ -1,0 +1,83 @@
+
+Evidence (initial)
+
+Build/lint/format
+```
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.38s
+
+```
+
+```
+
+```
+
+```
+    Checking engine v0.1.0 (/home/ubuntu/afewell-hh/demon/engine)
+error: unneeded `return` statement
+   --> engine/src/rituals/worker/ttl_worker.rs:128:17
+    |
+128 |                 return Ok(true);
+    |                 ^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_return
+    = note: `-D clippy::needless-return` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_return)]`
+help: remove `return`
+    |
+128 -                 return Ok(true);
+128 +                 Ok(true)
+    |
+
+error: unneeded `return` statement
+   --> engine/src/rituals/worker/ttl_worker.rs:132:17
+    |
+132 |                 return Ok(false);
+    |                 ^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_return
+help: remove `return`
+    |
+132 -                 return Ok(false);
+132 +                 Ok(false)
+    |
+
+error: unneeded `return` statement
+   --> engine/src/rituals/worker/ttl_worker.rs:138:9
+    |
+138 |         return Ok(true);
+    |         ^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_return
+help: remove `return`
+    |
+138 -         return Ok(true);
+138 +         Ok(true)
+    |
+
+error: could not compile `engine` (lib) due to 3 previous errors
+
+```
+
+Unit tests (subset)
+```
+
+running 8 tests
+test rituals::log::tests::test_append_and_read ... ignored
+test rituals::log::tests::test_idempotency ... ignored
+test rituals::worker::ttl_worker::tests::parse_subject_happy ... ok
+test rituals::worker::ttl_worker::tests::parse_timer_id ... ok
+test rituals::state::tests::test_replay_produces_completed_state ... ok
+test rituals::state::tests::test_partial_replay ... ok
+test rituals::state::tests::test_replay_determinism ... ok
+test rituals::tests::parse_minimal_yaml ... ok
+
+test result: ok. 6 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.27s
+     Running unittests src/lib.rs (target/debug/deps/engine-033bad12e09d9a3a)
+
+```
+
+Integration plan (CI):
+- cargo test -p engine --test ttl_worker_integration -- --ignored --nocapture
+- cargo test -p engine --test ttl_worker_restart -- --ignored --nocapture

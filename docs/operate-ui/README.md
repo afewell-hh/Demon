@@ -42,6 +42,12 @@ Then visit:
 - Behavior: consumes `timer.scheduled:v1` on `demon.ritual.v1.*.*.events`, calls auto-expiry, acks on success/no-op.
 - Monitoring: logs `ttl_worker` events and in-process counters.
 
+## Preview Mode
+
+- See docs/preview/alpha/runbook.md for a 10‑minute, one‑command demo.
+- After starting the UI and TTL worker, run `./examples/seed/seed_preview.sh` and open `/runs`.
+- Admin: `/admin/templates/report` shows `template_ready=true` and `has_filter_tojson=true`.
+
 ## Approvals Endpoints — HTTP Semantics
 
 Endpoints:

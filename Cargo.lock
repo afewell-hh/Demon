@@ -658,10 +658,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-nats",
+ "axum",
  "chrono",
  "futures-util",
  "humantime",
  "jsonschema",
+ "operate-ui",
+ "reqwest 0.11.27",
  "runtime",
  "serde",
  "serde_json",
@@ -669,7 +672,9 @@ dependencies = [
  "tokio",
  "tokio-test",
  "tracing",
+ "tracing-subscriber",
  "uuid",
+ "wards",
 ]
 
 [[package]]
@@ -2929,6 +2934,10 @@ dependencies = [
 [[package]]
 name = "wards"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "wasi"

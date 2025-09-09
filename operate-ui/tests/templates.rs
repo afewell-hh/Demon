@@ -38,4 +38,35 @@ async fn templates_compile_and_render_minimal() {
         .render("run_detail.html", &ctx2)
         .expect("run_detail.html should render");
     assert!(html2.contains("Run test-run-123"));
+
+    // Smoke: approvals expired deny label renders
+    let mut ctx3 = tera::Context::new();
+    ctx3.insert(
+        "run",
+        &serde_json::json!({
+            "run_id": "run-x",
+            "ritual_id": "ritual-x",
+            "events": []
+        }),
+    );
+    ctx3.insert("jetstream_available", &true);
+    ctx3.insert("run_id", &"run-x");
+    ctx3.insert("current_page", &"runs");
+    // Fields normally provided by handler
+    ctx3.insert("run_status", &"Running");
+    ctx3.insert("run_status_class", &"status-running");
+    ctx3.insert(
+        "approvals",
+        &serde_json::json!({
+            "status": "Denied — expired",
+            "statusClass": "status-failed",
+            "gateId": "g1",
+            "approver": "system",
+            "reason": "expired"
+        }),
+    );
+    let html3 = tera
+        .render("run_detail.html", &ctx3)
+        .expect("run_detail.html should render with approvals");
+    assert!(html3.contains("Denied — expired"));
 }
