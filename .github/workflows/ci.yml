@@ -65,6 +65,13 @@ jobs:
         run: |
           cargo test -p engine --test approvals_integration -- --ignored --nocapture
 
+      - name: Engine approvals TTL integration (NATS)
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS
+          APPROVAL_TTL_SECONDS: 2
+        run: |
+          cargo test -p engine --test approvals_ttl_integration -- --ignored --nocapture
+
       - name: Operate UI approvals routes (NATS)
         env:
           RITUAL_STREAM_NAME: RITUAL_EVENTS

@@ -57,6 +57,19 @@ pub enum RitualEvent {
         #[serde(rename = "traceId", skip_serializing_if = "Option::is_none")]
         trace_id: Option<String>,
     },
+    #[serde(rename = "policy.decision:v1")]
+    PolicyDecision {
+        #[serde(rename = "ritualId")]
+        ritual_id: String,
+        #[serde(rename = "runId")]
+        run_id: String,
+        ts: String,
+        #[serde(rename = "tenantId")]
+        tenant_id: String,
+        capability: String,
+        decision: Value,
+        quota: Value,
+    },
 }
 
 impl EventLog {
@@ -129,6 +142,9 @@ impl EventLog {
                 ritual_id, run_id, ..
             }
             | RitualEvent::Completed {
+                ritual_id, run_id, ..
+            }
+            | RitualEvent::PolicyDecision {
                 ritual_id, run_id, ..
             } => (ritual_id, run_id),
         };

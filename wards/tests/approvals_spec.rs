@@ -19,4 +19,3 @@ fn request_then_deny_transitions_once() {
     assert!(a.deny("run-2", "gate-1", "approver", "because"));
     assert!(!a.grant("run-2", "gate-1", "approver", None)); // single-resolution rule
 }
-
