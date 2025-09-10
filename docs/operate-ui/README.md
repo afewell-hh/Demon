@@ -46,11 +46,16 @@ Then visit:
 
 - See docs/preview/alpha/runbook.md for a 10‑minute, one‑command demo.
  - After starting the UI and TTL worker, run `./examples/seed/seed_preview.sh` and open `/runs`.
- - Preview Mode links:
+- Preview Mode links:
    - Runbook (One‑Pager): `docs/preview/alpha/runbook.md`
    - Client Deck (5 slides): `docs/preview/alpha/deck.md`
    - Presenter Script (60‑sec): `docs/preview/alpha/presenter_script.md`
-   - Dry‑Run Checklist: `docs/preview/alpha/dry_run_checklist.md`
+  - Dry‑Run Checklist: `docs/preview/alpha/dry_run_checklist.md`
+
+## Admin Probe (dev-only)
+
+- Endpoint: `/admin/templates/report` returns JSON `{ template_ready, has_filter_tojson, templates }` used by the bootstrapper verify phase.
+- Optional auth: set `ADMIN_TOKEN` in the environment to require header `X-Admin-Token: <token>`; without it, the probe is unauthenticated (dev-only).
 - Admin: `/admin/templates/report` shows `template_ready=true` and `has_filter_tojson=true`.
 
 ## Approvals Endpoints — HTTP Semantics
