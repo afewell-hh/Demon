@@ -1,0 +1,13 @@
+{
+  "provider": "local",
+  "bundles": [
+    {
+      "name": "preview-local-dev",
+      "version": "0.0.1",
+      "path": "examples/bundles/local-dev.yaml",
+      "digest": { "sha256": "f691d7f0acf56b000bea35321d5dcdfcdc56a0f2f033f49840b86e2438d59445" },
+      "sig":    { "ed25519": "azOENOcSL/BhHwi9TAZQwrCpyR4GYml9kHgJUp9wYrNSoixdog7rF6VJvDYp4JkvO2BJzppRLwDh27Ik38kfCQ" },
+      "pubKeyId": "preview"
+    }
+  ]
+}
