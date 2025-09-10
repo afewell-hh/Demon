@@ -225,9 +225,6 @@ jobs:
           sleep 1
 
       - name: Bootstrap ensure+seed+verify (idempotent)
-        env:
-          RITUAL_STREAM_NAME: RITUAL_EVENTS
-          RITUAL_SUBJECTS: demon.ritual.v1.>
         run: |
           cargo run -q -p bootstrapper-demonctl -- --ensure-stream --seed --verify
           cargo run -q -p bootstrapper-demonctl -- --ensure-stream --seed --verify
