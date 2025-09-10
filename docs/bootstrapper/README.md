@@ -21,8 +21,8 @@ cargo run -p bootstrapper-demonctl -- \
 - `UI_URL` for verification (default `http://127.0.0.1:3000`)
 
 ## Verify criteria
+- `/admin/templates/report` JSON: `template_ready:true` and `has_filter_tojson:true`
 - `/api/runs` returns an array with ≥1 element
-- `/runs` returns HTML (basic template sanity)
 
 ## CI
-A smoke step should start NATS + Operate UI + TTL worker, then run `bootstrapper-demonctl --ensure-stream --seed --verify` and assert exit 0.
+A smoke step should start NATS + Operate UI + TTL worker with `APPROVER_ALLOWLIST=ops@example.com`, then run `bootstrapper-demonctl --ensure-stream --seed --verify` twice and assert exit 0.
