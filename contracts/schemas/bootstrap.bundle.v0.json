@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demon.dev/schemas/bootstrap.bundle.v0.json",
+  "title": "Demon Bootstrap Bundle (v0)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "nats": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": { "type": "string", "minLength": 1 }
+      },
+      "required": ["url"]
+    },
+    "stream": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "default": "RITUAL_EVENTS" },
+        "subjects": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["demon.ritual.v1.>"]
+        },
+        "duplicateWindowSeconds": { "type": "integer", "minimum": 0, "default": 120 }
+      },
+      "required": ["name", "subjects"]
+    },
+    "operateUi": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "baseUrl": { "type": "string", "minLength": 1 },
+        "approverAllowlist": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "adminToken": { "type": "string" }
+      },
+      "required": ["baseUrl"]
+    },
+    "seed": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "runs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "runId": { "type": "string", "minLength": 1 },
+              "ritualId": { "type": "string", "minLength": 1 },
+              "gates": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "gateId": { "type": "string", "minLength": 1 },
+                    "requester": { "type": "string", "minLength": 1 },
+                    "ttlSeconds": { "type": "integer", "minimum": 0 }
+                  },
+                  "required": ["gateId", "requester"]
+                },
+                "default": []
+              }
+            },
+            "required": ["runId", "ritualId"]
+          },
+          "default": []
+        }
+      },
+      "required": ["enabled"]
+    }
+  },
+  "required": ["nats", "stream", "operateUi", "seed"]
+}

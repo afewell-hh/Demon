@@ -1,0 +1,19 @@
+nats:
+  url: "${NATS_URL:-nats://127.0.0.1:4222}"
+stream:
+  name: "${RITUAL_STREAM_NAME:-RITUAL_EVENTS}"
+  subjects: ["${RITUAL_SUBJECTS:-demon.ritual.v1.>}"]
+  duplicateWindowSeconds: ${RITUAL_DUPWIN_SECONDS:-120}
+operateUi:
+  baseUrl: "${OPERATE_UI_URL:-http://127.0.0.1:3000}"
+  approverAllowlist: ["ops@example.com"]
+  adminToken: "${ADMIN_TOKEN:-}"
+seed:
+  enabled: true
+  runs:
+    - runId: "bundle-run-a"
+      ritualId: "echo-ritual"
+      gates:
+        - gateId: "promote"
+          requester: "dev@example.com"
+          ttlSeconds: 0
