@@ -4,6 +4,8 @@
 
 # Demon — Meta-PaaS (Milestone 0)
 
+[![Preview: Alpha](https://img.shields.io/badge/Preview-Alpha-6f42c1.svg)](https://github.com/afewell-hh/Demon/releases/tag/preview-alpha-1)
+
 Thin-slice bootstrapping of the Demon project.
 
 ## Quickstart
