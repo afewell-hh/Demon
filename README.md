@@ -1,4 +1,6 @@
 ![CI](https://github.com/afewell-hh/demon/actions/workflows/ci.yml/badge.svg)
+> Preview Kit: see docs/preview/alpha/README.md
+
 
 # Demon — Meta-PaaS (Milestone 0)
 
