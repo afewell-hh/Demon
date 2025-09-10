@@ -21,8 +21,18 @@ cargo run -p bootstrapper-demonctl -- \
 - `UI_URL` for verification (default `http://127.0.0.1:3000`)
 
 ## Verify criteria
-- `/admin/templates/report` JSON: `template_ready:true` and `has_filter_tojson:true`
-- `/api/runs` returns an array with ≥1 element
+- `/admin/templates/report` JSON:
+  - `template_ready: true` — templates compiled and ready.
+  - `has_filter_tojson: true` — JSON filter is available for templates.
+- `/api/runs` returns an array with ≥1 element.
+
+## Stream precedence
+
+Bootstrapper resolves the stream name with precedence:
+
+1. `RITUAL_STREAM_NAME` (recommended)
+2. `DEMON_RITUAL_EVENTS` (deprecated; logs a deprecation warning)
+3. `RITUAL_EVENTS` (default)
 
 ## CI
 A smoke step should start NATS + Operate UI + TTL worker with `APPROVER_ALLOWLIST=ops@example.com`, then run `bootstrapper-demonctl --ensure-stream --seed --verify` twice and assert exit 0.
