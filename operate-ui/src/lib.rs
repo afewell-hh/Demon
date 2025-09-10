@@ -22,6 +22,7 @@ use tracing::{error, info, warn};
 pub struct AppState {
     pub jetstream_client: Option<jetstream::JetStreamClient>,
     pub tera: Tera,
+    pub admin_token: Option<String>,
 }
 
 impl AppState {
@@ -62,9 +63,12 @@ impl AppState {
         tera.register_filter("json", tojson);
         tera.register_filter("tojson", tojson);
 
+        let admin_token = std::env::var("ADMIN_TOKEN").ok();
+
         Self {
             jetstream_client,
             tera,
+            admin_token,
         }
     }
 }
