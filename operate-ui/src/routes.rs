@@ -256,7 +256,6 @@ pub async fn admin_templates_report(State(state): State<AppState>, headers: Head
             return (StatusCode::UNAUTHORIZED, "missing or invalid admin token").into_response();
         }
     }
-
     let templates = state
         .tera
         .get_template_names()
