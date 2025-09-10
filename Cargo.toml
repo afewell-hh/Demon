@@ -5,7 +5,8 @@ members = [
   "wards",
   "capsules/echo",
   "demonctl",
-  "operate-ui"
+  "operate-ui",
+  "bootstrapper/demonctl"
 ]
 resolver = "2"
 

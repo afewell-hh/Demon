@@ -160,6 +160,10 @@ pub fn create_app(state: AppState) -> Router {
         .route("/runs/:run_id", get(routes::get_run_html))
         .route("/api/runs", get(routes::list_runs_api))
         .route("/api/runs/:run_id", get(routes::get_run_api))
+        .route(
+            "/admin/templates/report",
+            get(routes::admin_templates_report),
+        )
         // Approvals endpoints (publish Granted/Denied)
         .route(
             "/api/approvals/:run_id/:gate_id/grant",

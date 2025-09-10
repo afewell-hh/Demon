@@ -236,6 +236,33 @@ pub async fn get_run_api(State(state): State<AppState>, Path(run_id): Path<Strin
     }
 }
 
+// ---------------- Admin ----------------
+#[derive(Serialize)]
+pub struct TemplateReport {
+    pub templates: Vec<String>,
+    pub has_filter_tojson: bool,
+    pub template_ready: bool,
+}
+
+/// Admin: templates/report (JSON)
+pub async fn admin_templates_report(State(state): State<AppState>) -> Json<TemplateReport> {
+    // List templates from Tera registry
+    let templates = state
+        .tera
+        .get_template_names()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+    // We register the `tojson` filter during AppState::new
+    let has_filter_tojson = true;
+    // If we reached here, templates compiled at startup
+    let template_ready = true;
+    Json(TemplateReport {
+        templates,
+        has_filter_tojson,
+        template_ready,
+    })
+}
+
 // Helper functions for templates
 impl RunSummary {
     pub fn format_timestamp(&self) -> String {
