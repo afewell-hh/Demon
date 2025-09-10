@@ -57,6 +57,11 @@ async fn main() -> Result<()> {
         profile: cli.profile.into(),
         ..Default::default()
     };
+    // Log deprecation if DEMON_RITUAL_EVENTS is set and RITUAL_STREAM_NAME is not
+    if std::env::var("RITUAL_STREAM_NAME").is_err() && std::env::var("DEMON_RITUAL_EVENTS").is_ok()
+    {
+        tracing::warn!("[deprecation] using DEMON_RITUAL_EVENTS; set RITUAL_STREAM_NAME instead");
+    }
     info!(?cfg, "bootstrap: effective_config");
 
     if !(cli.ensure_stream || cli.seed || cli.verify) {
@@ -72,7 +77,7 @@ async fn run_all(cfg: &BootstrapConfig, ritual: &str) -> Result<()> {
     info!(name=%stream.cached_info().config.name, "ensure_stream: ok");
     let client = async_nats::connect(&cfg.nats_url).await?;
     let js = async_nats::jetstream::new(client);
-    seed_preview_min(&js, ritual).await?;
+    seed_preview_min(&js, ritual, &cfg.ui_url).await?;
     info!("seed: ok");
     verify_ui(&cfg.ui_url).await?;
     info!("verify: ok");
@@ -88,7 +93,7 @@ async fn run_some(cfg: &BootstrapConfig, cli: &Cli) -> Result<()> {
     if cli.seed {
         let client = async_nats::connect(&cfg.nats_url).await?;
         let js = async_nats::jetstream::new(client);
-        seed_preview_min(&js, &cli.ritual_id).await?;
+        seed_preview_min(&js, &cli.ritual_id, &cfg.ui_url).await?;
         info!("seed: ok");
     }
     if cli.verify {

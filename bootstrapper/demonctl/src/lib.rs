@@ -59,7 +59,7 @@ pub async fn ensure_stream(cfg: &BootstrapConfig) -> Result<jetstream::stream::S
     Ok(stream)
 }
 
-pub async fn seed_preview_min(js: &jetstream::Context, ritual: &str) -> Result<()> {
+pub async fn seed_preview_min(js: &jetstream::Context, ritual: &str, ui_url: &str) -> Result<()> {
     let tenant = "default";
     let run_b = "bootstrap-run-b";
     let run_c = "bootstrap-run-c";
@@ -80,18 +80,8 @@ pub async fn seed_preview_min(js: &jetstream::Context, ritual: &str) -> Result<(
         &format!("{}:approval:{}", run_b, gate_b),
     )
     .await?;
-    // grant via event for seeding purposes (UI also grants via REST in other paths)
-    let grant_b = serde_json::json!({
-        "event": "approval.granted:v1", "ts": now(), "tenantId": tenant,
-        "runId": run_b, "ritualId": ritual, "gateId": gate_b, "approver": "ops@example.com", "note": "ok"
-    });
-    publish_idem(
-        js,
-        &subject(run_b),
-        &grant_b,
-        &format!("{}:approval:{}:granted", run_b, gate_b),
-    )
-    .await?;
+    // grant via REST to exercise allow-list and first-writer-wins
+    grant_via_rest(ui_url, run_b, gate_b).await?;
 
     // approval.requested + timer.scheduled (C)
     let req_c = serde_json::json!({
@@ -136,6 +126,24 @@ async fn publish_idem(
 
 pub async fn verify_ui(ui_url: &str) -> Result<()> {
     let c = reqwest::Client::builder().build()?;
+    // Admin JSON probe
+    let probe: serde_json::Value = c
+        .get(format!("{}/admin/templates/report", ui_url))
+        .send()
+        .await
+        .context("failed GET /admin/templates/report")?
+        .error_for_status()?
+        .json()
+        .await?;
+    let tr = probe
+        .as_object()
+        .ok_or_else(|| anyhow!("invalid admin probe JSON"))?;
+    if tr.get("template_ready").and_then(|v| v.as_bool()) != Some(true) {
+        return Err(anyhow!("verify: admin probe template_ready!=true"));
+    }
+    if tr.get("has_filter_tojson").and_then(|v| v.as_bool()) != Some(true) {
+        return Err(anyhow!("verify: admin probe has_filter_tojson!=true"));
+    }
     // Runs array
     let runs: serde_json::Value = c
         .get(format!("{}/api/runs", ui_url))
@@ -149,16 +157,16 @@ pub async fn verify_ui(ui_url: &str) -> Result<()> {
     if len < 1 {
         return Err(anyhow!("verify: /api/runs returned empty array"));
     }
-    // Basic HTML render smoke (since admin report endpoint may not exist yet)
-    let html = c
-        .get(format!("{}/runs", ui_url))
-        .send()
-        .await?
-        .error_for_status()?
-        .text()
-        .await?;
-    if !html.to_lowercase().contains("<!doctype html>") {
-        return Err(anyhow!("verify: /runs did not return HTML"));
+    Ok(())
+}
+
+async fn grant_via_rest(ui_url: &str, run_id: &str, gate_id: &str) -> Result<()> {
+    let c = reqwest::Client::builder().build()?;
+    let url = format!("{}/api/approvals/{}/{}/grant", ui_url, run_id, gate_id);
+    let body = serde_json::json!({"approver":"ops@example.com","note":"bootstrap grant"});
+    let resp = c.post(url).json(&body).send().await?;
+    if !resp.status().is_success() {
+        return Err(anyhow!("grant REST failed: {}", resp.status()));
     }
     Ok(())
 }
