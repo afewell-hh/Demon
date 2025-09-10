@@ -1,5 +1,10 @@
 use anyhow::Result;
-use bootstrapper_demonctl::{ensure_stream, seed_preview_min, verify_ui, BootstrapConfig, Profile};
+use bootstrapper_demonctl::libindex::resolve_local;
+use bootstrapper_demonctl::provenance::verify_provenance;
+use bootstrapper_demonctl::{
+    bundle::load_bundle, ensure_stream, seed_from_bundle, seed_preview_min, verify_ui_with_token,
+    BootstrapConfig, Profile,
+};
 use clap::{ArgAction, Parser, ValueEnum};
 use tracing::{info, Level};
 
@@ -26,6 +31,22 @@ struct Cli {
     /// Ritual id used for seeding (default: preview)
     #[arg(long, default_value = "preview")]
     ritual_id: String,
+
+    /// Optional bundle file (YAML)
+    #[arg(long)]
+    bundle: Option<String>,
+
+    /// Optional overrides (flags > bundle > env)
+    #[arg(long)]
+    nats_url: Option<String>,
+    #[arg(long)]
+    stream_name: Option<String>,
+    #[arg(long)]
+    ui_base_url: Option<String>,
+
+    /// Verify only (resolve + provenance check; no NATS/seed/verify-UI phases)
+    #[arg(long, action = ArgAction::SetTrue)]
+    verify_only: bool,
 }
 
 #[derive(Copy, Clone, Debug, ValueEnum)]
@@ -53,7 +74,7 @@ async fn main() -> Result<()> {
         .init();
 
     let cli = Cli::parse();
-    let cfg = BootstrapConfig {
+    let _cfg = BootstrapConfig {
         profile: cli.profile.into(),
         ..Default::default()
     };
@@ -62,24 +83,117 @@ async fn main() -> Result<()> {
     {
         tracing::warn!("[deprecation] using DEMON_RITUAL_EVENTS; set RITUAL_STREAM_NAME instead");
     }
-    info!(?cfg, "bootstrap: effective_config");
+    let (cfg, provenance) = bootstrapper_demonctl::compute_effective_config(
+        cli.bundle.as_deref().map(std::path::Path::new),
+        cli.nats_url.as_deref(),
+        cli.stream_name.as_deref(),
+        cli.ui_base_url.as_deref(),
+    );
+
+    println!(
+        "{}",
+        serde_json::json!({
+            "phase":"config",
+            "effective":{
+                "nats_url": cfg.nats_url,
+                "stream_name": cfg.stream_name,
+                "subjects": cfg.subjects,
+                "dedupe": cfg.dedupe_window_secs,
+                "ui_url": cfg.ui_url,
+            },
+            "provenance": provenance
+        })
+    );
+
+    if cli.verify_only {
+        if let Some(uri) = cli.bundle.as_deref() {
+            if uri.starts_with("lib://local/") {
+                let mut idx_path = std::path::PathBuf::from("bootstrapper/library/index.json");
+                if !idx_path.exists() {
+                    for prefix in ["..", "../..", "../../.."].iter() {
+                        let p =
+                            std::path::Path::new(prefix).join("bootstrapper/library/index.json");
+                        if p.exists() {
+                            idx_path = p;
+                            break;
+                        }
+                    }
+                }
+                let resolved = resolve_local(uri, &idx_path)?;
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "phase":"resolve",
+                        "uri": uri,
+                        "provider": resolved.provider,
+                        "name": resolved.name,
+                        "version": resolved.version,
+                        "path": resolved.path
+                    })
+                );
+                let vr = verify_provenance(
+                    &resolved.path,
+                    &resolved.pub_key_id,
+                    &resolved.digest_sha256,
+                    &resolved.sig_ed25519,
+                )?;
+                if vr.signature_ok {
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "phase":"verify",
+                            "bundle": {"name": resolved.name, "version": resolved.version},
+                            "digest": vr.digest_hex,
+                            "signature": "ok",
+                            "pubKeyId": resolved.pub_key_id
+                        })
+                    );
+                } else {
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "phase":"verify",
+                            "bundle": {"name": resolved.name, "version": resolved.version},
+                            "digest": vr.digest_hex,
+                            "signature": "failed",
+                            "reason": vr.reason.unwrap_or_else(|| "unknown".to_string()),
+                            "pubKeyId": resolved.pub_key_id
+                        })
+                    );
+                    anyhow::bail!("signature verification failed");
+                }
+                return Ok(());
+            }
+        }
+        anyhow::bail!("--verify-only requires --bundle lib://local/... URI");
+    }
 
     if !(cli.ensure_stream || cli.seed || cli.verify) {
         // default: run all
-        run_all(&cfg, &cli.ritual_id).await
+        run_all(&cfg, &cli.ritual_id, cli.bundle.as_deref()).await
     } else {
         run_some(&cfg, &cli).await
     }
 }
 
-async fn run_all(cfg: &BootstrapConfig, ritual: &str) -> Result<()> {
+async fn run_all(cfg: &BootstrapConfig, ritual: &str, bundle_path: Option<&str>) -> Result<()> {
     let stream = ensure_stream(cfg).await?;
     info!(name=%stream.cached_info().config.name, "ensure_stream: ok");
     let client = async_nats::connect(&cfg.nats_url).await?;
     let js = async_nats::jetstream::new(client);
-    seed_preview_min(&js, ritual, &cfg.ui_url).await?;
+    if let Some(path) = bundle_path {
+        let b = load_bundle(std::path::Path::new(path))?;
+        seed_from_bundle(&js, &b, &cfg.ui_url).await?;
+        let token = b
+            .operate_ui
+            .admin_token
+            .or_else(|| std::env::var("ADMIN_TOKEN").ok());
+        verify_ui_with_token(&cfg.ui_url, token).await?;
+    } else {
+        seed_preview_min(&js, ritual, &cfg.ui_url).await?;
+        verify_ui_with_token(&cfg.ui_url, std::env::var("ADMIN_TOKEN").ok()).await?;
+    }
     info!("seed: ok");
-    verify_ui(&cfg.ui_url).await?;
     info!("verify: ok");
     info!("done: all checks passed");
     Ok(())
@@ -97,7 +211,7 @@ async fn run_some(cfg: &BootstrapConfig, cli: &Cli) -> Result<()> {
         info!("seed: ok");
     }
     if cli.verify {
-        verify_ui(&cfg.ui_url).await?;
+        verify_ui_with_token(&cfg.ui_url, std::env::var("ADMIN_TOKEN").ok()).await?;
         info!("verify: ok");
     }
     info!("done");
