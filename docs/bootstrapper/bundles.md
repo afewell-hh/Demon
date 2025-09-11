@@ -63,6 +63,12 @@ Notes
   mv examples/bundles/local-dev.yaml{.bak,}
   ```
 
+#### Key rotation & multiple keys
+
+- Multiple public keys: keep older keys alongside new ones in `contracts/keys/`. Each library index entry must specify `pubKeyId` indicating which key was used to sign that bundle.
+- Rotation flow: add the new key → re‑sign bundles with the new key → update `bootstrapper/library/index.json` entries with the new `pubKeyId` → keep the previous key checked in for a deprecation window so `--verify-only` still passes for older tags.
+- CI is offline and verifies against whichever `pubKeyId` the index declares — no network trust is involved.
+
 ### Troubleshooting
 
 **“signature”: “failed” but no local changes**
@@ -128,3 +134,23 @@ Install: brew install jq (macOS) or sudo apt-get install -y jq (Debian/Ubuntu).
 Windows shells
 
 Prefer Git Bash or WSL for the documented commands; PowerShell may need adjusted quoting.
+
+Determinism checklist
+
+- Quote ambiguous YAML scalars (on, off, yes, no, timestamps) to avoid unintended type coercion.
+- Numbers: prefer integers or quoted strings; avoid leading zeros.
+- Whitespace: remove trailing spaces; ensure LF line endings.
+- Interpolation order: `${VAR}` is resolved before canonicalization — set envs explicitly when verifying locally.
+- Arrays/maps: authoring order of maps doesn’t matter; canonicalization sorts map keys lexicographically.
+
+Local one‑liner verify
+
+```bash
+cargo build --locked -q && \
+target/debug/demonctl bootstrap --verify-only --bundle lib://local/preview-local-dev@0.0.1 | \
+jq -r 'select(.phase=="verify")'
+```
+
+Required job name reminder: do not rename
+
+- The required check is pinned as: `Bootstrapper bundles — negative verify (tamper ⇒ failed)`.
