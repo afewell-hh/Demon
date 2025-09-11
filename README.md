@@ -4,6 +4,10 @@
 - [Preview Kit](docs/preview/alpha/README.md)
 - [Bundle Library & Signatures](docs/bootstrapper/bundles.md) (offline, reproducible, CI-enforced)
 
+<sub>Local verify:</sub>  
+<code>target/debug/demonctl bootstrap --verify-only --bundle lib://local/preview-local-dev@0.0.1 \
+| jq -e 'select(.phase=="verify" and .signature=="ok")' >/dev/null && echo "signature ok"</code>
+
 
 # Demon — Meta-PaaS (Milestone 0)
 
