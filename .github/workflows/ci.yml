@@ -339,9 +339,13 @@ jobs:
           target/debug/bootstrapper-demonctl --verify-only --bundle lib://local/preview-local-dev@0.0.1 | tee verify.log
           jq -e 'select(.phase=="verify" and .signature=="ok")' verify.log >/dev/null
 
+  # DO NOT RENAME THIS JOB. It's pinned in branch protections as a required check.
   bootstrapper-bundles-verify-negative:
     name: Bootstrapper bundles — negative verify (tamper ⇒ failed)
     runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-negverify
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
