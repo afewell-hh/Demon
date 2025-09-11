@@ -1,6 +1,9 @@
 ![CI](https://github.com/afewell-hh/demon/actions/workflows/ci.yml/badge.svg)
 > Preview Kit: see docs/preview/alpha/README.md
 
+- [Preview Kit](docs/preview/alpha/README.md)
+- [Bundle Library & Signatures](docs/bootstrapper/bundles.md) (offline, reproducible, CI-enforced)
+
 
 # Demon — Meta-PaaS (Milestone 0)
 
