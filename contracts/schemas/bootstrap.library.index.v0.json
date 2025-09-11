@@ -1,0 +1,45 @@
+{
+  "$id": "https://demon.dev/schemas/bootstrap.library.index.v0.json",
+  "title": "Demon Bootstrap Bundle Library Index (v0)",
+  "type": "object",
+  "required": ["provider", "bundles"],
+  "properties": {
+    "provider": {
+      "type": "string",
+      "enum": ["local"]
+    },
+    "bundles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "version", "path", "digest", "sig", "pubKeyId"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "version": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "minLength": 1 },
+          "digest": {
+            "type": "object",
+            "required": ["sha256"],
+            "properties": {
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "sig": {
+            "type": "object",
+            "required": ["ed25519"],
+            "properties": {
+              "ed25519": { "type": "string", "minLength": 1 }
+            }
+          },
+          "pubKeyId": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}
+
