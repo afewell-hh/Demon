@@ -1,35 +1,54 @@
 name: protection-audit
 
 on:
-  workflow_dispatch:
   schedule:
     - cron: "17 3 * * *"  # daily at 03:17 UTC
+  workflow_dispatch: {}
 
 jobs:
+  audit-skip-note:
+    if: ${{ secrets.PROTECTION_TOKEN == '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Skipping protection audit: PROTECTION_TOKEN not set."
+
   audit:
     # Skip in forks or repos without the secret to avoid noisy failures
     if: ${{ secrets.PROTECTION_TOKEN != '' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    concurrency:
+      group: protection-audit
+      cancel-in-progress: false
     # Uses a PAT because GITHUB_TOKEN often lacks repo-admin read for branch protection in orgs.
     # PAT scope: Repository permissions -> Administration: Read-only (repo-scoped, fine-grained).
     env:
       GH_TOKEN: ${{ secrets.PROTECTION_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+      - name: Get default branch
+        id: repo
+        shell: bash
+        run: |
+          gh api repos/${{ github.repository }} --jq .default_branch > default_branch.txt
+          echo "branch=$(cat default_branch.txt)" >> "$GITHUB_OUTPUT"
       - name: Verify required protection settings
         shell: bash
         run: |
           set -euo pipefail
-          gh api repos/:owner/:repo/branches/main/protection -q '.required_status_checks.contexts | sort' | jq .
+          BR="${{ steps.repo.outputs.branch }}"
+          gh api -H "Accept: application/vnd.github+json" repos/:owner/:repo/branches/$BR/protection -q '.required_status_checks.contexts | sort' | jq .
 
           # Assert required checks present
           REQ1='Bootstrapper bundles — verify (offline, signature ok)'
           REQ2='Bootstrapper bundles — negative verify (tamper ⇒ failed)'
           REQ3='review-lock-guard'
-          MAP=$(gh api repos/:owner/:repo/branches/main/protection -q '.required_status_checks.contexts')
+          MAP=$(gh api -H "Accept: application/vnd.github+json" repos/:owner/:repo/branches/$BR/protection -q '.required_status_checks.contexts')
           echo "$MAP" | jq -e "index(\"$REQ1\")" >/dev/null
           echo "$MAP" | jq -e "index(\"$REQ2\")" >/dev/null
           echo "$MAP" | jq -e "index(\"$REQ3\")" >/dev/null
 
           # Assert CODEOWNERS gate
-          gh api repos/:owner/:repo/branches/main/protection -q '.required_pull_request_reviews.require_code_owner_reviews' | grep -qx true
+          gh api -H "Accept: application/vnd.github+json" repos/:owner/:repo/branches/$BR/protection -q '.required_pull_request_reviews.require_code_owner_reviews' | grep -qx true
