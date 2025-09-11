@@ -178,7 +178,14 @@ async fn main() -> Result<()> {
 
 async fn run_all(cfg: &BootstrapConfig, ritual: &str, bundle_path: Option<&str>) -> Result<()> {
     let stream = ensure_stream(cfg).await?;
-    info!(name=%stream.cached_info().config.name, "ensure_stream: ok");
+    println!(
+        "{}",
+        serde_json::json!({
+            "phase":"ensure_stream",
+            "name": stream.cached_info().config.name,
+            "mutation":"noop"
+        })
+    );
     let client = async_nats::connect(&cfg.nats_url).await?;
     let js = async_nats::jetstream::new(client);
     if let Some(path) = bundle_path {
@@ -202,7 +209,14 @@ async fn run_all(cfg: &BootstrapConfig, ritual: &str, bundle_path: Option<&str>)
 async fn run_some(cfg: &BootstrapConfig, cli: &Cli) -> Result<()> {
     if cli.ensure_stream {
         let stream = ensure_stream(cfg).await?;
-        info!(name=%stream.cached_info().config.name, "ensure_stream: ok");
+        println!(
+            "{}",
+            serde_json::json!({
+                "phase":"ensure_stream",
+                "name": stream.cached_info().config.name,
+                "mutation":"noop"
+            })
+        );
     }
     if cli.seed {
         let client = async_nats::connect(&cfg.nats_url).await?;

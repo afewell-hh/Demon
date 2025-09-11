@@ -1,4 +1,7 @@
 use anyhow::{anyhow, Context, Result};
+pub mod bundle;
+pub mod libindex;
+pub mod provenance;
 use async_nats::jetstream;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -44,6 +47,64 @@ impl Default for BootstrapConfig {
             ui_url,
         }
     }
+}
+
+pub fn compute_effective_config(
+    bundle_path: Option<&std::path::Path>,
+    flag_nats_url: Option<&str>,
+    flag_stream_name: Option<&str>,
+    flag_ui_url: Option<&str>,
+) -> (BootstrapConfig, serde_json::Value) {
+    let mut cfg = BootstrapConfig::default();
+    let mut provenance = serde_json::json!({});
+    if let Some(path) = bundle_path {
+        if let Ok(b) = crate::bundle::load_bundle(path) {
+            if cfg.nats_url.is_empty() {
+                cfg.nats_url = b.nats.url;
+                provenance["nats_url"] = "bundle".into();
+            }
+            if cfg.stream_name.is_empty() {
+                cfg.stream_name = b.stream.name;
+                provenance["stream_name"] = "bundle".into();
+            }
+            if cfg.subjects.is_empty() {
+                cfg.subjects = b.stream.subjects;
+                provenance["subjects"] = "bundle".into();
+            }
+            if cfg.dedupe_window_secs == 0 {
+                cfg.dedupe_window_secs = b.stream.duplicate_window_seconds;
+                provenance["dedupe_window_secs"] = "bundle".into();
+            }
+            if cfg.ui_url.is_empty() {
+                if let Some(u) = b.operate_ui.base_url {
+                    cfg.ui_url = u;
+                    provenance["ui_url"] = "bundle".into();
+                }
+            }
+        }
+    }
+    if let Some(v) = flag_nats_url {
+        cfg.nats_url = v.to_string();
+        provenance["nats_url"] = "flag".into();
+    }
+    if let Some(v) = flag_stream_name {
+        cfg.stream_name = v.to_string();
+        provenance["stream_name"] = "flag".into();
+    }
+    if let Some(v) = flag_ui_url {
+        cfg.ui_url = v.to_string();
+        provenance["ui_url"] = "flag".into();
+    }
+    if provenance["nats_url"].is_null() {
+        provenance["nats_url"] = "env|default".into();
+    }
+    if provenance["stream_name"].is_null() {
+        provenance["stream_name"] = "env|default".into();
+    }
+    if provenance["ui_url"].is_null() {
+        provenance["ui_url"] = "env|default".into();
+    }
+    (cfg, provenance)
 }
 
 pub async fn ensure_stream(cfg: &BootstrapConfig) -> Result<jetstream::stream::Stream> {
@@ -167,6 +228,91 @@ async fn grant_via_rest(ui_url: &str, run_id: &str, gate_id: &str) -> Result<()>
     let resp = c.post(url).json(&body).send().await?;
     if !resp.status().is_success() {
         return Err(anyhow!("grant REST failed: {}", resp.status()));
+    }
+    Ok(())
+}
+
+// Compatibility helpers expected by existing CLI and tests
+use crate::bundle::Bundle;
+
+pub fn build_seed_run_log(
+    run_id: &str,
+    ritual_id: &str,
+    gate_id: &str,
+    applied_req: bool,
+    applied_timer: Option<bool>,
+) -> serde_json::Value {
+    serde_json::json!({
+        "phase":"seed_run",
+        "runId": run_id,
+        "ritualId": ritual_id,
+        "gateId": gate_id,
+        "mutation_req": if applied_req {"applied"} else {"noop"},
+        "mutation_timer": applied_timer.map(|b| if b {"applied"} else {"noop"}).unwrap_or("noop"),
+    })
+}
+
+pub async fn seed_from_bundle(
+    js: &async_nats::jetstream::Context,
+    b: &Bundle,
+    _ui_url: &str,
+) -> Result<()> {
+    if !b.seed.enabled.unwrap_or(true) {
+        return Ok(());
+    }
+    if let Some(runs) = &b.seed.runs {
+        for run in runs {
+            if let Some(gates) = &run.gates {
+                for g in gates {
+                    // Publish request event
+                    let subject =
+                        format!("demon.ritual.v1.{}.{}.events", run.ritual_id, run.run_id);
+                    let evt = serde_json::json!({
+                        "event":"approval.requested:v1",
+                        "ts": chrono::Utc::now().to_rfc3339(),
+                        "tenantId":"default",
+                        "runId": run.run_id,
+                        "ritualId": run.ritual_id,
+                        "gateId": g.gate_id,
+                        "requester": g.requester,
+                    });
+                    let _ = publish_idem(
+                        js,
+                        &subject,
+                        &evt,
+                        &format!("{}:approval:{}", run.run_id, g.gate_id),
+                    )
+                    .await;
+                    println!(
+                        "{}",
+                        build_seed_run_log(&run.run_id, &run.ritual_id, &g.gate_id, false, None)
+                    );
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+pub async fn verify_ui_with_token(ui_url: &str, token: Option<String>) -> Result<()> {
+    let c = reqwest::Client::builder().build()?;
+    let mut req = c.get(format!("{}/api/runs", ui_url));
+    if let Some(t) = token.clone() {
+        req = req.header("X-Admin-Token", t);
+    }
+    let runs: serde_json::Value = req.send().await?.error_for_status()?.json().await?;
+    let len = runs.as_array().map(|a| a.len()).unwrap_or(0);
+    if len < 1 {
+        return Err(anyhow!("verify: /api/runs returned empty array"));
+    }
+    // HTML check
+    let mut req2 = c.get(format!("{}/runs", ui_url));
+    if let Some(t) = token {
+        req2 = req2.header("X-Admin-Token", t);
+    }
+    let html = req2.send().await?.error_for_status()?.text().await?;
+    if !html.to_lowercase().contains("<!doctype html>") {
+        return Err(anyhow!("verify: /runs did not return HTML"));
     }
     Ok(())
 }
