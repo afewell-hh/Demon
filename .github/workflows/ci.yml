@@ -338,3 +338,47 @@ jobs:
         run: |
           target/debug/bootstrapper-demonctl --verify-only --bundle lib://local/preview-local-dev@0.0.1 | tee verify.log
           jq -e 'select(.phase=="verify" and .signature=="ok")' verify.log >/dev/null
+
+  bootstrapper-bundles-verify-negative:
+    name: Bootstrapper bundles — negative verify (tamper ⇒ failed)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Build demonctl (locked)
+        run: cargo build --locked -p bootstrapper-demonctl
+
+      - name: Tamper bundle and run verify-only (expect failure)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Tamper canonical bytes: bump duplicateWindowSeconds deterministically.
+          # If the key exists, increment; otherwise append it.
+          if grep -q '^duplicateWindowSeconds:' examples/bundles/local-dev.yaml; then
+            awk 'BEGIN{FS=OFS=": "}
+                 /^duplicateWindowSeconds:/{print $1": "$2+1; next}
+                 {print}' examples/bundles/local-dev.yaml > local-dev.tmp
+            mv local-dev.tmp examples/bundles/local-dev.yaml
+          else
+            printf '\nduplicateWindowSeconds: 121\n' >> examples/bundles/local-dev.yaml
+          fi
+
+          # Run offline verify; capture exit code
+          set +e
+          target/debug/bootstrapper-demonctl --verify-only --bundle lib://local/preview-local-dev@0.0.1 | tee tamper.log
+          status=$?
+          set -e
+
+          # Assert we saw a failed signature line…
+          jq -e 'select(.phase=="verify" and .signature=="failed")' tamper.log >/dev/null
+
+          # …and the process exited non-zero.
+          if [ $status -eq 0 ]; then
+            echo "::error::verify-only unexpectedly succeeded on tampered bundle"
+            exit 1
+          fi
