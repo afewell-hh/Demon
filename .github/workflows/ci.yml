@@ -7,6 +7,25 @@ on:
     branches: [ "**" ]
 
 jobs:
+  # DO NOT RENAME: Required status check for PR review-lock
+  review-lock-guard:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' }}
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const body = pr.body || "";
+            const head = pr.head.sha;
+            const m = body.match(/[0-9a-f]{40}/i);
+            if (!m) core.setFailed("Review-lock SHA not found in PR body.");
+            else if (m[0].toLowerCase() !== head.toLowerCase())
+              core.setFailed(`Review-lock mismatch: body=${m[0].slice(0,7)} head=${head.slice(0,7)}`);
   build-test:
     runs-on: ubuntu-latest
 
