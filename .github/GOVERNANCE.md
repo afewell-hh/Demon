@@ -17,3 +17,10 @@ Notes:
 - Required checks should include positive/negative offline bundle verify and the review-lock guard.
 - CODEOWNERS is enforced for `bootstrapper/`, `contracts/`, and CI workflow changes.
 
+
+## Branch protection snapshot (2025-09-11 UTC)
+
+<details><summary>JSON</summary>
+
+"
+</details>
