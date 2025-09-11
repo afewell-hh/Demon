@@ -1,0 +1,32 @@
+name: protection-audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * 1'  # Mondays at 04:00 UTC
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify branch protection (main)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROT=$(gh api repos/${{ github.repository }}/branches/main/protection)
+          req_checks=$(jq -r '.required_status_checks.contexts[]?' <<<"$PROT")
+          must_have=(
+            "Bootstrapper bundles — verify (offline, signature ok)"
+            "Bootstrapper bundles — negative verify (tamper ⇒ failed)"
+            "review-lock-guard"
+          )
+          for c in "${must_have[@]}"; do
+            echo "$req_checks" | grep -Fx "$c" >/dev/null || { echo "Missing required check: $c"; exit 1; }
+          done
+          jq -e '.required_pull_request_reviews.require_code_owner_reviews == true' <<<"$PROT" >/dev/null \
+            || { echo "CODEOWNERS review not required"; exit 1; }
+          echo "Branch protection looks good."
+
