@@ -1,0 +1,20 @@
+# deny.toml
+[advisories]
+vulnerability = "deny"   # deny known vulns
+unmaintained = "warn"
+yanked = "warn"
+notice = "warn"
+ignore = []
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+
+[licenses]
+allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "BSD-2-Clause", "Unicode-DFS-2016", "ISC"]
+deny  = ["GPL-3.0", "AGPL-3.0"]
+confidence-threshold = 0.8
