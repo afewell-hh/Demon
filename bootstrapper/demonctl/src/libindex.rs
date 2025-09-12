@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use jsonschema::{Draft, JSONSchema};
+use jsonschema::{Draft, Validator};
 use serde::Deserialize;
 use serde_json::Value;
 use std::fs;
@@ -57,15 +57,13 @@ fn validate_index_schema(text: &str) -> Result<()> {
     // Extend schema lifetime for the validator
     let boxed = Box::new(schema_json);
     let leaked: &'static Value = Box::leak(boxed);
-    let compiled = JSONSchema::options()
+    let compiled = Validator::options()
         .with_draft(Draft::Draft7)
-        .compile(leaked)?;
+        .build(leaked)?;
     let doc_json: Value = serde_json::from_str(text)?;
-    if let Err(errs) = compiled.validate(&doc_json) {
+    if let Err(err) = compiled.validate(&doc_json) {
         let mut msg = String::from("library index schema errors:\n");
-        for e in errs {
-            msg.push_str(&format!("- {}\n", e));
-        }
+        msg.push_str(&format!("- {}\n", err));
         anyhow::bail!(msg);
     }
     Ok(())

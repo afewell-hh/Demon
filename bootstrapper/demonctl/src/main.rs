@@ -87,8 +87,9 @@ async fn main() -> Result<()> {
         cli.bundle.as_deref().map(std::path::Path::new),
         cli.nats_url.as_deref(),
         cli.stream_name.as_deref(),
+        None, // subjects - not in CLI yet
         cli.ui_base_url.as_deref(),
-    );
+    )?;
 
     println!(
         "{}",
@@ -183,15 +184,16 @@ async fn run_all(cfg: &BootstrapConfig, ritual: &str, bundle_path: Option<&str>)
     let js = async_nats::jetstream::new(client);
     if let Some(path) = bundle_path {
         let b = load_bundle(std::path::Path::new(path))?;
-        seed_from_bundle(&js, &b, &cfg.ui_url).await?;
+        let b_json = serde_json::to_value(&b)?;
+        seed_from_bundle(&js, &b_json, &cfg.stream_name, &cfg.ui_url).await?;
         let token = b
             .operate_ui
             .admin_token
             .or_else(|| std::env::var("ADMIN_TOKEN").ok());
-        verify_ui_with_token(&cfg.ui_url, token).await?;
+        verify_ui_with_token(&cfg.ui_url, token.as_deref()).await?;
     } else {
         seed_preview_min(&js, ritual, &cfg.ui_url).await?;
-        verify_ui_with_token(&cfg.ui_url, std::env::var("ADMIN_TOKEN").ok()).await?;
+        verify_ui_with_token(&cfg.ui_url, std::env::var("ADMIN_TOKEN").ok().as_deref()).await?;
     }
     info!("seed: ok");
     info!("verify: ok");
@@ -211,7 +213,7 @@ async fn run_some(cfg: &BootstrapConfig, cli: &Cli) -> Result<()> {
         info!("seed: ok");
     }
     if cli.verify {
-        verify_ui_with_token(&cfg.ui_url, std::env::var("ADMIN_TOKEN").ok()).await?;
+        verify_ui_with_token(&cfg.ui_url, std::env::var("ADMIN_TOKEN").ok().as_deref()).await?;
         info!("verify: ok");
     }
     info!("done");
