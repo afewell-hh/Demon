@@ -1,3 +1,7 @@
+pub mod bundle;
+pub mod libindex;
+pub mod provenance;
+
 use anyhow::{anyhow, Context, Result};
 use async_nats::jetstream;
 use chrono::Utc;
@@ -122,6 +126,71 @@ async fn publish_idem(
         .await?
         .await?;
     Ok(())
+}
+
+pub fn compute_effective_config(
+    bundle_path: Option<&std::path::Path>,
+    nats_url: Option<&str>,
+    stream_name: Option<&str>,
+    subjects: Option<Vec<String>>,
+    ui_url: Option<&str>,
+) -> Result<(BootstrapConfig, Option<serde_json::Value>)> {
+    let mut cfg = BootstrapConfig::default();
+    
+    let provenance = if let Some(path) = bundle_path {
+        let bundle = bundle::load_bundle(path)?;
+        
+        // Override config from bundle
+        if !bundle.nats.url.is_empty() {
+            cfg.nats_url = bundle.nats.url.clone();
+        }
+        if !bundle.stream.name.is_empty() {
+            cfg.stream_name = bundle.stream.name.clone();
+        }
+        if !bundle.stream.subjects.is_empty() {
+            cfg.subjects = bundle.stream.subjects.clone();
+        }
+        if let Some(ref url) = bundle.operate_ui.base_url {
+            if !url.is_empty() {
+                cfg.ui_url = url.clone();
+            }
+        }
+        
+        // Return bundle as provenance
+        Some(serde_json::to_value(bundle)?)
+    } else {
+        None
+    };
+    
+    // Command line overrides
+    if let Some(url) = nats_url {
+        cfg.nats_url = url.to_string();
+    }
+    if let Some(name) = stream_name {
+        cfg.stream_name = name.to_string();
+    }
+    if let Some(subj) = subjects {
+        cfg.subjects = subj;
+    }
+    if let Some(ui) = ui_url {
+        cfg.ui_url = ui.to_string();
+    }
+    
+    Ok((cfg, provenance))
+}
+
+pub async fn seed_from_bundle(
+    js: &jetstream::Context, 
+    _bundle: &serde_json::Value,
+    stream_name: &str,
+    ui_url: &str
+) -> Result<()> {
+    // For now, just seed preview min
+    seed_preview_min(js, stream_name, ui_url).await
+}
+
+pub async fn verify_ui_with_token(ui_url: &str, _token: Option<&str>) -> Result<()> {
+    verify_ui(ui_url).await
 }
 
 pub async fn verify_ui(ui_url: &str) -> Result<()> {

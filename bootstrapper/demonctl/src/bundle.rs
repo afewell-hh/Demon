@@ -1,13 +1,13 @@
 use anyhow::{anyhow, Context, Result};
-use jsonschema::{Draft, JSONSchema};
-use serde::Deserialize;
+use jsonschema::{Draft, Validator};
+use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
 #[allow(dead_code)]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Bundle {
     pub nats: Nats,
     #[serde(default)]
@@ -18,12 +18,12 @@ pub struct Bundle {
     pub seed: Seed,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Nats {
     pub url: String,
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Deserialize, Serialize, Default)]
 pub struct Stream {
     #[serde(default = "default_stream_name")]
     pub name: String,
@@ -33,7 +33,7 @@ pub struct Stream {
     pub duplicate_window_seconds: u64,
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Deserialize, Serialize, Default)]
 pub struct OperateUi {
     #[serde(rename = "baseUrl")]
     pub base_url: Option<String>,
@@ -43,13 +43,13 @@ pub struct OperateUi {
     pub admin_token: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Deserialize, Serialize, Default)]
 pub struct Seed {
     pub enabled: Option<bool>,
     pub runs: Option<Vec<RunSpec>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct RunSpec {
     #[serde(rename = "runId")]
     pub run_id: String,
@@ -58,7 +58,7 @@ pub struct RunSpec {
     pub gates: Option<Vec<GateSpec>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct GateSpec {
     #[serde(rename = "gateId")]
     pub gate_id: String,
@@ -96,14 +96,12 @@ fn validate_against_schema(yaml_text: &str) -> Result<()> {
     // Leak the schema JSON to extend lifetime (acceptable for CLI process)
     let boxed = Box::new(schema_owned);
     let leaked: &'static JsonValue = Box::leak(boxed);
-    let compiled = JSONSchema::options()
+    let compiled = Validator::options()
         .with_draft(Draft::Draft7)
-        .compile(leaked)?;
-    if let Err(errs) = compiled.validate(&doc_json) {
+        .build(leaked)?;
+    if let Err(err) = compiled.validate(&doc_json) {
         let mut msg = String::from("bundle schema validation errors:\n");
-        for e in errs {
-            msg.push_str(&format!("- {}\n", e));
-        }
+        msg.push_str(&format!("- {}\n", err));
         return Err(anyhow!(msg));
     }
     Ok(())

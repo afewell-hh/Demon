@@ -83,12 +83,15 @@ async fn main() -> Result<()> {
     {
         tracing::warn!("[deprecation] using DEMON_RITUAL_EVENTS; set RITUAL_STREAM_NAME instead");
     }
+    // Don't pass lib:// URIs to compute_effective_config - they need resolution first
+    let bundle_for_config = cli.bundle.as_deref().filter(|uri| !uri.starts_with("lib://"));
     let (cfg, provenance) = bootstrapper_demonctl::compute_effective_config(
-        cli.bundle.as_deref().map(std::path::Path::new),
+        bundle_for_config.map(std::path::Path::new),
         cli.nats_url.as_deref(),
         cli.stream_name.as_deref(),
+        None, // subjects - not in CLI yet
         cli.ui_base_url.as_deref(),
-    );
+    )?;
 
     println!(
         "{}",
@@ -176,22 +179,40 @@ async fn main() -> Result<()> {
     }
 }
 
-async fn run_all(cfg: &BootstrapConfig, ritual: &str, bundle_path: Option<&str>) -> Result<()> {
+async fn run_all(cfg: &BootstrapConfig, ritual: &str, bundle_uri: Option<&str>) -> Result<()> {
     let stream = ensure_stream(cfg).await?;
     info!(name=%stream.cached_info().config.name, "ensure_stream: ok");
     let client = async_nats::connect(&cfg.nats_url).await?;
     let js = async_nats::jetstream::new(client);
-    if let Some(path) = bundle_path {
-        let b = load_bundle(std::path::Path::new(path))?;
-        seed_from_bundle(&js, &b, &cfg.ui_url).await?;
+    if let Some(uri) = bundle_uri {
+        // Resolve the URI if it's a lib:// URI
+        let bundle_path = if uri.starts_with("lib://local/") {
+            let mut idx_path = std::path::PathBuf::from("bootstrapper/library/index.json");
+            if !idx_path.exists() {
+                for prefix in ["..", "../..", "../../.."].iter() {
+                    let p = std::path::Path::new(prefix).join("bootstrapper/library/index.json");
+                    if p.exists() {
+                        idx_path = p;
+                        break;
+                    }
+                }
+            }
+            let resolved = resolve_local(uri, &idx_path)?;
+            resolved.path
+        } else {
+            std::path::PathBuf::from(uri)
+        };
+        let b = load_bundle(&bundle_path)?;
+        let b_json = serde_json::to_value(&b)?;
+        seed_from_bundle(&js, &b_json, &cfg.stream_name, &cfg.ui_url).await?;
         let token = b
             .operate_ui
             .admin_token
             .or_else(|| std::env::var("ADMIN_TOKEN").ok());
-        verify_ui_with_token(&cfg.ui_url, token).await?;
+        verify_ui_with_token(&cfg.ui_url, token.as_deref()).await?;
     } else {
         seed_preview_min(&js, ritual, &cfg.ui_url).await?;
-        verify_ui_with_token(&cfg.ui_url, std::env::var("ADMIN_TOKEN").ok()).await?;
+        verify_ui_with_token(&cfg.ui_url, std::env::var("ADMIN_TOKEN").ok().as_deref()).await?;
     }
     info!("seed: ok");
     info!("verify: ok");
@@ -211,7 +232,7 @@ async fn run_some(cfg: &BootstrapConfig, cli: &Cli) -> Result<()> {
         info!("seed: ok");
     }
     if cli.verify {
-        verify_ui_with_token(&cfg.ui_url, std::env::var("ADMIN_TOKEN").ok()).await?;
+        verify_ui_with_token(&cfg.ui_url, std::env::var("ADMIN_TOKEN").ok().as_deref()).await?;
         info!("verify: ok");
     }
     info!("done");
