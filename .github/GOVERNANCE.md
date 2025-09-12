@@ -77,9 +77,65 @@ mv examples/bundles/local-dev.yaml{.bak,}
 - **Quarterly:** Rotate PROTECTION_TOKEN
 - **On CI changes:** Re-verify job names match protection requirements
 
+## Protected Tags
+
+### Recommended Tag Protection Rules
+Protect release and preview tags from unauthorized changes:
+- **Pattern**: `v*` (version tags like v1.0.0)
+- **Pattern**: `preview-*` (preview releases)
+
+### Settings
+- ❌ Forbid force-push to protected tags
+- ❌ Forbid direct creation (require PR → merge → tag)
+- ✅ Allow deletion only by maintainers
+
+### How to Enable Tag Protection
+1. Go to Settings → Tags → Add rule
+2. Enter pattern (e.g., `v*`)
+3. Select "Restrict who can create matching tags"
+4. Add maintainer team/users who can create tags
+5. Save rule
+
+*Alternative: Use Rulesets for more granular control (Settings → Rules → Rulesets)*
+
+## Emergency Playbook
+
+### CI is Red — What Now?
+
+#### If protection-audit fails
+1. Open the failed run → read the assertion error
+2. If a required check name drifted: align CI job name (never rename in Branch Protection)
+3. If PROTECTION_TOKEN returns 403: rotate PAT or re-grant Administration: Read-only
+4. Re-run audit from Actions tab; ensure it passes
+
+#### If cargo-audit breaks (new advisory)
+1. Open a chore PR to bump affected dependencies
+2. If fix unavailable: temporarily allowlist with expiry date
+   ```toml
+   # deny.toml
+   [advisories]
+   ignore = ["RUSTSEC-2025-XXXX"] # TODO: remove after fix released
+   ```
+3. Document exception in PR with follow-up ticket link
+
+#### If a release needs to land while non-critical guard is red
+1. Keep required checks intact — do not disable protection
+2. Land targeted fix PR addressing only the failure
+3. Document exception in PR body with evidence and follow-up ticket
+
+#### Rollback Procedure
+```bash
+# For squash merges (revert cleanly)
+git revert <merge_sha>
+git push origin main
+
+# NEVER disable protection or rename required jobs to "make it green"
+```
+
 ## Protection History
 - 2025-09-12: Initial protection enabled (PR #38, #40)
 - 2025-09-12: First governance snapshot committed
+- 2025-09-12: Added tag protection docs and emergency playbook
 
 ---
 *Job names are frozen in CI with "DO NOT RENAME" comments to maintain protection stability.*
