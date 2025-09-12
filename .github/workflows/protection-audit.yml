@@ -52,3 +52,36 @@ jobs:
 
           # Assert CODEOWNERS gate
           gh api -H "Accept: application/vnd.github+json" repos/:owner/:repo/branches/$BR/protection -q '.required_pull_request_reviews.require_code_owner_reviews' | grep -qx true
+
+      - name: Create/Update issue on failure (DO NOT RENAME)
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = "⚠️ Protection audit failed";
+            const body  = `Protection audit failed on ${new Date().toISOString()}.
+            
+            Please verify required checks, Code Owners, and branch settings (strict/linear history).
+            
+            Run logs are attached to the failed workflow.`;
+            // Try to find existing open issue
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo, state: "open", labels: "ops-audit"
+            });
+            if (issues.length > 0) {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: issues[0].number, body });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo,
+                title, body, labels: ["ops-audit","security","ci"]
+              });
+            }
+
+      - name: Slack notify on failure (optional)
+        if: failure() && env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -s -X POST -H 'Content-type: application/json' \
+            --data "{\"text\":\"⚠️ Protection audit failed in ${GITHUB_REPOSITORY} @ ${GITHUB_RUN_ID}\"}" \
+            "$SLACK_WEBHOOK_URL"
