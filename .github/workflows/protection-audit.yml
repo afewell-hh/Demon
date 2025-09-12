@@ -1,32 +1,54 @@
 name: protection-audit
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: '0 4 * * 1'  # Mondays at 04:00 UTC
+    - cron: "17 3 * * *"  # daily at 03:17 UTC
+  workflow_dispatch: {}
 
 jobs:
-  audit:
+  audit-skip-note:
+    if: ${{ secrets.PROTECTION_TOKEN == '' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Verify branch protection (main)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: echo "Skipping protection audit: PROTECTION_TOKEN not set."
+
+  audit:
+    # Skip in forks or repos without the secret to avoid noisy failures
+    if: ${{ secrets.PROTECTION_TOKEN != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    concurrency:
+      group: protection-audit
+      cancel-in-progress: false
+    # Uses a PAT because GITHUB_TOKEN often lacks repo-admin read for branch protection in orgs.
+    # PAT scope: Repository permissions -> Administration: Read-only (repo-scoped, fine-grained).
+    env:
+      GH_TOKEN: ${{ secrets.PROTECTION_TOKEN }}
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+      - name: Get default branch
+        id: repo
+        shell: bash
+        run: |
+          gh api repos/${{ github.repository }} --jq .default_branch > default_branch.txt
+          echo "branch=$(cat default_branch.txt)" >> "$GITHUB_OUTPUT"
+      - name: Verify required protection settings
         shell: bash
         run: |
           set -euo pipefail
-          PROT=$(gh api repos/${{ github.repository }}/branches/main/protection)
-          req_checks=$(jq -r '.required_status_checks.contexts[]?' <<<"$PROT")
-          must_have=(
-            "Bootstrapper bundles — verify (offline, signature ok)"
-            "Bootstrapper bundles — negative verify (tamper ⇒ failed)"
-            "review-lock-guard"
-          )
-          for c in "${must_have[@]}"; do
-            echo "$req_checks" | grep -Fx "$c" >/dev/null || { echo "Missing required check: $c"; exit 1; }
-          done
-          jq -e '.required_pull_request_reviews.require_code_owner_reviews == true' <<<"$PROT" >/dev/null \
-            || { echo "CODEOWNERS review not required"; exit 1; }
-          echo "Branch protection looks good."
+          BR="${{ steps.repo.outputs.branch }}"
+          gh api -H "Accept: application/vnd.github+json" repos/:owner/:repo/branches/$BR/protection -q '.required_status_checks.contexts | sort' | jq .
 
+          # Assert required checks present
+          REQ1='Bootstrapper bundles — verify (offline, signature ok)'
+          REQ2='Bootstrapper bundles — negative verify (tamper ⇒ failed)'
+          REQ3='review-lock-guard'
+          MAP=$(gh api -H "Accept: application/vnd.github+json" repos/:owner/:repo/branches/$BR/protection -q '.required_status_checks.contexts')
+          echo "$MAP" | jq -e "index(\"$REQ1\")" >/dev/null
+          echo "$MAP" | jq -e "index(\"$REQ2\")" >/dev/null
+          echo "$MAP" | jq -e "index(\"$REQ3\")" >/dev/null
+
+          # Assert CODEOWNERS gate
+          gh api -H "Accept: application/vnd.github+json" repos/:owner/:repo/branches/$BR/protection -q '.required_pull_request_reviews.require_code_owner_reviews' | grep -qx true
