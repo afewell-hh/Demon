@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 CARGO := cargo
 
-.PHONY: dev up down build test fmt lint
+.PHONY: dev up down build test fmt lint deploy-ci-hardening
 
 dev: up build
 	@echo "Dev environment ready on $$NATS_PORT (default 4222)."
@@ -24,3 +24,8 @@ fmt:
 
 lint:
 	$(CARGO) clippy --workspace --all-targets -- -D warnings || true
+
+deploy-ci-hardening:
+	@GIT_USER_EMAIL=$${GIT_USER_EMAIL:-ops@example.com} \
+	 GIT_USER_NAME=$${GIT_USER_NAME:-demon-ci-ops} \
+	 bash scripts/deploy-ci-hardening.sh
