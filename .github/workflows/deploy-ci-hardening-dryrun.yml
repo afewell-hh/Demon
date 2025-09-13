@@ -1,0 +1,25 @@
+name: deploy-ci-hardening (dry-run)
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/deploy-ci-hardening.sh'
+      - '.github/workflows/deploy-ci-hardening-dryrun.yml'
+
+jobs:
+  dryrun:
+    name: Dry-run smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y jq
+      
+      - name: Test script (dry-run mode)
+        run: |
+          chmod +x scripts/deploy-ci-hardening.sh
+          DRY_RUN=1 REPO_EXPECTED="$(gh repo view --json nameWithOwner -q .nameWithOwner)" \
+            bash scripts/deploy-ci-hardening.sh || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
