@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 CARGO := cargo
 
-.PHONY: dev up down build test fmt lint deploy-ci-hardening
+.PHONY: dev up down build test fmt lint deploy-ci-hardening audit-triage audit-triage-issue
 
 dev: up build
 	@echo "Dev environment ready on $$NATS_PORT (default 4222)."
@@ -29,3 +29,15 @@ deploy-ci-hardening:
 	@GIT_USER_EMAIL=$${GIT_USER_EMAIL:-ops@example.com} \
 	 GIT_USER_NAME=$${GIT_USER_NAME:-demon-ci-ops} \
 	 bash scripts/deploy-ci-hardening.sh
+
+# Generate triage MD for last N PRs (default 30) and print the newest file
+audit-triage:
+	@COUNT=$${COUNT:-30} ./audit-pr-triage-md.sh
+	@ls -t pr-review-triage-*.md | head -n1 | xargs -I{} sh -c 'echo "\n---\nGenerated: {}"; head -n 20 {}'
+
+# Optional: open a tracking issue with today’s report attached
+audit-triage-issue:
+	@./audit-pr-triage-md.sh
+	@T="Review triage report — $$(date -u +%F)"; F=$$(ls -t pr-review-triage-*.md | head -n1); \
+	  gh issue create -t "$$T" -F "$$F" -l ops-audit >/dev/null || true; \
+	  echo "Created/attempted issue for $$F"

@@ -1,0 +1,104 @@
+name: review-triage (PR comment)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  comment:
+    # Gate to PRs that have the label "triage-comment" to avoid noise.
+    if: >
+      github.event.pull_request.draft == false &&
+      (
+        contains(join(fromJSON(toJSON(github.event.pull_request.labels)).*.name, ','), 'triage-comment') ||
+        github.event_name == 'workflow_dispatch'
+      )
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    concurrency:
+      group: review-triage-comment-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate repo triage report
+        run: |
+          chmod +x ./audit-pr-triage-md.sh
+          ./audit-pr-triage-md.sh
+
+      - name: Extract current PR section
+        id: extract
+        run: |
+          PR=${{ github.event.pull_request.number }}
+          SRC="$(ls -t pr-review-triage-*.md | head -n1)"
+          OUT="pr-review-triage-pr-${PR}.md"
+          awk -v pr="## PR #"$PR":" '
+            BEGIN { found=0 }
+            found==0 && index($0, pr)==1 { found=1; print; next }
+            found==1 {
+              if ($0 ~ /^## PR #/ && index($0, pr)!=1) exit
+              print
+            }
+          ' "$SRC" > "$OUT" || true
+          # Fallback to entire file if section not found
+          test -s "$OUT" || cp "$SRC" "$OUT"
+          echo "file=$OUT" >> "$GITHUB_OUTPUT"
+
+      - name: Post or update sticky comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request.number;
+            const anchor = `<!-- review-triage:pr-${pr}:do-not-edit -->`;
+            const fs = require('fs');
+            const bodyMd = fs.readFileSync(process.env.FILE, 'utf8');
+            const header = `### 🧭 Review triage\n${anchor}\n`;
+            const footer = [
+              '',
+              '> _This is a generated snapshot from `audit-pr-triage-md.sh`. ' +
+              'Resolve threads or reply (Fixed/Clarified/Won’t fix) before merging._'
+            ].join('\n');
+            const newBody = header + bodyMd + '\n' + footer;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr,
+              per_page: 100
+            });
+
+            const prior = comments.find(c =>
+              c.user.type === 'Bot' && c.body && c.body.includes(anchor)
+            );
+
+            if (prior) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: prior.id,
+                body: newBody
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr,
+                body: newBody
+              });
+            }
+        env:
+          FILE: ${{ steps.extract.outputs.file }}
+
+      - name: Upload triage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-${{ github.event.pull_request.number }}-review-triage
+          path: |
+            pr-review-triage-*.md
