@@ -192,6 +192,28 @@ jobs:
         if: always()
         run: docker rm -f nats || true
 
+  cargo-audit:
+    name: Cargo audit (advisories)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+      - name: Audit
+        run: cargo audit --deny warnings
+
+  cargo-deny:
+    name: Cargo deny (licenses/bans)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cargo-deny
+        run: curl -LsSf https://github.com/EmbarkStudios/cargo-deny/releases/latest/download/cargo-deny-$(uname -s)-$(uname -m).tar.gz \
+          | tar xz -C ~/.cargo/bin --strip-components=1 cargo-deny
+      - name: Check licenses & bans
+        run: cargo deny check --all-features
+
   bootstrapper-smoke:
     runs-on: ubuntu-latest
     needs: build-test
