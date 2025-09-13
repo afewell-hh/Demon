@@ -34,6 +34,11 @@ jobs:
         run: |
           gh api repos/${{ github.repository }} --jq .default_branch > default_branch.txt
           echo "branch=$(cat default_branch.txt)" >> "$GITHUB_OUTPUT"
+      - name: List rulesets (informational)
+        continue-on-error: true
+        run: |
+          echo "Fetching repository rulesets (best-effort)..."
+          gh api repos/:owner/:repo/rulesets 2>/dev/null | jq . || echo "Note: Unable to fetch rulesets (insufficient permissions or feature not available)"
       - name: Verify required protection settings
         shell: bash
         run: |
@@ -52,3 +57,13 @@ jobs:
 
           # Assert CODEOWNERS gate
           gh api -H "Accept: application/vnd.github+json" repos/:owner/:repo/branches/$BR/protection -q '.required_pull_request_reviews.require_code_owner_reviews' | grep -qx true
+
+          # Assert "Require branches to be up to date" (strict)
+          gh api -H "Accept: application/vnd.github+json" repos/:owner/:repo/branches/$BR/protection | 
+            jq -e '.required_status_checks.strict == true' >/dev/null || 
+            { echo "ERROR: 'Require branches to be up to date' (strict) not enabled"; exit 1; }
+
+          # Assert "Require linear history"
+          gh api -H "Accept: application/vnd.github+json" repos/:owner/:repo/branches/$BR/protection | 
+            jq -e '.required_linear_history.enabled == true' >/dev/null || 
+            { echo "ERROR: 'Require linear history' not enabled"; exit 1; }
