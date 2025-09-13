@@ -1,0 +1,24 @@
+name: shellcheck (deploy-ci-hardening)
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/deploy-ci-hardening.sh'
+      - '.github/workflows/shellcheck.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/deploy-ci-hardening.sh'
+      - '.github/workflows/shellcheck.yml'
+
+jobs:
+  lint:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ludeeus/action-shellcheck@v2
+        with:
+          scandir: "./scripts"
+          ignore_names: ""
+          severity: warning
