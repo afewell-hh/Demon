@@ -1,0 +1,27 @@
+name: Story
+description: User story with acceptance criteria
+labels: [story]
+body:
+  - type: input
+    id: epic
+    attributes: {label: Epic, placeholder: MVP-E1, description: Link/name of epic}
+  - type: textarea
+    id: story
+    attributes: {label: Story, description: As a <persona>, I want <capability> so that <value>.}
+  - type: checkboxes
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      options:
+        - label: Criterion 1
+        - label: Criterion 2
+        - label: Criterion 3
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: Definition of Done
+      options:
+        - label: Tests added/updated (Playwright/Unit)
+        - label: Docs updated (README/HOWTO)
+        - label: All review threads resolved and replied
+        - label: CI green on PR (required checks)
