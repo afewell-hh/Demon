@@ -45,3 +45,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo 'PROTECTION_TOKEN not set; protection audit skipped.'
+
+# proof trigger
