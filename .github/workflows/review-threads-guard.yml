@@ -16,6 +16,11 @@ jobs:
   guard:
     runs-on: ubuntu-latest
     steps:
+      - name: Skip on manual dispatch (not a PR context)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          echo "Manual dispatch: skipping guard (no PR context)."
+          exit 0
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -102,4 +107,3 @@ jobs:
             } else {
               core.info('Guard passed (all unresolved threads have author replies, or none remain).');
             }
-
