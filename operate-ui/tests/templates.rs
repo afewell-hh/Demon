@@ -45,7 +45,7 @@ async fn templates_compile_and_render_minimal() {
         "run",
         &serde_json::json!({
             "runId": "run-x",
-            "ritualId": "ritual-x", 
+            "ritualId": "ritual-x",
             "events": []
         }),
     );
