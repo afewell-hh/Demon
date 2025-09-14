@@ -30,11 +30,9 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const core = require('@actions/core');
-            const github = require('@actions/github');
-            const pr = github.context.payload.pull_request;
-            const owner = github.context.repo.owner;
-            const repo  = github.context.repo.repo;
+            const pr = context.payload.pull_request;
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
 
             const labels = (pr?.labels || []).map(l => l.name.toLowerCase());
             const enforce = labels.includes('enforce-review-replies');
@@ -65,11 +63,9 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const core = require('@actions/core');
-            const github = require('@actions/github');
-            const owner = github.context.repo.owner;
-            const repo  = github.context.repo.repo;
-            const number = github.context.payload.pull_request.number;
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+            const number = context.payload.pull_request.number;
 
             const prResp = await github.rest.pulls.get({ owner, repo, pull_number: number });
             const prAuthor = prResp.data.user?.login || '';
