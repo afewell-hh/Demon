@@ -24,10 +24,18 @@ jobs:
             const pr = context.payload.pull_request;
             const body = pr.body || "";
             const head = pr.head.sha;
-            const m = body.match(/[0-9a-f]{40}/i);
-            if (!m) core.setFailed("Review-lock SHA not found in PR body.");
-            else if (m[0].toLowerCase() !== head.toLowerCase())
-              core.setFailed(`Review-lock mismatch: body=${m[0].slice(0,7)} head=${head.slice(0,7)}`);
+            // Extract the explicit Review-lock line to avoid capturing unrelated SHAs in the body
+            const m = body.match(/Review-lock:\s*([0-9a-f]{40})/i);
+            if (!m) {
+              core.setFailed("Review-lock not found. Add a line: 'Review-lock: <HEAD_SHA>'");
+            } else {
+              const lock = m[1];
+              if (lock.toLowerCase() !== head.toLowerCase()) {
+                core.setFailed(`Review-lock mismatch: body=${lock.slice(0,7)} head=${head.slice(0,7)}`);
+              } else {
+                core.info(`Review-lock OK for ${head.slice(0,7)}`);
+              }
+            }
   build-test:
     runs-on: ubuntu-latest
 
