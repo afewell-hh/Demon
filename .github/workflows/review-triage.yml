@@ -1,0 +1,48 @@
+name: review-triage (PR)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  triage:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # used by gh inside the script
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate repo triage report (last 30 PRs)
+        run: |
+          chmod +x ./audit-pr-triage-md.sh
+          ./audit-pr-triage-md.sh
+
+      # Optional: extract a per-PR mini report section for this PR
+      - name: Extract current PR section
+        run: |
+          PR=${{ github.event.pull_request.number }}
+          SRC="$(ls -t pr-review-triage-*.md | head -n1)"
+          awk -v pr="## PR #"$PR":" '
+            BEGIN { found=0 }
+            found==0 && index($0, pr)==1 { found=1; print; next }
+            found==1 {
+              if ($0 ~ /^## PR #/ && index($0, pr)!=1) exit
+              print
+            }
+          ' "$SRC" > "pr-review-triage-pr-${PR}.md" || true
+          test -s "pr-review-triage-pr-${PR}.md" || cp "$SRC" "pr-review-triage-pr-${PR}.md"
+
+      - name: Upload triage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-${{ github.event.pull_request.number }}-review-triage
+          path: |
+            pr-review-triage-*.md
+          if-no-files-found: error
+
