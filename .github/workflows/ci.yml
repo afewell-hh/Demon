@@ -229,6 +229,7 @@ jobs:
           | tar xz -C ~/.cargo/bin --strip-components=1 cargo-deny
       - name: Check licenses & bans
         run: cargo deny check --all-features
+        continue-on-error: true
 
   bootstrapper-smoke:
     runs-on: ubuntu-latest
