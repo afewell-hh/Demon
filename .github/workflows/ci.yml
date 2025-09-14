@@ -5,6 +5,7 @@ on:
     branches: [ main, trunk, master ]
   pull_request:
     branches: [ "**" ]
+  workflow_dispatch: {}
 
 jobs:
   # DO NOT RENAME: used in branch protection required checks
