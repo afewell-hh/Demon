@@ -21,20 +21,41 @@ jobs:
       - uses: actions/github-script@v7
         with:
           script: |
+            const {owner, repo} = context.repo;
             const pr = context.payload.pull_request;
-            const body = pr.body || "";
             const head = pr.head.sha;
-            // Extract the explicit Review-lock line to avoid capturing unrelated SHAs in the body
-            const m = body.match(/Review-lock:\s*([0-9a-f]{40})/i);
-            if (!m) {
-              core.setFailed("Review-lock not found. Add a line: 'Review-lock: <HEAD_SHA>'");
-            } else {
-              const lock = m[1];
-              if (lock.toLowerCase() !== head.toLowerCase()) {
-                core.setFailed(`Review-lock mismatch: body=${lock.slice(0,7)} head=${head.slice(0,7)}`);
-              } else {
-                core.info(`Review-lock OK for ${head.slice(0,7)}`);
+
+            async function fetchBody() {
+              const res = await github.rest.pulls.get({ owner, repo, pull_number: pr.number });
+              return res.data.body || "";
+            }
+
+            async function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+            // Retry loop to tolerate API eventual consistency on PR body updates
+            let body = await fetchBody();
+            let lock = null;
+            const maxAttempts = 10;
+            for (let i = 1; i <= maxAttempts; i++) {
+              const m = body.match(/Review-lock:\s*([0-9a-f]{40})/i);
+              lock = m ? m[1] : null;
+              if (lock && lock.toLowerCase() === head.toLowerCase()) {
+                core.info(`Review-lock OK for ${head.slice(0,7)} on attempt ${i}`);
+                break;
               }
+              if (i < maxAttempts) {
+                core.info(`Review-lock not aligned yet (attempt ${i}/${maxAttempts}): body=${(lock||'none').slice(0,7)} head=${head.slice(0,7)}; retrying…`);
+                await wait(3000);
+                body = await fetchBody();
+              }
+            }
+
+            if (!lock) {
+              core.setFailed("Review-lock not found. Add a line: 'Review-lock: <HEAD_SHA>'");
+              return;
+            }
+            if (lock.toLowerCase() !== head.toLowerCase()) {
+              core.setFailed(`Review-lock mismatch after retries: body=${lock.slice(0,7)} head=${head.slice(0,7)}`);
             }
   build-test:
     runs-on: ubuntu-latest
