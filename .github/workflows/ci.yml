@@ -80,10 +80,6 @@ jobs:
           done
           echo "NATS did not report ready in time"; docker logs nats; exit 1
 
-<<<<<<< HEAD
-      - name: Operate UI NATS-backed tests
-        run: cargo test -p operate-ui -- --ignored --nocapture
-=======
       - name: Engine approvals integration (NATS)
         env:
           RITUAL_STREAM_NAME: RITUAL_EVENTS
@@ -108,7 +104,7 @@ jobs:
           RITUAL_STREAM_NAME: RITUAL_EVENTS
         run: |
           cargo test -p engine --test per_cap_quota_integration -- --ignored --nocapture
->>>>>>> origin/main
+
 
       - name: Smoke run (demonctl)
         run: |
