@@ -27,3 +27,4 @@ lcov.info
 
 # Runtime data
 .demon/
+# trigger CI
