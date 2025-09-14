@@ -33,7 +33,8 @@ seed:
         Some("FLAG_STREAM"),
         Some(vec!["demon.ritual.v1.>".to_string()]),
         Some("http://flag-ui"),
-    ).unwrap();
+    )
+    .unwrap();
     assert_eq!(cfg.nats_url, "nats://flag:4222");
     assert_eq!(cfg.stream_name, "FLAG_STREAM");
     assert_eq!(cfg.ui_url, "http://flag-ui");
