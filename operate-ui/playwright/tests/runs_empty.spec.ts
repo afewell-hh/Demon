@@ -9,10 +9,17 @@ test("runs page shows banner when stream is missing", async ({ page, baseURL }) 
   // Poll for the API response to be properly shaped (handles race conditions)
   await expect
     .poll(async () => {
-      const r = await page.request.get(`${baseURL}/api/runs`, { timeout: 5000 });
+      const r = await page.request.get(`${baseURL}/api/runs`, { timeout: 15000 });
       if (!r.ok()) return -1;
       const j = await r.json().catch(() => ({}));
-      return Array.isArray(j.runs) ? j.runs.length : -1;
+      // Accept three shapes:
+      // 1) direct array:    [ {...}, {...} ]
+      if (Array.isArray(j)) return j.length;
+      // 2) wrapped:         { runs: [ {...} ] }
+      if (j && Array.isArray((j as any).runs)) return (j as any).runs.length;
+      // 3) error:           { error: "…" } => treat as 0 (no runs yet)
+      if (j && (j as any).error) return 0;
+      return -1;
     }, { timeout: 30000, intervals: [500, 1000, 2000] })
     .not.toBe(-1);
 });

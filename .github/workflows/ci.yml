@@ -124,6 +124,15 @@ jobs:
           (cd ../.. && RUST_LOG=info cargo run -p operate-ui --quiet &) 
           # Wait for port 3000 to open
           for i in {1..60}; do nc -z 127.0.0.1 3000 && break; sleep 0.5; done
+          # Stronger readiness: require HTTP 200 and JSON body from /api/runs
+          for i in {1..60}; do
+            code=$(curl -sS -o /tmp/runs.json -w "%{http_code}" http://127.0.0.1:3000/api/runs || true)
+            if [[ "$code" == "200" ]] && jq -e . /tmp/runs.json >/dev/null 2>&1; then
+              echo "✓ API ready"; break
+            fi
+            sleep 0.5
+          done
+          jq . /tmp/runs.json || true
           npm install
           npx playwright install --with-deps
           npm test
