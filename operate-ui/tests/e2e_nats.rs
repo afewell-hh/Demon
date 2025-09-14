@@ -1,5 +1,5 @@
 use axum::Router;
-use operate_ui::{create_app, AppConfig, AppState};
+use operate_ui::{create_app, AppState};
 use std::str::FromStr;
 use tokio::net::TcpListener;
 use tokio::time::{sleep, Duration};
@@ -12,10 +12,7 @@ async fn runs_endpoints_behave_with_and_without_stream() -> anyhow::Result<()> {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let addr = listener.local_addr()?;
 
-    let state = AppState::new_with_config(AppConfig {
-        skip_stream_bootstrap: true,
-    })
-    .await;
+    let state = AppState::new().await;
     let app: Router = create_app(state);
     tokio::spawn(async move {
         axum::serve(listener, app).await.unwrap();
