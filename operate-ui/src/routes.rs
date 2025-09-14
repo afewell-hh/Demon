@@ -1,13 +1,21 @@
 use crate::jetstream::{RunDetail, RunSummary};
 use crate::{AppError, AppState};
 
+<<<<<<< HEAD
+=======
+use axum::http::HeaderMap;
+>>>>>>> origin/main
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::{Html, IntoResponse, Response},
     Json,
 };
+<<<<<<< HEAD
 use serde::Deserialize;
+=======
+use serde::{Deserialize, Serialize};
+>>>>>>> origin/main
 use tracing::{debug, error, info};
 
 // Query parameters for list runs API
@@ -45,7 +53,11 @@ pub async fn list_runs_html(
     context.insert("runs", &runs);
     context.insert("error", &error);
     context.insert("jetstream_available", &state.jetstream_client.is_some());
+<<<<<<< HEAD
     context.insert("stream_ready", &state.stream_ready);
+=======
+    context.insert("current_page", &"runs");
+>>>>>>> origin/main
 
     let html = state
         .tera
@@ -80,6 +92,7 @@ pub async fn list_runs_api(
         query.limit
     );
 
+<<<<<<< HEAD
     // New behavior: return 200 with { runs: [] } and a warning header when NATS/stream missing
     let mut warn_header: Option<&'static str> = None;
     let body = if let Some(client) = &state.jetstream_client {
@@ -101,6 +114,36 @@ pub async fn list_runs_api(
             .insert("X-Demon-Warn", axum::http::HeaderValue::from_static(v));
     }
     resp
+=======
+    match &state.jetstream_client {
+        Some(client) => match client.list_runs(query.limit).await {
+            Ok(runs) => {
+                info!("Successfully retrieved {} runs for API", runs.len());
+                Json(runs).into_response()
+            }
+            Err(e) => {
+                error!("Failed to retrieve runs: {}", e);
+                (
+                    StatusCode::BAD_GATEWAY,
+                    Json(serde_json::json!({
+                        "error": format!("Failed to retrieve runs: {}", e)
+                    })),
+                )
+                    .into_response()
+            }
+        },
+        None => {
+            error!("JetStream client not available");
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({
+                    "error": "JetStream is not available"
+                })),
+            )
+                .into_response()
+        }
+    }
+>>>>>>> origin/main
 }
 
 /// Get run detail - HTML response
@@ -134,6 +177,10 @@ pub async fn get_run_html(
     context.insert("error", &error);
     context.insert("jetstream_available", &state.jetstream_client.is_some());
     context.insert("run_id", &run_id);
+<<<<<<< HEAD
+=======
+    context.insert("current_page", &"runs");
+>>>>>>> origin/main
 
     // View helpers to avoid template method calls
     if let Some(ref rd) = run {
@@ -153,6 +200,14 @@ pub async fn get_run_html(
             .unwrap_or(("Running", "status-running"));
         context.insert("run_status", &status);
         context.insert("run_status_class", &status_class);
+<<<<<<< HEAD
+=======
+
+        // Approvals summary (single row): Pending/Granted/Denied with fields
+        if let Some(summary) = ApprovalsSummary::from_events(&rd.events) {
+            context.insert("approvals", &summary);
+        }
+>>>>>>> origin/main
     }
 
     let html = state
@@ -223,6 +278,42 @@ pub async fn get_run_api(State(state): State<AppState>, Path(run_id): Path<Strin
     }
 }
 
+<<<<<<< HEAD
+=======
+// ---------------- Admin ----------------
+#[derive(Serialize)]
+pub struct TemplateReport {
+    pub templates: Vec<String>,
+    pub has_filter_tojson: bool,
+    pub template_ready: bool,
+}
+
+/// Admin: templates/report (JSON)
+pub async fn admin_templates_report(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if let Some(expected) = &state.admin_token {
+        let got = headers
+            .get("X-Admin-Token")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        if got != expected {
+            return (StatusCode::UNAUTHORIZED, "missing or invalid admin token").into_response();
+        }
+    }
+
+    let templates = state
+        .tera
+        .get_template_names()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+    let body = TemplateReport {
+        templates,
+        has_filter_tojson: true,
+        template_ready: true,
+    };
+    Json(body).into_response()
+}
+
+>>>>>>> origin/main
 // Helper functions for templates
 impl RunSummary {
     pub fn format_timestamp(&self) -> String {
@@ -298,6 +389,392 @@ impl crate::jetstream::RitualEvent {
     }
 }
 
+<<<<<<< HEAD
+=======
+// ---- Approvals summary helpers ----
+#[derive(Debug, Clone, Serialize)]
+struct ApprovalsSummary {
+    status: String, // Pending | Granted | Denied
+    #[serde(rename = "statusClass")]
+    status_class: String, // badge class mapping
+    #[serde(rename = "gateId")]
+    gate_id: String,
+    requester: Option<String>,
+    approver: Option<String>,
+    reason: Option<String>,
+    note: Option<String>,
+}
+
+impl ApprovalsSummary {
+    fn from_events(events: &[crate::jetstream::RitualEvent]) -> Option<Self> {
+        // Find the latest approval.* event
+        let evt = events
+            .iter()
+            .rev()
+            .find(|e| e.event.starts_with("approval."))?;
+
+        let gate_id = evt
+            .extra
+            .get("gateId")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        match evt.event.as_str() {
+            "approval.granted:v1" => Some(Self {
+                status: "Granted".to_string(),
+                status_class: "status-completed".to_string(),
+                gate_id,
+                requester: None,
+                approver: evt
+                    .extra
+                    .get("approver")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string()),
+                reason: None,
+                note: evt
+                    .extra
+                    .get("note")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string()),
+            }),
+            "approval.denied:v1" => {
+                let reason = evt
+                    .extra
+                    .get("reason")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let status = if matches!(reason.as_deref(), Some("expired")) {
+                    "Denied — expired".to_string()
+                } else {
+                    "Denied".to_string()
+                };
+                Some(Self {
+                    status,
+                    status_class: "status-failed".to_string(),
+                    gate_id,
+                    requester: None,
+                    approver: evt
+                        .extra
+                        .get("approver")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string()),
+                    reason,
+                    note: None,
+                })
+            }
+            "approval.requested:v1" => Some(Self {
+                status: "Pending".to_string(),
+                status_class: "status-running".to_string(),
+                gate_id,
+                requester: evt
+                    .extra
+                    .get("requester")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string()),
+                approver: None,
+                reason: evt
+                    .extra
+                    .get("reason")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string()),
+                note: None,
+            }),
+            _ => None,
+        }
+    }
+}
+
+// ---- Approvals grant/deny endpoints ----
+#[derive(Debug, Deserialize)]
+pub struct ApproveBody {
+    approver: String,
+    #[serde(default)]
+    note: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DenyBody {
+    approver: String,
+    reason: String,
+}
+
+async fn publish_approval_event(
+    ritual_id: &str,
+    run_id: &str,
+    payload: serde_json::Value,
+    msg_id: String,
+) -> anyhow::Result<()> {
+    use async_nats::jetstream;
+    let url = std::env::var("NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".to_string());
+    let client = async_nats::connect(&url).await?;
+    let js = jetstream::new(client.clone());
+    // Resolve stream name with precedence
+    let desired = std::env::var("RITUAL_STREAM_NAME").ok();
+    if let Some(name) = desired {
+        let _ = js
+            .get_or_create_stream(jetstream::stream::Config {
+                name,
+                subjects: vec!["demon.ritual.v1.>".to_string()],
+                ..Default::default()
+            })
+            .await?;
+    } else {
+        // Prefer default; fall back to deprecated if it exists
+        if js.get_stream("RITUAL_EVENTS").await.is_err() {
+            if js.get_stream("DEMON_RITUAL_EVENTS").await.is_ok() {
+                tracing::warn!("Using deprecated stream 'DEMON_RITUAL_EVENTS'; set RITUAL_STREAM_NAME or migrate to 'RITUAL_EVENTS'");
+            } else {
+                let _ = js
+                    .get_or_create_stream(jetstream::stream::Config {
+                        name: "RITUAL_EVENTS".to_string(),
+                        subjects: vec!["demon.ritual.v1.>".to_string()],
+                        ..Default::default()
+                    })
+                    .await?;
+            }
+        }
+    }
+
+    let subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
+    let mut headers = async_nats::HeaderMap::new();
+    headers.insert("Nats-Msg-Id", msg_id.as_str());
+    js.publish_with_headers(subject, headers, serde_json::to_vec(&payload)?.into())
+        .await?
+        .await?;
+    Ok(())
+}
+
+fn approver_allowed(email: &str) -> bool {
+    let allowlist = std::env::var("APPROVER_ALLOWLIST").unwrap_or_default();
+    if allowlist.is_empty() {
+        return false;
+    }
+    allowlist
+        .split(',')
+        .map(|s| s.trim())
+        .any(|allowed| !allowed.is_empty() && allowed.eq_ignore_ascii_case(email))
+}
+
+#[axum::debug_handler]
+pub async fn grant_approval_api(
+    State(state): State<AppState>,
+    Path((run_id, gate_id)): Path<(String, String)>,
+    Json(body): Json<ApproveBody>,
+) -> Response {
+    if !approver_allowed(&body.approver) {
+        return (StatusCode::FORBIDDEN, "approver not allowed").into_response();
+    }
+
+    // Ensure stream exists before attempting to read (if explicit name set)
+    if let Ok(name) = std::env::var("RITUAL_STREAM_NAME") {
+        if let Ok(client) = async_nats::connect(
+            &std::env::var("NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".to_string()),
+        )
+        .await
+        {
+            let js = async_nats::jetstream::new(client);
+            let _ = js
+                .get_or_create_stream(async_nats::jetstream::stream::Config {
+                    name,
+                    subjects: vec!["demon.ritual.v1.>".to_string()],
+                    ..Default::default()
+                })
+                .await;
+        }
+    }
+
+    // Discover ritualId by looking up run and enforce first-writer-wins on approvals
+    let ritual_id = match &state.jetstream_client {
+        Some(js) => match js.get_run_detail(&run_id).await {
+            Ok(Some(rd)) => {
+                // Enforce: if a terminal approval already exists for this gate, prevent conflicting writes
+                if let Some(last) = rd.events.iter().rev().find(|e| {
+                    (e.event == "approval.granted:v1" || e.event == "approval.denied:v1")
+                        && e.extra
+                            .get("gateId")
+                            .and_then(|v| v.as_str())
+                            .map(|g| g == gate_id)
+                            .unwrap_or(false)
+                }) {
+                    // If already granted, duplicate grant is a no-op (200); deny is rejected (409)
+                    if last.event == "approval.granted:v1" {
+                        // same terminal -> no-op
+                        return (
+                            StatusCode::OK,
+                            Json(serde_json::json!({
+                                "status": "noop",
+                                "reason": "gate already granted"
+                            })),
+                        )
+                            .into_response();
+                    }
+                    // Already denied => reject grant
+                    return (
+                        StatusCode::CONFLICT,
+                        Json(serde_json::json!({
+                            "error": "gate already resolved",
+                            "state": if last.event == "approval.granted:v1" { "granted" } else { "denied" }
+                        })),
+                    )
+                        .into_response();
+                }
+                rd.ritual_id
+            }
+            Ok(None) => return (StatusCode::NOT_FOUND, "run not found").into_response(),
+            Err(e) => {
+                error!("get_run_detail failed: {}", e);
+                return (StatusCode::BAD_GATEWAY, "JetStream error").into_response();
+            }
+        },
+        None => return (StatusCode::BAD_GATEWAY, "JetStream unavailable").into_response(),
+    };
+
+    let now = chrono::Utc::now().to_rfc3339();
+    let payload = serde_json::json!({
+        "event": "approval.granted:v1",
+        "ts": now,
+        "tenantId": "default",
+        "runId": run_id,
+        "ritualId": ritual_id,
+        "gateId": gate_id,
+        "approver": body.approver,
+        "note": body.note,
+    });
+    let msg_id = format!(
+        "{}:approval:{}:granted",
+        payload["runId"].as_str().unwrap(),
+        payload["gateId"].as_str().unwrap()
+    );
+    if let Err(e) = publish_approval_event(
+        payload["ritualId"].as_str().unwrap(),
+        payload["runId"].as_str().unwrap(),
+        payload.clone(),
+        msg_id,
+    )
+    .await
+    {
+        error!("failed to publish: {}", e);
+        return (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({"error": format!("publish failed: {}", e)})),
+        )
+            .into_response();
+    }
+
+    (StatusCode::OK, Json(payload)).into_response()
+}
+
+#[axum::debug_handler]
+pub async fn deny_approval_api(
+    State(state): State<AppState>,
+    Path((run_id, gate_id)): Path<(String, String)>,
+    Json(body): Json<DenyBody>,
+) -> Response {
+    if !approver_allowed(&body.approver) {
+        return (StatusCode::FORBIDDEN, "approver not allowed").into_response();
+    }
+
+    // Ensure stream exists before attempting to read
+    if let Some(_jsctx) = &state.jetstream_client {
+        let desired = std::env::var("RITUAL_STREAM_NAME").ok();
+        if let Some(name) = desired {
+            let client = async_nats::connect(
+                &std::env::var("NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".to_string()),
+            )
+            .await
+            .ok();
+            if let Some(client) = client {
+                let _ = async_nats::jetstream::new(client)
+                    .get_or_create_stream(async_nats::jetstream::stream::Config {
+                        name,
+                        subjects: vec!["demon.ritual.v1.>".to_string()],
+                        ..Default::default()
+                    })
+                    .await;
+            }
+        }
+    }
+
+    let ritual_id = match &state.jetstream_client {
+        Some(js) => match js.get_run_detail(&run_id).await {
+            Ok(Some(rd)) => {
+                if let Some(last) = rd.events.iter().rev().find(|e| {
+                    (e.event == "approval.granted:v1" || e.event == "approval.denied:v1")
+                        && e.extra
+                            .get("gateId")
+                            .and_then(|v| v.as_str())
+                            .map(|g| g == gate_id)
+                            .unwrap_or(false)
+                }) {
+                    // Already denied -> duplicate deny is a no-op (200); grant is rejected (409)
+                    if last.event == "approval.denied:v1" {
+                        return (
+                            StatusCode::OK,
+                            Json(serde_json::json!({
+                                "status": "noop",
+                                "reason": "gate already denied"
+                            })),
+                        )
+                            .into_response();
+                    }
+                    // Already granted => reject deny
+                    return (
+                        StatusCode::CONFLICT,
+                        Json(serde_json::json!({
+                            "error": "gate already resolved",
+                            "state": if last.event == "approval.granted:v1" { "granted" } else { "denied" }
+                        })),
+                    )
+                        .into_response();
+                }
+                rd.ritual_id
+            }
+            Ok(None) => return (StatusCode::NOT_FOUND, "run not found").into_response(),
+            Err(e) => {
+                error!("get_run_detail failed: {}", e);
+                return (StatusCode::BAD_GATEWAY, "JetStream error").into_response();
+            }
+        },
+        None => return (StatusCode::BAD_GATEWAY, "JetStream unavailable").into_response(),
+    };
+
+    let now = chrono::Utc::now().to_rfc3339();
+    let payload = serde_json::json!({
+        "event": "approval.denied:v1",
+        "ts": now,
+        "tenantId": "default",
+        "runId": run_id,
+        "ritualId": ritual_id,
+        "gateId": gate_id,
+        "approver": body.approver,
+        "reason": body.reason,
+    });
+    let msg_id = format!(
+        "{}:approval:{}:denied",
+        payload["runId"].as_str().unwrap(),
+        payload["gateId"].as_str().unwrap()
+    );
+    if let Err(e) = publish_approval_event(
+        payload["ritualId"].as_str().unwrap(),
+        payload["runId"].as_str().unwrap(),
+        payload.clone(),
+        msg_id,
+    )
+    .await
+    {
+        error!("failed to publish: {}", e);
+        return (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({"error": format!("publish failed: {}", e)})),
+        )
+            .into_response();
+    }
+
+    (StatusCode::OK, Json(payload)).into_response()
+}
+
+>>>>>>> origin/main
 #[cfg(test)]
 mod tests {
     use super::*;

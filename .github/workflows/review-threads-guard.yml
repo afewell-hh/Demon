@@ -1,13 +1,22 @@
+<<<<<<< HEAD
 name: review-threads-guard (PR)
+=======
+name: review-threads-guard (PR)  # DO NOT RENAME
+>>>>>>> origin/main
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, labeled]
+<<<<<<< HEAD
   workflow_dispatch: {}
+=======
+  workflow_dispatch:
+>>>>>>> origin/main
 
 permissions:
   contents: read
   pull-requests: read
+<<<<<<< HEAD
   issues: write
   actions: read
 
@@ -85,6 +94,59 @@ jobs:
                           nodes { author { login } }
                         }
                         id
+=======
+
+jobs:
+  guard:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'enforce-review-replies')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: review-threads-guard-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    steps:
+      - name: Detect docs-only change
+        id: docsonly
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            docs:
+              - 'docs/**'
+              - '**/*.md'
+
+      - name: Skip for docs-only PRs
+        if: steps.docsonly.outputs.docs == 'true'
+        run: echo "Docs-only change; skipping guard."
+
+      - name: Check unresolved threads with no author reply
+        if: steps.docsonly.outputs.docs != 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+            const number = pr.number;
+
+            // Fetch PR author and all review threads (paginated)
+            const query = `
+              query Threads($owner:String!, $repo:String!, $number:Int!, $after:String) {
+                repository(owner:$owner, name:$repo) {
+                  pullRequest(number:$number) {
+                    author { login }
+                    reviewThreads(first: 100, after: $after) {
+                      nodes {
+                        isResolved
+                        comments(first: 100) {
+                          nodes {
+                            author { login }
+                            url
+                            createdAt
+                          }
+                        }
+>>>>>>> origin/main
                       }
                       pageInfo { hasNextPage endCursor }
                     }
@@ -92,6 +154,7 @@ jobs:
                 }
               }`;
 
+<<<<<<< HEAD
             let unresolved = 0;
             let noReply = 0;
             let cursor = null;
@@ -137,3 +200,59 @@ jobs:
         if: steps.threads.outputs.noreply == '0'
         run: |
           echo "Guard passed (all unresolved threads have author replies, or none remain)."
+=======
+            let after = null;
+            let threads = [];
+            let authorLogin = null;
+
+            do {
+              const res = await github.graphql(query, { owner, repo, number, after });
+              const prData = res.repository.pullRequest;
+              authorLogin = authorLogin ?? (prData.author && prData.author.login);
+              const page = prData.reviewThreads;
+              threads.push(...page.nodes);
+              after = page.pageInfo.hasNextPage ? page.pageInfo.endCursor : null;
+            } while (after);
+
+            // Evaluate unresolved + no author reply
+            let offending = [];
+            for (const t of threads) {
+              if (t.isResolved) continue;
+              const hasAuthorReply = t.comments.nodes.some(c => c.author?.login === authorLogin);
+              if (!hasAuthorReply) {
+                // Use the first comment URL as a deep link for action
+                const firstUrl = t.comments.nodes[0]?.url || '';
+                offending.push(firstUrl);
+              }
+            }
+
+            core.info(`Found ${threads.length} threads; offending unresolved-no-reply: ${offending.length}`);
+            if (offending.length > 0) {
+              core.setFailed(
+                [
+                  `Unresolved review threads without author reply: ${offending.length}`,
+                  `Please respond on each thread (Fixed/Clarified/Won’t fix) and/or resolve.`,
+                  `Links:\n- ${offending.join('\n- ')}`
+                ].join('\n')
+              );
+            }
+
+      - name: Comment on failure with links
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const body = `### 🔴 Review threads guard failed
+            Please reply to each unresolved thread (Fixed/Clarified/Won’t fix) and/or resolve.
+            See failing job logs for deep links.`;
+            const {owner, repo} = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const existing = await github.rest.issues.listComments({owner, repo, issue_number});
+            const prev = existing.data.find(c => c.user.type === 'Bot' && c.body?.includes('Review threads guard failed'));
+            if (prev) {
+              await github.rest.issues.updateComment({owner, repo, comment_id: prev.id, body});
+            } else {
+              await github.rest.issues.createComment({owner, repo, issue_number, body});
+            }
+>>>>>>> origin/main

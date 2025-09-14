@@ -93,6 +93,10 @@ The Operate UI provides:
 | `BIND_ADDR` | `0.0.0.0` | Bind address |
 | `NATS_URL` | `nats://localhost:4222` | NATS server URL |
 | `NATS_CREDS_PATH` | (none) | Path to NATS credentials file |
+<<<<<<< HEAD
+=======
+| `RITUAL_STREAM_NAME` | `RITUAL_EVENTS` | JetStream stream for ritual events. If unset, UI looks for `RITUAL_EVENTS` first, then falls back to `DEMON_RITUAL_EVENTS` (deprecated) and logs a warning. |
+>>>>>>> origin/main
 
 ### Development with NATS
 
@@ -210,6 +214,10 @@ export BIND_ADDR=0.0.0.0
 export NATS_URL=nats://nats-cluster:4222
 export NATS_CREDS_PATH=/etc/nats/creds/operate-ui.creds
 export RUST_LOG=operate_ui=info
+<<<<<<< HEAD
+=======
+export RITUAL_STREAM_NAME=RITUAL_EVENTS
+>>>>>>> origin/main
 ```
 
 ## Contributing
@@ -224,4 +232,8 @@ export RUST_LOG=operate_ui=info
 - **Read-Only**: This UI only reads from JetStream, never writes
 - **No Authentication**: Currently no auth - add reverse proxy if needed
 - **Input Validation**: All user inputs are validated and sanitized
+<<<<<<< HEAD
 - **DoS Protection**: Limits on query sizes and timeouts prevent abuse
+=======
+- **DoS Protection**: Limits on query sizes and timeouts prevent abuse
+>>>>>>> origin/main

@@ -84,6 +84,10 @@ impl RitualState {
                 }
                 self.event_count += 1;
             }
+            RitualEvent::PolicyDecision { .. } => {
+                // Track count only; no state transition impact
+                self.event_count += 1;
+            }
         }
 
         Ok(())
@@ -142,14 +146,16 @@ impl StateStore {
         let run_id = match event {
             RitualEvent::Started { run_id, .. }
             | RitualEvent::StateTransitioned { run_id, .. }
-            | RitualEvent::Completed { run_id, .. } => run_id,
+            | RitualEvent::Completed { run_id, .. }
+            | RitualEvent::PolicyDecision { run_id, .. } => run_id,
         };
 
         let state = self.states.entry(run_id.clone()).or_insert_with(|| {
             let ritual_id = match event {
                 RitualEvent::Started { ritual_id, .. }
                 | RitualEvent::StateTransitioned { ritual_id, .. }
-                | RitualEvent::Completed { ritual_id, .. } => ritual_id.clone(),
+                | RitualEvent::Completed { ritual_id, .. }
+                | RitualEvent::PolicyDecision { ritual_id, .. } => ritual_id.clone(),
             };
             RitualState::new(ritual_id, run_id.clone())
         });

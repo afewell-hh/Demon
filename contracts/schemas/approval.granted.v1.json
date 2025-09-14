@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demon.meta/contracts/approval.granted.v1.json",
+  "title": "ApprovalGrantedV1",
+  "type": "object",
+  "required": [
+    "event",
+    "ts",
+    "tenantId",
+    "runId",
+    "ritualId",
+    "gateId",
+    "approver"
+  ],
+  "properties": {
+    "event": { "const": "approval.granted:v1" },
+    "ts": { "type": "string", "format": "date-time" },
+    "tenantId": { "type": "string" },
+    "runId": { "type": "string" },
+    "ritualId": { "type": "string" },
+    "gateId": { "type": "string" },
+    "approver": { "type": "string" },
+    "note": { "type": "string" },
+    "traceId": { "type": "string" }
+  },
+  "additionalProperties": false
+}

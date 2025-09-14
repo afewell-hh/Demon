@@ -1,0 +1,10 @@
+{
+  "event": "approval.denied:v1",
+  "ts": "2025-01-01T00:00:02Z",
+  "tenantId": "tenant-ttl",
+  "runId": "run-ttl-expired",
+  "ritualId": "ritual-ttl",
+  "gateId": "gate-ttl",
+  "approver": "system",
+  "reason": "expired"
+}

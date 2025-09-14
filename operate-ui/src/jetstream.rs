@@ -11,6 +11,7 @@ use tracing::{debug, error, info, warn};
 #[derive(Clone)]
 pub struct JetStreamClient {
     jetstream: jetstream::Context,
+<<<<<<< HEAD
     cfg: JetStreamConfig,
 }
 
@@ -18,6 +19,8 @@ pub struct JetStreamClient {
 pub struct JetStreamConfig {
     pub stream_name: String,
     pub subjects: Vec<String>,
+=======
+>>>>>>> origin/main
 }
 
 /// Run summary information
@@ -94,6 +97,7 @@ impl JetStreamClient {
 
         let jetstream = jetstream::new(client);
 
+<<<<<<< HEAD
         let cfg = JetStreamConfig {
             stream_name: env::var("RITUAL_STREAM_NAME").unwrap_or_else(|_| "RITUAL_EVENTS".into()),
             subjects: env::var("RITUAL_SUBJECTS")
@@ -130,6 +134,9 @@ impl JetStreamClient {
                     .map(|_| ())?)
             }
         }
+=======
+        Ok(Self { jetstream })
+>>>>>>> origin/main
     }
 
     /// List recent runs with optional limit
@@ -289,12 +296,36 @@ impl JetStreamClient {
             subject_filter
         );
 
+<<<<<<< HEAD
         // Get stream; caller handles missing stream
         let stream = self
             .jetstream
             .get_stream(&self.cfg.stream_name)
             .await
             .with_context(|| format!("JetStream stream '{}' not found", self.cfg.stream_name))?;
+=======
+        // Resolve stream with precedence: RITUAL_STREAM_NAME -> existing DEMON_RITUAL_EVENTS (deprecated) -> default RITUAL_EVENTS
+        let desired = std::env::var("RITUAL_STREAM_NAME").ok();
+        let stream = if let Some(name) = desired {
+            self.jetstream
+                .get_stream(&name)
+                .await
+                .with_context(|| format!("JetStream stream '{}' not found", name))?
+        } else {
+            match self.jetstream.get_stream("RITUAL_EVENTS").await {
+                Ok(s) => s,
+                Err(_) => {
+                    let s = self
+                        .jetstream
+                        .get_stream("DEMON_RITUAL_EVENTS")
+                        .await
+                        .with_context(|| "JetStream stream 'RITUAL_EVENTS' not found; 'DEMON_RITUAL_EVENTS' also missing")?;
+                    warn!("Using deprecated stream name 'DEMON_RITUAL_EVENTS'; set RITUAL_STREAM_NAME or migrate to 'RITUAL_EVENTS'");
+                    s
+                }
+            }
+        };
+>>>>>>> origin/main
 
         // Create ephemeral (non-durable) consumer for truly stateless read-only queries
         // Non-durable consumers are automatically deleted after use and don't persist state
@@ -396,12 +427,36 @@ impl JetStreamClient {
     ) -> Result<Vec<async_nats::jetstream::Message>> {
         debug!("Querying messages with subject filter: {}", subject_filter);
 
+<<<<<<< HEAD
         // Get stream; caller handles missing stream
         let stream = self
             .jetstream
             .get_stream(&self.cfg.stream_name)
             .await
             .with_context(|| format!("JetStream stream '{}' not found", self.cfg.stream_name))?;
+=======
+        // Resolve stream with precedence (see above)
+        let desired = std::env::var("RITUAL_STREAM_NAME").ok();
+        let stream = if let Some(name) = desired {
+            self.jetstream
+                .get_stream(&name)
+                .await
+                .with_context(|| format!("JetStream stream '{}' not found", name))?
+        } else {
+            match self.jetstream.get_stream("RITUAL_EVENTS").await {
+                Ok(s) => s,
+                Err(_) => {
+                    let s = self
+                        .jetstream
+                        .get_stream("DEMON_RITUAL_EVENTS")
+                        .await
+                        .with_context(|| "JetStream stream 'RITUAL_EVENTS' not found; 'DEMON_RITUAL_EVENTS' also missing")?;
+                    warn!("Using deprecated stream name 'DEMON_RITUAL_EVENTS'; set RITUAL_STREAM_NAME or migrate to 'RITUAL_EVENTS'");
+                    s
+                }
+            }
+        };
+>>>>>>> origin/main
 
         // Create ephemeral (non-durable) consumer for truly stateless read-only queries
         // Non-durable consumers are automatically deleted after use and don't persist state

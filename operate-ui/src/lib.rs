@@ -8,7 +8,11 @@ use axum::{
     handler::HandlerWithoutStateExt,
     http::StatusCode,
     response::{Html, IntoResponse, Response},
+<<<<<<< HEAD
     routing::{get, get_service},
+=======
+    routing::{get, get_service, post},
+>>>>>>> origin/main
     Router,
 };
 use tera::Tera;
@@ -22,16 +26,21 @@ use tracing::{error, info, warn};
 pub struct AppState {
     pub jetstream_client: Option<jetstream::JetStreamClient>,
     pub tera: Tera,
+<<<<<<< HEAD
     pub stream_ready: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct AppConfig {
     pub skip_stream_bootstrap: bool,
+=======
+    pub admin_token: Option<String>,
+>>>>>>> origin/main
 }
 
 impl AppState {
     pub async fn new() -> Self {
+<<<<<<< HEAD
         let skip = std::env::var("DEMON_SKIP_STREAM_BOOTSTRAP")
             .ok()
             .map_or(false, |v| v == "1" || v.eq_ignore_ascii_case("true"));
@@ -42,6 +51,8 @@ impl AppState {
     }
 
     pub async fn new_with_config(cfg: AppConfig) -> Self {
+=======
+>>>>>>> origin/main
         let jetstream_client = match jetstream::JetStreamClient::new().await {
             Ok(client) => {
                 info!("Successfully connected to NATS JetStream");
@@ -78,6 +89,7 @@ impl AppState {
         tera.register_filter("json", tojson);
         tera.register_filter("tojson", tojson);
 
+<<<<<<< HEAD
         // Ensure stream exists if connected
         let mut stream_ready = false;
         if let Some(client) = &jetstream_client {
@@ -88,11 +100,18 @@ impl AppState {
                 }
             }
         }
+=======
+        let admin_token = std::env::var("ADMIN_TOKEN").ok();
+>>>>>>> origin/main
 
         Self {
             jetstream_client,
             tera,
+<<<<<<< HEAD
             stream_ready,
+=======
+            admin_token,
+>>>>>>> origin/main
         }
     }
 }
@@ -189,6 +208,22 @@ pub fn create_app(state: AppState) -> Router {
         .route("/api/runs", get(routes::list_runs_api))
         .route("/api/runs/:run_id", get(routes::get_run_api))
         .route(
+<<<<<<< HEAD
+=======
+            "/admin/templates/report",
+            get(routes::admin_templates_report),
+        )
+        // Approvals endpoints (publish Granted/Denied)
+        .route(
+            "/api/approvals/:run_id/:gate_id/grant",
+            post(routes::grant_approval_api),
+        )
+        .route(
+            "/api/approvals/:run_id/:gate_id/deny",
+            post(routes::deny_approval_api),
+        )
+        .route(
+>>>>>>> origin/main
             "/static/*path",
             get_service(
                 ServeDir::new("static").not_found_service(handle_static_file_error.into_service()),

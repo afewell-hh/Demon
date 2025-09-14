@@ -1,0 +1,10 @@
+{
+  "event": "approval.requested:v1",
+  "ts": "2024-01-01T00:00:00Z",
+  "tenantId": "tenant-1",
+  "runId": "run-123",
+  "ritualId": "ritual-abc",
+  "gateId": "gate-1",
+  "requester": "alice@example.com",
+  "reason": "Proceed to production"
+}

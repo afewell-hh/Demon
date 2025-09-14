@@ -1,0 +1,11 @@
+{
+  "event": "approval.denied:v1",
+  "ts": "2024-01-01T00:05:00Z",
+  "tenantId": "tenant-1",
+  "runId": "run-124",
+  "ritualId": "ritual-abc",
+  "gateId": "gate-2",
+  "approver": "bob@example.com",
+  "reason": "Missing security review",
+  "traceId": "trace-002"
+}
