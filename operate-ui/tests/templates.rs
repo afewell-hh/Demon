@@ -44,8 +44,8 @@ async fn templates_compile_and_render_minimal() {
     ctx3.insert(
         "run",
         &serde_json::json!({
-            "run_id": "run-x",
-            "ritual_id": "ritual-x",
+            "runId": "run-x",
+            "ritualId": "ritual-x", 
             "events": []
         }),
     );
