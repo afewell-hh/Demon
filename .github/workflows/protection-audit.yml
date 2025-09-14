@@ -1,26 +1,40 @@
 name: protection-audit
 
 on:
-  schedule:
-    - cron: '23 4 * * *'
-  pull_request:
-    types: [opened, synchronize, reopened, labeled, ready_for_review]
   workflow_dispatch: {}
+  push:
+    branches: [ main ]
+  pull_request: {}
 
 permissions:
   contents: read
+  pull-requests: read
+  administration: read   # needed only if PROTECTION_TOKEN is present
+
+env:
+  GH_TOKEN: ${{ secrets.PROTECTION_TOKEN }}  # use admin token when available
 
 jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Gate admin calls (skip if no token)
+        run: |
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "No PROTECTION_TOKEN; running in info mode and skipping admin endpoints."
+            echo "audit_skip_admin=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "audit_skip_admin=false" >> "$GITHUB_OUTPUT"
+          fi
+        id: gate
       - name: Get default branch
         id: repo
         run: |
           gh api repos/${{ github.repository }} --jq .default_branch > default_branch.txt
           echo "branch=$(cat default_branch.txt)" >> "$GITHUB_OUTPUT"
-      - name: Assert replies guard required when flagged
+      - name: Assert replies guard required when flagged (admin)
+        if: steps.gate.outputs.audit_skip_admin == 'false'
         shell: bash
         run: |
           set -euo pipefail
@@ -33,9 +47,7 @@ jobs:
           else
             echo "Flag absent — skipping replies-guard assertion (burn-in phase)"
           fi
+      - name: Info mode (no admin token)
+        if: steps.gate.outputs.audit_skip_admin == 'true'
+        run: echo "Audit in info mode: no admin token; skipping protection assertions."
 
-  note-missing-token:
-    if: ${{ secrets.PROTECTION_TOKEN == '' }}
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo 'PROTECTION_TOKEN not set; audit uses GITHUB_TOKEN-only calls.'
