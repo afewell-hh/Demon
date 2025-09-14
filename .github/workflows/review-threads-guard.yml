@@ -2,7 +2,7 @@ name: review-threads-guard (PR)  # DO NOT RENAME
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
   workflow_dispatch:
 
 permissions:
