@@ -8,11 +8,6 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  yaml-check:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "YAML parsed successfully to reach this point"
-  
   # DO NOT RENAME: used in branch protection required checks
   review-lock-guard:
     name: review-lock-guard
@@ -447,3 +442,6 @@ jobs:
             echo "::error::verify-only unexpectedly succeeded on tampered bundle"
             exit 1
           fi
+          
+          echo "✅ Negative test passed: tampered bundle correctly failed verification"
+          exit 0
