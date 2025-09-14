@@ -1,0 +1,44 @@
+name: protection-audit
+
+on:
+  schedule:
+    - cron: '23 4 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    if: ${{ secrets.PROTECTION_TOKEN != '' }}
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.PROTECTION_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get default branch
+        id: repo
+        run: |
+          gh api repos/${{ github.repository }} --jq .default_branch > default_branch.txt
+          echo "branch=$(cat default_branch.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Assert replies guard required when flagged
+        shell: bash
+        run: |
+          set -euo pipefail
+          BR="${{ steps.repo.outputs.branch }}"
+          if [[ -f .github/flags/guard-required ]]; then
+            echo "Flag present: .github/flags/guard-required — asserting required status check includes replies guard"
+            ctx=$(gh api repos/:owner/:repo/branches/$BR/protection -q '.required_status_checks.contexts')
+            echo "$ctx" | jq -e 'index("review-threads-guard (PR) / guard") != null' >/dev/null || {
+              echo "::error::Required checks missing: review-threads-guard (PR) / guard"; exit 1; }
+          else
+            echo "Flag absent — skipping replies guard assertion (burn-in phase)"
+          fi
+
+  note-missing-token:
+    if: ${{ secrets.PROTECTION_TOKEN == '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'PROTECTION_TOKEN not set; protection audit skipped.'
