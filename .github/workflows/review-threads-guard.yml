@@ -1,0 +1,139 @@
+name: review-threads-guard (PR)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+  actions: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Decide enforcement & docs-only
+        id: decide
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const core = require('@actions/core');
+            const github = require('@actions/github');
+            const pr = github.context.payload.pull_request;
+            const owner = github.context.repo.owner;
+            const repo  = github.context.repo.repo;
+
+            const labels = (pr?.labels || []).map(l => l.name.toLowerCase());
+            const enforce = labels.includes('enforce-review-replies');
+
+            // List changed files to detect docs-only changes
+            const files = await github.rest.pulls.listFiles({
+              owner, repo, pull_number: pr.number, per_page: 300
+            });
+
+            // Treat these paths as "docs"
+            const DOCS_RE = /^(docs\/|README\.md$|\.github\/|CONTRIBUTING\.md$|GOVERNANCE\.md$)/i;
+            const codeFiles = files.data.filter(f => !DOCS_RE.test(f.filename));
+            const docsonly = codeFiles.length === 0;
+
+            core.setOutput('enforce', enforce ? 'true' : 'false');
+            core.setOutput('docsonly', docsonly ? 'true' : 'false');
+
+      - name: Short-circuit (not enforcing)
+        if: steps.decide.outputs.enforce != 'true'
+        run: |
+          echo "Guard not enforced (label missing). Passing by design."
+          exit 0
+
+      - name: Short-circuit (docs-only)
+        if: steps.decide.outputs.docsonly == 'true'
+        run: |
+          echo "Docs-only change; skipping guard."
+          exit 0
+
+      - name: Compute unresolved/no-reply threads
+        id: threads
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const core = require('@actions/core');
+            const github = require('@actions/github');
+            const owner = github.context.repo.owner;
+            const repo  = github.context.repo.repo;
+            const number = github.context.payload.pull_request.number;
+
+            // Pull PR author
+            const prResp = await github.rest.pulls.get({ owner, repo, pull_number: number });
+            const prAuthor = prResp.data.user?.login?.toLowerCase() || '';
+
+            // GraphQL to page review threads
+            const query = `
+              query($owner:String!,$repo:String!,$number:Int!,$cursor:String) {
+                repository(owner:$owner, name:$repo) {
+                  pullRequest(number:$number) {
+                    reviewThreads(first:100, after:$cursor) {
+                      nodes {
+                        isResolved
+                        comments(first:50) {
+                          nodes { author { login } }
+                        }
+                        id
+                      }
+                      pageInfo { hasNextPage endCursor }
+                    }
+                  }
+                }
+              }`;
+
+            let unresolved = 0;
+            let noReply = 0;
+            let cursor = null;
+
+            while (true) {
+              const r = await github.graphql(query, { owner, repo, number, cursor });
+              const rt = r.repository.pullRequest.reviewThreads;
+              for (const th of rt.nodes) {
+                if (!th.isResolved) {
+                  unresolved++;
+                  const comments = th.comments.nodes || [];
+                  const hasAuthorReply = comments.some(c =>
+                    (c.author?.login || '').toLowerCase() === prAuthor
+                  );
+                  if (!hasAuthorReply) noReply++;
+                }
+              }
+              if (!rt.pageInfo.hasNextPage) break;
+              cursor = rt.pageInfo.endCursor;
+            }
+
+            core.setOutput('unresolved', String(unresolved));
+            core.setOutput('noreply',    String(noReply));
+
+      - name: Sticky failure comment
+        if: steps.threads.outputs.noreply != '0'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: review-threads-guard
+          message: |
+            **Review Replies Guard**
+            - Unresolved threads: `${{ steps.threads.outputs.unresolved }}`
+            - Unresolved with **no author reply**: `${{ steps.threads.outputs.noreply }}`
+            ➜ Please reply to each unresolved thread (or resolve them) to pass.
+
+      - name: Fail when unresolved+no-reply > 0
+        if: steps.threads.outputs.noreply != '0'
+        run: |
+          echo "Failing: unresolved threads without author replies present."
+          exit 1
+
+      - name: Success summary
+        if: steps.threads.outputs.noreply == '0'
+        run: |
+          echo "Guard passed (all unresolved threads have author replies, or none remain)."
