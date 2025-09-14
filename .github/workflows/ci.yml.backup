@@ -1,0 +1,444 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, trunk, master ]
+  pull_request:
+    branches: [ "**" ]
+  workflow_dispatch: {}
+
+jobs:
+  # DO NOT RENAME: used in branch protection required checks
+  review-lock-guard:
+    name: review-lock-guard
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' }}
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const body = pr.body || "";
+            const head = pr.head.sha;
+            const m = body.match(/[0-9a-f]{40}/i);
+            if (!m) core.setFailed("Review-lock SHA not found in PR body.");
+            else if (m[0].toLowerCase() !== head.toLowerCase())
+              core.setFailed(`Review-lock mismatch: body=${m[0].slice(0,7)} head=${head.slice(0,7)}`);
+  build-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust (pinned toolchain)
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: 1.82.0
+          components: clippy, rustfmt
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+          cache-on-failure: true
+
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+      - name: Clippy (deny warnings)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Build (debug)
+        run: cargo build --workspace
+
+      - name: Unit tests
+        run: cargo test --workspace --all-features -- --nocapture
+
+      - name: Guard: no snake_case in approvals template usage
+        run: |
+          set -e
+          ! grep -R --line-number -E '\\.(run_id|ritual_id|state_from|state_to)\\b' operate-ui/templates || \
+            (echo "Snake_case fields found in templates; use camelCase VM fields."; exit 1)
+
+      - name: Validate approval contract fixtures
+        run: cargo test -p engine --test approval_contracts_spec -- --nocapture
+
+      # M0 smoke: run echo ritual; NATS not required yet, but we bring it up to match dev profile
+      - name: Start NATS (JetStream)
+        run: |
+          docker run -d --rm --name nats -p 4222:4222 -p 8222:8222 nats:2.10 -js
+          # Wait briefly for readiness
+          for i in {1..20}; do
+            if docker logs nats 2>&1 | grep -q "Server is ready"; then exit 0; fi
+            sleep 0.5
+          done
+          echo "NATS did not report ready in time"; docker logs nats; exit 1
+
+      - name: Engine approvals integration (NATS)
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS
+        run: |
+          cargo test -p engine --test approvals_integration -- --ignored --nocapture
+
+      - name: Engine approvals TTL integration (NATS)
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS
+          APPROVAL_TTL_SECONDS: 2
+        run: |
+          cargo test -p engine --test approvals_ttl_integration -- --ignored --nocapture
+
+      - name: Operate UI approvals routes (NATS)
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS
+        run: |
+          cargo test -p operate-ui --test approvals_routes_spec -- --ignored --nocapture
+
+      - name: Engine per-cap quotas integration (NATS)
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS
+        run: |
+          cargo test -p engine --test per_cap_quota_integration -- --ignored --nocapture
+
+
+      - name: Smoke run (demonctl)
+        run: |
+          set -euo pipefail
+          OUT="$(cargo run -q -p demonctl -- run examples/rituals/echo.yaml)"
+          echo "$OUT"
+          echo "$OUT" | grep -q '"event": "ritual.completed:v1"'
+          echo "$OUT" | grep -q 'Hello from Demon!' || true  # printed to stdout by capsule; may be interleaved
+
+      - name: Playwright smoke (Operate UI banner)
+        working-directory: operate-ui/playwright
+        env:
+          BASE_URL: http://127.0.0.1:3000
+        run: |
+          # Start server on 3000 without stream bootstrap
+          export DEMON_SKIP_STREAM_BOOTSTRAP=1
+          (cd ../.. && RUST_LOG=info cargo run -p operate-ui --quiet &) 
+          # Wait for port 3000 to open
+          for i in {1..60}; do nc -z 127.0.0.1 3000 && break; sleep 0.5; done
+          npm install
+          npx playwright install --with-deps
+          npm test
+
+      - name: Teardown NATS
+        if: always()
+        run: docker rm -f nats || true
+
+  preview-smoke:
+    runs-on: ubuntu-latest
+    needs: build-test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust (pinned toolchain)
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: 1.82.0
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+          cache-on-failure: true
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Start NATS (JetStream)
+        run: |
+          docker run -d --rm --name nats -p 4222:4222 -p 8222:8222 nats:2.10 -js
+          for i in {1..40}; do
+            if docker logs nats 2>&1 | grep -q "Server is ready"; then exit 0; fi
+            sleep 0.5
+          done
+          echo "NATS did not report ready in time"; docker logs nats; exit 1
+
+      - name: Build workspace
+        run: cargo build --workspace
+
+      - name: Start Operate UI (background)
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS
+          APPROVER_ALLOWLIST: ops@example.com
+        run: |
+          nohup bash -c 'APPROVER_ALLOWLIST=ops@example.com RITUAL_STREAM_NAME=RITUAL_EVENTS cargo run -q -p operate-ui' >/tmp/ui.log 2>&1 &
+          for i in {1..60}; do
+            curl -sf http://127.0.0.1:3000/api/runs >/dev/null 2>&1 && break || true
+            sleep 0.5
+          done
+
+      - name: Start TTL worker (background)
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS
+        run: |
+          nohup bash -c 'TTL_WORKER_ENABLED=1 RITUAL_STREAM_NAME=RITUAL_EVENTS cargo run -q -p engine --bin demon-ttl-worker' >/tmp/worker.log 2>&1 &
+          sleep 1
+
+      - name: Seed preview (idempotent)
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS
+        run: |
+          chmod +x examples/seed/seed_preview.sh
+          ./examples/seed/seed_preview.sh | tee /tmp/seed.log
+
+      - name: Preview assertions
+        run: |
+          set -euo pipefail
+          # Runs list
+          curl -s http://127.0.0.1:3000/api/runs | jq 'length >= 1' | grep -q true
+          # Granted present
+          curl -s http://127.0.0.1:3000/api/runs/run-preview-b | jq '.events | map(.event) | index("approval.granted:v1") != null' | grep -q true
+          # TTL expired present once
+          curl -s http://127.0.0.1:3000/api/runs/run-preview-c | jq '.events | map(select(.event=="approval.denied:v1" and .reason=="expired")) | length == 1' | grep -q true
+          # HTML renders
+          curl -s http://127.0.0.1:3000/runs | grep -qi '<!doctype html>'
+          curl -s http://127.0.0.1:3000/runs/run-preview-b | grep -qi '<!doctype html>'
+
+      - name: Teardown NATS
+        if: always()
+        run: docker rm -f nats || true
+
+  cargo-audit:
+    name: Cargo audit (advisories)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+      - name: Audit
+        run: cargo audit --deny warnings
+
+  cargo-deny:
+    name: Cargo deny (licenses/bans)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cargo-deny
+        run: curl -LsSf https://github.com/EmbarkStudios/cargo-deny/releases/latest/download/cargo-deny-$(uname -s)-$(uname -m).tar.gz \
+          | tar xz -C ~/.cargo/bin --strip-components=1 cargo-deny
+      - name: Check licenses & bans
+        run: cargo deny check --all-features
+
+  bootstrapper-smoke:
+    runs-on: ubuntu-latest
+    needs: build-test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust (pinned toolchain)
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: 1.82.0
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+          cache-on-failure: true
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Start NATS (JetStream)
+        run: |
+          docker run -d --rm --name nats -p 4222:4222 -p 8222:8222 nats:2.10 -js
+          for i in {1..40}; do
+            if docker logs nats 2>&1 | grep -q "Server is ready"; then exit 0; fi
+            sleep 0.5
+          done
+          echo "NATS did not report ready in time"; docker logs nats; exit 1
+
+      - name: Build workspace
+        run: cargo build --workspace
+
+      - name: Start Operate UI (background)
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS
+          APPROVER_ALLOWLIST: ops@example.com
+        run: |
+          nohup bash -c 'APPROVER_ALLOWLIST=ops@example.com RITUAL_STREAM_NAME=RITUAL_EVENTS cargo run -q -p operate-ui' >/tmp/ui.log 2>&1 &
+          for i in {1..60}; do
+            curl -sf http://127.0.0.1:3000/api/runs >/dev/null 2>&1 && break || true
+            sleep 0.5
+          done
+
+      - name: Start TTL worker (background)
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS
+        run: |
+          nohup bash -c 'TTL_WORKER_ENABLED=1 RITUAL_STREAM_NAME=RITUAL_EVENTS cargo run -q -p engine --bin demon-ttl-worker' >/tmp/worker.log 2>&1 &
+          sleep 1
+
+      - name: Bootstrap ensure+seed+verify (idempotent)
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS
+          RITUAL_SUBJECTS: demon.ritual.v1.>
+        run: |
+          cargo run -q -p bootstrapper-demonctl -- --ensure-stream --seed --verify
+          cargo run -q -p bootstrapper-demonctl -- --ensure-stream --seed --verify
+
+      - name: Teardown NATS
+        if: always()
+        run: docker rm -f nats || true
+
+  bootstrapper-bundles:
+    runs-on: ubuntu-latest
+    needs: build-test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust (pinned toolchain)
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: 1.82.0
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+          cache-on-failure: true
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Start NATS (4222) and NATS (4223)
+        run: |
+          docker run -d --rm --name nats1 -p 4222:4222 -p 8222:8222 nats:2.10 -js
+          docker run -d --rm --name nats2 -p 4223:4222 -p 8223:8222 nats:2.10 -js
+          for i in {1..40}; do
+            docker logs nats1 2>&1 | grep -q "Server is ready" && docker logs nats2 2>&1 | grep -q "Server is ready" && exit 0 || sleep 0.5
+          done
+          echo ready check failed; exit 1
+
+      - name: Build workspace
+        run: cargo build --workspace
+
+      - name: Start Operate UI + TTL worker
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS
+          APPROVER_ALLOWLIST: ops@example.com
+        run: |
+          nohup bash -c 'APPROVER_ALLOWLIST=ops@example.com RITUAL_STREAM_NAME=RITUAL_EVENTS cargo run -q -p operate-ui' >/tmp/ui.log 2>&1 &
+          for i in {1..60}; do curl -sf http://127.0.0.1:3000/api/runs >/dev/null 2>&1 && break || sleep 0.5; done
+          nohup bash -c 'TTL_WORKER_ENABLED=1 RITUAL_STREAM_NAME=RITUAL_EVENTS cargo run -q -p engine --bin demon-ttl-worker' >/tmp/worker.log 2>&1 &
+          sleep 1
+
+      - name: Run local-dev bundle (twice) with idempotency asserts
+        run: |
+          cargo run -q -p bootstrapper-demonctl -- --bundle examples/bundles/local-dev.yaml --ensure-stream --seed --verify | tee /tmp/local1.log
+          cargo run -q -p bootstrapper-demonctl -- --bundle examples/bundles/local-dev.yaml --ensure-stream --seed --verify | tee /tmp/local2.log
+          # ensure_stream becomes no-op on rerun
+          grep -q '"phase":"ensure_stream".*"mutation":"noop"' /tmp/local2.log
+          # seed request publish becomes no-op on rerun
+          ! grep -q '"phase":"seed_run".*"mutation_req":"applied"' /tmp/local2.log
+          grep -q  '"phase":"seed_run".*"mutation_req":"noop"'     /tmp/local2.log
+          # timer publish (if TTL present) should also be a no-op on rerun
+          grep -q  '"phase":"seed_run".*"mutation_timer":"noop"'   /tmp/local2.log || true
+
+      - name: Run remote-nats bundle (twice) with idempotency asserts
+        env:
+          NATS_URL: nats://127.0.0.1:4223
+        run: |
+          cargo run -q -p bootstrapper-demonctl -- --bundle examples/bundles/remote-nats.yaml --ensure-stream --seed --verify | tee /tmp/remote1.log
+          cargo run -q -p bootstrapper-demonctl -- --bundle examples/bundles/remote-nats.yaml --ensure-stream --seed --verify | tee /tmp/remote2.log
+          grep -q '"phase":"ensure_stream".*"mutation":"noop"' /tmp/remote2.log
+          ! grep -q '"phase":"seed_run".*"mutation_req":"applied"' /tmp/remote2.log
+          grep -q  '"phase":"seed_run".*"mutation_req":"noop"'     /tmp/remote2.log
+          grep -q  '"phase":"seed_run".*"mutation_timer":"noop"'   /tmp/remote2.log || true
+
+      - name: Teardown NATS
+        if: always()
+        run: |
+          docker rm -f nats1 || true
+          docker rm -f nats2 || true
+
+  # DO NOT RENAME: used in branch protection required checks
+  bootstrapper-bundles-verify:
+    name: Bootstrapper bundles — verify (offline, signature ok)
+    runs-on: ubuntu-latest
+    needs: build-test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust (pinned toolchain)
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: 1.82.0
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+          cache-on-failure: true
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Build (locked)
+        run: cargo build --locked --workspace
+
+      - name: Verify library bundle (offline)
+        run: |
+          target/debug/bootstrapper-demonctl --verify-only --bundle lib://local/preview-local-dev@0.0.1 | tee verify.log
+          jq -e 'select(.phase=="verify" and .signature=="ok")' verify.log >/dev/null
+
+  bootstrapper-bundles-verify-negative:
+    name: Bootstrapper bundles — negative verify (tamper ⇒ failed)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Build demonctl (locked)
+        run: cargo build --locked -p bootstrapper-demonctl
+
+      - name: Tamper bundle and run verify-only (expect failure)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Tamper canonical bytes: bump duplicateWindowSeconds deterministically.
+          # If the key exists, increment; otherwise append it.
+          if grep -q '^duplicateWindowSeconds:' examples/bundles/local-dev.yaml; then
+            awk 'BEGIN{FS=OFS=": "}
+                 /^duplicateWindowSeconds:/{print $1": "$2+1; next}
+                 {print}' examples/bundles/local-dev.yaml > local-dev.tmp
+            mv local-dev.tmp examples/bundles/local-dev.yaml
+          else
+            printf '\nduplicateWindowSeconds: 121\n' >> examples/bundles/local-dev.yaml
+          fi
+
+          # Run offline verify; capture exit code
+          set +e
+          target/debug/bootstrapper-demonctl --verify-only --bundle lib://local/preview-local-dev@0.0.1 | tee tamper.log
+          status=$?
+          set -e
+
+          # Assert we saw a failed signature line…
+          jq -e 'select(.phase=="verify" and .signature=="failed")' tamper.log >/dev/null
+
+          # …and the process exited non-zero.
+          if [ $status -eq 0 ]; then
+            echo "::error::verify-only unexpectedly succeeded on tampered bundle"
+            exit 1
+          fi
