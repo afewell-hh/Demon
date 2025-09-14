@@ -252,10 +252,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install cargo-audit
-        run: cargo install cargo-audit
-      - name: Audit
-        run: cargo audit --deny warnings
+      - name: Install cargo-audit (+stable)
+        run: cargo +stable install cargo-audit
+      - name: Audit (+stable)
+        run: cargo +stable audit --deny warnings
 
   cargo-deny:
     name: Cargo deny (licenses/bans)

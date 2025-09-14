@@ -16,3 +16,8 @@
 ## Code Owners
 - Changes under `bootstrapper/`, `contracts/`, or `.github/workflows/ci.yml` will request a Code Owner review.
 
+
+## Review-lock
+- Add a line to the PR body: `Review-lock: <40-char HEAD SHA>`.
+- Our guard parses only this explicit line and compares to the current head.
+- After updating the body, allow a moment or re-trigger CI; the guard retries against the API to handle eventual consistency.
