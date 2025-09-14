@@ -14,3 +14,4 @@ mod tests {
         assert_eq!(out, msg);
     }
 }
+// guard: third no-op

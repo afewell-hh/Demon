@@ -48,3 +48,4 @@ fn main() -> Result<()> {
     }
     Ok(())
 }
+// no-op: exercise replies guard

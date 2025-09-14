@@ -1,14 +1,21 @@
 use crate::jetstream::{RunDetail, RunSummary};
 use crate::{AppError, AppState};
 
+<<<<<<< HEAD
+=======
 use axum::http::HeaderMap;
+>>>>>>> origin/main
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::{Html, IntoResponse, Response},
     Json,
 };
+<<<<<<< HEAD
+use serde::Deserialize;
+=======
 use serde::{Deserialize, Serialize};
+>>>>>>> origin/main
 use tracing::{debug, error, info};
 
 // Query parameters for list runs API
@@ -46,7 +53,11 @@ pub async fn list_runs_html(
     context.insert("runs", &runs);
     context.insert("error", &error);
     context.insert("jetstream_available", &state.jetstream_client.is_some());
+<<<<<<< HEAD
+    context.insert("stream_ready", &state.stream_ready);
+=======
     context.insert("current_page", &"runs");
+>>>>>>> origin/main
 
     let html = state
         .tera
@@ -81,6 +92,29 @@ pub async fn list_runs_api(
         query.limit
     );
 
+<<<<<<< HEAD
+    // New behavior: return 200 with { runs: [] } and a warning header when NATS/stream missing
+    let mut warn_header: Option<&'static str> = None;
+    let body = if let Some(client) = &state.jetstream_client {
+        match client.list_runs(query.limit).await {
+            Ok(runs) => serde_json::json!({ "runs": runs }),
+            Err(_) => {
+                warn_header = Some("stream-missing");
+                serde_json::json!({ "runs": [] })
+            }
+        }
+    } else {
+        warn_header = Some("nats-unavailable");
+        serde_json::json!({ "runs": [] })
+    };
+
+    let mut resp = Json(body).into_response();
+    if let Some(v) = warn_header {
+        resp.headers_mut()
+            .insert("X-Demon-Warn", axum::http::HeaderValue::from_static(v));
+    }
+    resp
+=======
     match &state.jetstream_client {
         Some(client) => match client.list_runs(query.limit).await {
             Ok(runs) => {
@@ -109,6 +143,7 @@ pub async fn list_runs_api(
                 .into_response()
         }
     }
+>>>>>>> origin/main
 }
 
 /// Get run detail - HTML response
@@ -142,7 +177,10 @@ pub async fn get_run_html(
     context.insert("error", &error);
     context.insert("jetstream_available", &state.jetstream_client.is_some());
     context.insert("run_id", &run_id);
+<<<<<<< HEAD
+=======
     context.insert("current_page", &"runs");
+>>>>>>> origin/main
 
     // View helpers to avoid template method calls
     if let Some(ref rd) = run {
@@ -162,11 +200,14 @@ pub async fn get_run_html(
             .unwrap_or(("Running", "status-running"));
         context.insert("run_status", &status);
         context.insert("run_status_class", &status_class);
+<<<<<<< HEAD
+=======
 
         // Approvals summary (single row): Pending/Granted/Denied with fields
         if let Some(summary) = ApprovalsSummary::from_events(&rd.events) {
             context.insert("approvals", &summary);
         }
+>>>>>>> origin/main
     }
 
     let html = state
@@ -237,6 +278,8 @@ pub async fn get_run_api(State(state): State<AppState>, Path(run_id): Path<Strin
     }
 }
 
+<<<<<<< HEAD
+=======
 // ---------------- Admin ----------------
 #[derive(Serialize)]
 pub struct TemplateReport {
@@ -270,6 +313,7 @@ pub async fn admin_templates_report(State(state): State<AppState>, headers: Head
     Json(body).into_response()
 }
 
+>>>>>>> origin/main
 // Helper functions for templates
 impl RunSummary {
     pub fn format_timestamp(&self) -> String {
@@ -345,6 +389,8 @@ impl crate::jetstream::RitualEvent {
     }
 }
 
+<<<<<<< HEAD
+=======
 // ---- Approvals summary helpers ----
 #[derive(Debug, Clone, Serialize)]
 struct ApprovalsSummary {
@@ -728,6 +774,7 @@ pub async fn deny_approval_api(
     (StatusCode::OK, Json(payload)).into_response()
 }
 
+>>>>>>> origin/main
 #[cfg(test)]
 mod tests {
     use super::*;

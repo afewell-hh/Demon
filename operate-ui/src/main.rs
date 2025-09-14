@@ -43,3 +43,8 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
+<<<<<<< HEAD
+
+// guard: no-op change for demo
+=======
+>>>>>>> origin/main
