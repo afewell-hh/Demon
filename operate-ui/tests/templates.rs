@@ -19,10 +19,6 @@ async fn templates_compile_and_render_minimal() {
     ctx.insert("runs", &Vec::<serde_json::Value>::new());
     ctx.insert("error", &Option::<String>::None);
     ctx.insert("jetstream_available", &false);
-<<<<<<< HEAD
-    ctx.insert("stream_ready", &false);
-=======
->>>>>>> origin/main
     ctx.insert("current_page", &"runs");
 
     let html = tera
@@ -42,8 +38,6 @@ async fn templates_compile_and_render_minimal() {
         .render("run_detail.html", &ctx2)
         .expect("run_detail.html should render");
     assert!(html2.contains("Run test-run-123"));
-<<<<<<< HEAD
-=======
 
     // Smoke: approvals expired deny label renders
     let mut ctx3 = tera::Context::new();
@@ -75,5 +69,4 @@ async fn templates_compile_and_render_minimal() {
         .render("run_detail.html", &ctx3)
         .expect("run_detail.html should render with approvals");
     assert!(html3.contains("Denied — expired"));
->>>>>>> origin/main
 }
