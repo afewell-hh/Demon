@@ -63,7 +63,10 @@ impl Default for Engine {
 impl Engine {
     pub fn new() -> Self {
         let config = load_from_env();
-        let policy_kernel = if config.cap_quotas.is_empty() && config.quotas.is_empty() && config.global_quota.is_none() {
+        let policy_kernel = if config.cap_quotas.is_empty()
+            && config.quotas.is_empty()
+            && config.global_quota.is_none()
+        {
             None
         } else {
             Some(PolicyKernel::new(config))
