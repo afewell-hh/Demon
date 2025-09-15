@@ -32,31 +32,3 @@ allow = [
     "CDLA-Permissive-2.0",  # Community Data License Agreement - needed for webpki-roots
 ]
 confidence-threshold = 0.8
-# Workspace crates don't have licenses yet - allow them specifically
-[[licenses.exceptions]]
-allow = ["Unlicense"]
-crate = "demonctl"
-
-[[licenses.exceptions]]
-allow = ["Unlicense"]
-crate = "engine"
-
-[[licenses.exceptions]]
-allow = ["Unlicense"]
-crate = "runtime"
-
-[[licenses.exceptions]]
-allow = ["Unlicense"]
-crate = "operate-ui"
-
-[[licenses.exceptions]]
-allow = ["Unlicense"]
-crate = "wards"
-
-[[licenses.exceptions]]
-allow = ["Unlicense"]
-crate = "capsules_echo"
-
-[[licenses.exceptions]]
-allow = ["Unlicense"]
-crate = "bootstrapper-demonctl"
