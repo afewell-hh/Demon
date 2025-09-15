@@ -1,0 +1,256 @@
+name: Project Backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_numbers:
+        description: 'Space-separated issue numbers to add to project'
+        required: true
+        type: string
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    if: ${{ env.GH_TOKEN != '' }}
+    permissions:
+      contents: read
+      issues: read
+      repository-projects: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Backfill issues to project
+        env:
+          GH_TOKEN: ${{ secrets.ADMINTOKEN_DEMON_AFEWELLHH }}
+        run: |
+          set -euo pipefail
+
+          # Get ProjectV2 ID for project number 1
+          PROJECT_ID=$(gh api graphql -f query='
+            query($login: String!) {
+              user(login: $login) {
+                projectV2(number: 1) {
+                  id
+                }
+              }
+            }' -f login="afewell-hh" --jq '.data.user.projectV2.id')
+
+          echo "Project ID: $PROJECT_ID"
+
+          # Get field IDs for Area, Priority, Target Release
+          FIELD_DATA=$(gh api graphql -f query="
+            query(\$projectId: ID!) {
+              node(id: \$projectId) {
+                ... on ProjectV2 {
+                  fields(first: 20) {
+                    nodes {
+                      ... on ProjectV2Field {
+                        id
+                        name
+                      }
+                      ... on ProjectV2SingleSelectField {
+                        id
+                        name
+                        options {
+                          id
+                          name
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }" -f projectId="$PROJECT_ID")
+
+          # Extract field IDs
+          AREA_FIELD_ID=$(echo "$FIELD_DATA" | jq -r '.data.node.fields.nodes[] | select(.name=="Area") | .id')
+          PRIORITY_FIELD_ID=$(echo "$FIELD_DATA" | jq -r '.data.node.fields.nodes[] | select(.name=="Priority") | .id')
+          TARGET_RELEASE_FIELD_ID=$(echo "$FIELD_DATA" | jq -r '.data.node.fields.nodes[] | select(.name=="Target Release") | .id')
+          STATUS_FIELD_ID=$(echo "$FIELD_DATA" | jq -r '.data.node.fields.nodes[] | select(.name=="Status") | .id')
+
+          # Extract option IDs for single-select fields
+          BACKEND_OPTION_ID=$(echo "$FIELD_DATA" | jq -r '.data.node.fields.nodes[] | select(.name=="Area") | .options[]? | select(.name=="backend") | .id // empty')
+          FRONTEND_OPTION_ID=$(echo "$FIELD_DATA" | jq -r '.data.node.fields.nodes[] | select(.name=="Area") | .options[]? | select(.name=="frontend") | .id // empty')
+          P0_OPTION_ID=$(echo "$FIELD_DATA" | jq -r '.data.node.fields.nodes[] | select(.name=="Priority") | .options[]? | select(.name=="p0") | .id // empty')
+          MVP_ALPHA_OPTION_ID=$(echo "$FIELD_DATA" | jq -r '.data.node.fields.nodes[] | select(.name=="Target Release") | .options[]? | select(.name=="MVP-Alpha") | .id // empty')
+          TODO_OPTION_ID=$(echo "$FIELD_DATA" | jq -r '.data.node.fields.nodes[] | select(.name=="Status") | .options[]? | select(.name=="Todo") | .id // empty')
+
+          echo "Field IDs: Area=$AREA_FIELD_ID Priority=$PRIORITY_FIELD_ID Target=$TARGET_RELEASE_FIELD_ID Status=$STATUS_FIELD_ID"
+          echo "Option IDs: backend=$BACKEND_OPTION_ID frontend=$FRONTEND_OPTION_ID p0=$P0_OPTION_ID MVP-Alpha=$MVP_ALPHA_OPTION_ID Todo=$TODO_OPTION_ID"
+
+          # Process each issue number
+          for issue_num in ${{ github.event.inputs.issue_numbers }}; do
+            echo "Processing issue #$issue_num"
+
+            # Get issue node ID
+            ISSUE_ID=$(gh api repos/:owner/:repo/issues/$issue_num --jq '.node_id')
+
+            # Add issue to project
+            ITEM_ID=$(gh api graphql -f query="
+              mutation(\$projectId: ID!, \$contentId: ID!) {
+                addProjectV2ItemById(input: {projectId: \$projectId, contentId: \$contentId}) {
+                  item {
+                    id
+                  }
+                }
+              }" -f projectId="$PROJECT_ID" -f contentId="$ISSUE_ID" --jq '.data.addProjectV2ItemById.item.id')
+
+            echo "Added issue #$issue_num to project with item ID: $ITEM_ID"
+
+            # Set Status to Todo if we have the option ID
+            if [ -n "$STATUS_FIELD_ID" ] && [ -n "$TODO_OPTION_ID" ]; then
+              gh api graphql -f query="
+                mutation(\$projectId: ID!, \$itemId: ID!, \$fieldId: ID!, \$optionId: String!) {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: \$projectId,
+                    itemId: \$itemId,
+                    fieldId: \$fieldId,
+                    value: {
+                      singleSelectOptionId: \$optionId
+                    }
+                  }) {
+                    projectV2Item {
+                      id
+                    }
+                  }
+                }" -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$STATUS_FIELD_ID" -f optionId="$TODO_OPTION_ID" >/dev/null
+              echo "Set Status=Todo for issue #$issue_num"
+            fi
+
+            # Determine Area based on issue number (56-59: backend, 60-63: frontend)
+            if [ "$issue_num" -ge 56 ] && [ "$issue_num" -le 59 ]; then
+              AREA_VALUE="backend"
+              AREA_OPTION_ID="$BACKEND_OPTION_ID"
+            elif [ "$issue_num" -ge 60 ] && [ "$issue_num" -le 63 ]; then
+              AREA_VALUE="frontend"
+              AREA_OPTION_ID="$FRONTEND_OPTION_ID"
+            else
+              AREA_VALUE="backend"  # default
+              AREA_OPTION_ID="$BACKEND_OPTION_ID"
+            fi
+
+            # Set Area field
+            if [ -n "$AREA_FIELD_ID" ]; then
+              if [ -n "$AREA_OPTION_ID" ]; then
+                # Use single-select option
+                gh api graphql -f query="
+                  mutation(\$projectId: ID!, \$itemId: ID!, \$fieldId: ID!, \$optionId: String!) {
+                    updateProjectV2ItemFieldValue(input: {
+                      projectId: \$projectId,
+                      itemId: \$itemId,
+                      fieldId: \$fieldId,
+                      value: {
+                        singleSelectOptionId: \$optionId
+                      }
+                    }) {
+                      projectV2Item {
+                        id
+                      }
+                    }
+                  }" -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$AREA_FIELD_ID" -f optionId="$AREA_OPTION_ID" >/dev/null
+              else
+                # Fallback to text value
+                gh api graphql -f query="
+                  mutation(\$projectId: ID!, \$itemId: ID!, \$fieldId: ID!, \$textValue: String!) {
+                    updateProjectV2ItemFieldValue(input: {
+                      projectId: \$projectId,
+                      itemId: \$itemId,
+                      fieldId: \$fieldId,
+                      value: {
+                        text: \$textValue
+                      }
+                    }) {
+                      projectV2Item {
+                        id
+                      }
+                    }
+                  }" -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$AREA_FIELD_ID" -f textValue="$AREA_VALUE" >/dev/null
+              fi
+              echo "Set Area=$AREA_VALUE for issue #$issue_num"
+            fi
+
+            # Set Priority to p0
+            if [ -n "$PRIORITY_FIELD_ID" ]; then
+              if [ -n "$P0_OPTION_ID" ]; then
+                # Use single-select option
+                gh api graphql -f query="
+                  mutation(\$projectId: ID!, \$itemId: ID!, \$fieldId: ID!, \$optionId: String!) {
+                    updateProjectV2ItemFieldValue(input: {
+                      projectId: \$projectId,
+                      itemId: \$itemId,
+                      fieldId: \$fieldId,
+                      value: {
+                        singleSelectOptionId: \$optionId
+                      }
+                    }) {
+                      projectV2Item {
+                        id
+                      }
+                    }
+                  }" -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$PRIORITY_FIELD_ID" -f optionId="$P0_OPTION_ID" >/dev/null
+              else
+                # Fallback to text value
+                gh api graphql -f query="
+                  mutation(\$projectId: ID!, \$itemId: ID!, \$fieldId: ID!, \$textValue: String!) {
+                    updateProjectV2ItemFieldValue(input: {
+                      projectId: \$projectId,
+                      itemId: \$itemId,
+                      fieldId: \$fieldId,
+                      value: {
+                        text: \$textValue
+                      }
+                    }) {
+                      projectV2Item {
+                        id
+                      }
+                    }
+                  }" -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$PRIORITY_FIELD_ID" -f textValue="p0" >/dev/null
+              fi
+              echo "Set Priority=p0 for issue #$issue_num"
+            fi
+
+            # Set Target Release to MVP-Alpha
+            if [ -n "$TARGET_RELEASE_FIELD_ID" ]; then
+              if [ -n "$MVP_ALPHA_OPTION_ID" ]; then
+                # Use single-select option
+                gh api graphql -f query="
+                  mutation(\$projectId: ID!, \$itemId: ID!, \$fieldId: ID!, \$optionId: String!) {
+                    updateProjectV2ItemFieldValue(input: {
+                      projectId: \$projectId,
+                      itemId: \$itemId,
+                      fieldId: \$fieldId,
+                      value: {
+                        singleSelectOptionId: \$optionId
+                      }
+                    }) {
+                      projectV2Item {
+                        id
+                      }
+                    }
+                  }" -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$TARGET_RELEASE_FIELD_ID" -f optionId="$MVP_ALPHA_OPTION_ID" >/dev/null
+              else
+                # Fallback to text value
+                gh api graphql -f query="
+                  mutation(\$projectId: ID!, \$itemId: ID!, \$fieldId: ID!, \$textValue: String!) {
+                    updateProjectV2ItemFieldValue(input: {
+                      projectId: \$projectId,
+                      itemId: \$itemId,
+                      fieldId: \$fieldId,
+                      value: {
+                        text: \$textValue
+                      }
+                    }) {
+                      projectV2Item {
+                        id
+                      }
+                    }
+                  }" -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$TARGET_RELEASE_FIELD_ID" -f textValue="MVP-Alpha" >/dev/null
+              fi
+              echo "Set Target Release=MVP-Alpha for issue #$issue_num"
+            fi
+
+            echo "✓ Completed backfill for issue #$issue_num"
+          done
+
+          echo "🎉 Backfill complete for issues: ${{ github.event.inputs.issue_numbers }}"
