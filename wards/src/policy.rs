@@ -3,8 +3,18 @@ use std::time::{Duration, Instant};
 
 use crate::config::{QuotaCfg, WardsConfig};
 
-fn counter_key(tenant: &str, capability: &str) -> String {
-    format!("ten:{tenant}|cap:{capability}")
+/// Build the quota counter key.
+/// When TENANTING_ENABLED=1 → "{tenant}:{capability}"; otherwise → "{capability}" (global counter).
+pub fn quota_key(tenant: Option<&str>, capability: &str) -> String {
+    let enabled = std::env::var("TENANTING_ENABLED")
+        .ok()
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    if enabled {
+        format!("{}:{}", tenant.unwrap_or("default"), capability)
+    } else {
+        capability.to_string()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -58,7 +68,7 @@ impl PolicyKernel {
 
     pub fn allow_and_count(&mut self, tenant: &str, capability: &str) -> Decision {
         let quota = self.cfg.effective_quota(tenant, capability);
-        let key = counter_key(tenant, capability);
+        let key = quota_key(Some(tenant), capability);
         let state = self
             .counters
             .entry(key)
@@ -94,11 +104,20 @@ mod tests {
     use std::collections::HashMap;
 
     #[test]
-    fn counter_key_scopes_by_capability() {
+    fn quota_key_scopes_by_tenant_when_enabled() {
+        std::env::set_var("TENANTING_ENABLED", "1");
         assert_eq!(
-            super::counter_key("t1", "capsule.echo"),
-            "ten:t1|cap:capsule.echo"
+            super::quota_key(Some("t1"), "capsule.echo"),
+            "t1:capsule.echo"
         );
+        std::env::remove_var("TENANTING_ENABLED");
+    }
+
+    #[test]
+    fn quota_key_is_global_when_disabled() {
+        std::env::set_var("TENANTING_ENABLED", "0");
+        assert_eq!(super::quota_key(Some("t1"), "capsule.echo"), "capsule.echo");
+        std::env::remove_var("TENANTING_ENABLED");
     }
 
     #[test]

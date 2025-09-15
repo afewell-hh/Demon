@@ -78,6 +78,156 @@ impl Engine {
         }
     }
 
+<<<<<<< Updated upstream
+=======
+    pub async fn with_event_log(mut self, nats_url: &str) -> Result<Self> {
+        let event_log = log::EventLog::new(nats_url).await?;
+        self.event_log = Some(event_log);
+        Ok(self)
+    }
+
+    pub async fn run_from_file_with_tenant(
+        &mut self,
+        path: &str,
+        tenant_id: Option<&str>,
+    ) -> Result<()> {
+        let text = std::fs::read_to_string(path)
+            .with_context(|| format!("reading ritual spec: {path}"))?;
+        let spec: RitualSpec =
+            serde_yaml::from_str(&text).with_context(|| "parsing ritual yaml")?;
+
+        let run_id = Uuid::new_v4().to_string();
+        let resolved_tenant = tenant_id.unwrap_or("default");
+
+        info!(ritual = %spec.id, %run_id, tenant = %resolved_tenant, "ritual.start");
+
+        // Emit Started event
+        if let Some(ref event_log) = self.event_log {
+            let started_event = log::RitualEvent::Started {
+                ritual_id: spec.id.clone(),
+                run_id: run_id.clone(),
+                ts: chrono::Utc::now().to_rfc3339(),
+                spec: serde_json::to_value(&spec).context("Failed to serialize spec")?,
+                trace_id: None,
+            };
+            event_log
+                .append_with_tenant(&started_event, 1, Some(resolved_tenant))
+                .await?;
+        }
+
+        let state = spec
+            .states
+            .first()
+            .context("Milestone 0 expects exactly one state")?;
+        match state {
+            State::Task { action, end, .. } => {
+                let capability = &action.function_ref.ref_name;
+
+                // Make policy decision if kernel is configured
+                if let Some(ref mut kernel) = self.policy_kernel {
+                    let decision = kernel.allow_and_count(resolved_tenant, capability);
+                    let qk = wards::policy::quota_key(Some(resolved_tenant), capability);
+                    tracing::debug!(quota_key = %qk, limit = decision.limit, remaining = decision.remaining, allowed = %decision.allowed, "quota check");
+
+                    // Emit policy decision event
+                    let policy_event = log::RitualEvent::PolicyDecision {
+                        ritual_id: spec.id.clone(),
+                        run_id: run_id.clone(),
+                        ts: chrono::Utc::now().to_rfc3339(),
+                        tenant_id: resolved_tenant.to_string(),
+                        capability: capability.clone(),
+                        decision: serde_json::json!({
+                            "allowed": decision.allowed,
+                            "reason": if decision.allowed { serde_json::Value::Null } else { serde_json::json!("limit_exceeded") }
+                        }),
+                        quota: serde_json::json!({
+                            "limit": decision.limit,
+                            "windowSeconds": decision.window_seconds,
+                            "remaining": decision.remaining
+                        }),
+                    };
+
+                    if let Some(ref event_log) = self.event_log {
+                        event_log
+                            .append_with_tenant(&policy_event, 2, Some(resolved_tenant))
+                            .await?;
+                    } else {
+                        println!("{}", serde_json::to_string_pretty(&policy_event)?);
+                    }
+
+                    if !decision.allowed {
+                        warn!(
+                            ritual = %spec.id,
+                            %run_id,
+                            tenant = %resolved_tenant,
+                            %capability,
+                            "ritual denied due to quota limits"
+                        );
+                        let completion_event = log::RitualEvent::Completed {
+                            ritual_id: spec.id.clone(),
+                            run_id: run_id.clone(),
+                            ts: chrono::Utc::now().to_rfc3339(),
+                            outputs: None,
+                            trace_id: None,
+                        };
+
+                        if let Some(ref event_log) = self.event_log {
+                            event_log
+                                .append_with_tenant(&completion_event, 3, Some(resolved_tenant))
+                                .await?;
+                        } else {
+                            println!("{}", serde_json::to_string_pretty(&completion_event)?);
+                        }
+                        return Ok(());
+                    }
+
+                    info!(
+                        ritual = %spec.id,
+                        %run_id,
+                        tenant = %resolved_tenant,
+                        %capability,
+                        limit = decision.limit,
+                        remaining = decision.remaining,
+                        "policy decision: allowed"
+                    );
+                }
+
+                let out = self.router.dispatch(
+                    &action.function_ref.ref_name,
+                    &action.function_ref.arguments,
+                )?;
+                if !end {
+                    warn!(
+                        "Milestone 0 only supports single task with end=true; treating as terminal"
+                    );
+                }
+
+                // Emit completion event
+                let completion_event = log::RitualEvent::Completed {
+                    ritual_id: spec.id.clone(),
+                    run_id: run_id.clone(),
+                    ts: chrono::Utc::now().to_rfc3339(),
+                    outputs: Some(out),
+                    trace_id: None,
+                };
+
+                if let Some(ref event_log) = self.event_log {
+                    let next_seq = if self.policy_kernel.is_some() { 4 } else { 2 };
+                    event_log
+                        .append_with_tenant(&completion_event, next_seq, Some(resolved_tenant))
+                        .await?;
+                } else {
+                    println!("{}", serde_json::to_string_pretty(&completion_event)?);
+                }
+
+                info!(ritual = %spec.id, %run_id, tenant = %resolved_tenant, "ritual.end");
+            }
+        }
+
+        Ok(())
+    }
+
+>>>>>>> Stashed changes
     /// Execute a minimal ritual: only a single `task` with `end: true` is supported.
     pub fn run_from_file(&mut self, path: &str) -> Result<()> {
         let text = std::fs::read_to_string(path)
@@ -100,7 +250,13 @@ impl Engine {
 
                 // Make policy decision if kernel is configured
                 if let Some(ref mut kernel) = self.policy_kernel {
+<<<<<<< Updated upstream
                     let decision = kernel.allow_and_count(tenant_id, capability);
+=======
+                    let decision = kernel.allow_and_count(&tenant_id, capability);
+                    let qk = wards::policy::quota_key(Some(&tenant_id), capability);
+                    tracing::debug!(quota_key = %qk, limit = decision.limit, remaining = decision.remaining, allowed = %decision.allowed, "quota check");
+>>>>>>> Stashed changes
 
                     // Emit policy decision event (to stdout for now)
                     let policy_event = json!({

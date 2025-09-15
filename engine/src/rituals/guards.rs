@@ -3,7 +3,7 @@ use serde_json::{json, Value};
 use std::sync::{Mutex, OnceLock};
 
 use wards::config::{load_from_env, WardsConfig};
-use wards::policy::{Decision as KernelDecision, PolicyKernel};
+use wards::policy::{quota_key, Decision as KernelDecision, PolicyKernel};
 
 static KERNEL: OnceLock<Mutex<PolicyKernel>> = OnceLock::new();
 
@@ -27,6 +27,9 @@ pub async fn check_and_emit(
         .lock()
         .expect("kernel lock poisoned")
         .allow_and_count(tenant_id, capability);
+
+    let key = quota_key(Some(tenant_id), capability);
+    tracing::debug!(quota_key = %key, allowed = %decision.allowed, remaining = %decision.remaining, "policy decision evaluated");
 
     let decision_json = if decision.allowed {
         json!({ "allowed": true })
