@@ -15,6 +15,14 @@ pub struct EventLog {
     client: async_nats::Client,
     jetstream: jetstream::Context,
     stream: Stream,
+    tenant_config: TenantConfig,
+}
+
+#[derive(Debug, Clone)]
+struct TenantConfig {
+    enabled: bool,
+    default_tenant: String,
+    dual_publish: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -72,6 +80,47 @@ pub enum RitualEvent {
     },
 }
 
+impl TenantConfig {
+    fn from_env() -> Self {
+        let enabled = std::env::var("TENANTING_ENABLED")
+            .unwrap_or_else(|_| "0".to_string())
+            .parse::<u8>()
+            .unwrap_or(0)
+            == 1;
+
+        let default_tenant =
+            std::env::var("TENANT_DEFAULT").unwrap_or_else(|_| "default".to_string());
+
+        let dual_publish = std::env::var("TENANT_DUAL_PUBLISH")
+            .unwrap_or_else(|_| "0".to_string())
+            .parse::<u8>()
+            .unwrap_or(0)
+            == 1;
+
+        debug!(
+            "Engine tenant configuration - enabled: {}, default: {}, dual_publish: {}",
+            enabled, default_tenant, dual_publish
+        );
+
+        Self {
+            enabled,
+            default_tenant,
+            dual_publish,
+        }
+    }
+
+    fn build_subject(&self, tenant_id: &str, ritual_id: &str, run_id: &str) -> String {
+        if self.enabled {
+            format!(
+                "demon.ritual.v1.{}.{}.{}.events",
+                tenant_id, ritual_id, run_id
+            )
+        } else {
+            format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id)
+        }
+    }
+}
+
 impl EventLog {
     pub async fn new(nats_url: &str) -> Result<Self> {
         let client = async_nats::connect(nats_url)
@@ -126,14 +175,26 @@ impl EventLog {
         let stream_info = stream.info().await.context("Failed to fetch stream info")?;
         info!("Connected to JetStream stream: {}", stream_info.config.name);
 
+        let tenant_config = TenantConfig::from_env();
+
         Ok(Self {
             client,
             jetstream,
             stream,
+            tenant_config,
         })
     }
 
     pub async fn append(&self, event: &RitualEvent, sequence: u64) -> Result<()> {
+        self.append_with_tenant(event, sequence, None).await
+    }
+
+    pub async fn append_with_tenant(
+        &self,
+        event: &RitualEvent,
+        sequence: u64,
+        tenant_id: Option<&str>,
+    ) -> Result<()> {
         let (ritual_id, run_id) = match event {
             RitualEvent::Started {
                 ritual_id, run_id, ..
@@ -149,17 +210,21 @@ impl EventLog {
             } => (ritual_id, run_id),
         };
 
-        let subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
+        let resolved_tenant = tenant_id.unwrap_or(&self.tenant_config.default_tenant);
         let msg_id = format!("{}:{}", run_id, sequence);
-
         let payload = serde_json::to_vec(event).context("Failed to serialize event")?;
 
         let mut headers = async_nats::HeaderMap::new();
         headers.insert("Nats-Msg-Id", msg_id.as_str());
 
+        // Primary subject (tenant-scoped if enabled)
+        let subject = self
+            .tenant_config
+            .build_subject(resolved_tenant, ritual_id, run_id);
+
         let ack = self
             .jetstream
-            .publish_with_headers(subject.clone(), headers, payload.into())
+            .publish_with_headers(subject.clone(), headers.clone(), payload.clone().into())
             .await
             .context("Failed to publish event")?
             .await
@@ -170,11 +235,45 @@ impl EventLog {
             msg_id, subject, ack.sequence
         );
 
+        // Dual publish to legacy subject if enabled
+        if self.tenant_config.dual_publish && self.tenant_config.enabled {
+            let legacy_subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
+            let legacy_msg_id = format!("legacy:{}:{}", run_id, sequence);
+
+            let mut legacy_headers = async_nats::HeaderMap::new();
+            legacy_headers.insert("Nats-Msg-Id", legacy_msg_id.as_str());
+
+            let legacy_ack = self
+                .jetstream
+                .publish_with_headers(legacy_subject.clone(), legacy_headers, payload.into())
+                .await
+                .context("Failed to publish legacy event")?
+                .await
+                .context("Failed to get legacy ack")?;
+
+            debug!(
+                "Dual-published event with msg-id {} to legacy {}, seq: {}",
+                legacy_msg_id, legacy_subject, legacy_ack.sequence
+            );
+        }
+
         Ok(())
     }
 
     pub async fn read_run(&self, ritual_id: &str, run_id: &str) -> Result<Vec<RitualEvent>> {
-        let filter_subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
+        self.read_run_with_tenant(ritual_id, run_id, None).await
+    }
+
+    pub async fn read_run_with_tenant(
+        &self,
+        ritual_id: &str,
+        run_id: &str,
+        tenant_id: Option<&str>,
+    ) -> Result<Vec<RitualEvent>> {
+        let resolved_tenant = tenant_id.unwrap_or(&self.tenant_config.default_tenant);
+        let filter_subject = self
+            .tenant_config
+            .build_subject(resolved_tenant, ritual_id, run_id);
 
         // Create truly ephemeral pull consumer (no name = auto-generated)
         // This allows concurrent reads and prevents consumer conflicts
@@ -342,8 +441,8 @@ mod tests {
         let event1 = create_test_started_event(ritual_id, &run_id);
         let event2 = create_test_completed_event(ritual_id, &run_id);
 
-        log.append(&event1, 1).await.unwrap();
-        log.append(&event2, 2).await.unwrap();
+        log.append_with_tenant(&event1, 1, None).await.unwrap();
+        log.append_with_tenant(&event2, 2, None).await.unwrap();
 
         // Read back
         let events = log.read_run(ritual_id, &run_id).await.unwrap();
@@ -366,8 +465,8 @@ mod tests {
         let event = create_test_started_event(ritual_id, &run_id);
 
         // Publish same event twice with same sequence
-        log.append(&event, 1).await.unwrap();
-        log.append(&event, 1).await.unwrap(); // Should be deduplicated
+        log.append_with_tenant(&event, 1, None).await.unwrap();
+        log.append_with_tenant(&event, 1, None).await.unwrap(); // Should be deduplicated
 
         // Read back - should only have one event
         let events = log.read_run(ritual_id, &run_id).await.unwrap();

@@ -67,6 +67,48 @@ Starting with Sprint 3, pending approvals can be managed directly from the Opera
 2. Navigate to a run with pending approval: `/runs/{run_id}`
 3. Click "Grant" or "Deny" and provide your email when prompted
 
+## Tenancy
+
+Demon supports multi-tenant namespace isolation for events and resources. When enabled, events are published to tenant-scoped subjects and isolated from other tenants.
+
+### Configuration
+
+**Environment Variables:**
+- `TENANTING_ENABLED=0|1` — Enable/disable tenant isolation (default: 0)
+- `TENANT_DEFAULT=default` — Default tenant when none specified (default: "default")
+- `TENANT_ALLOWLIST=default,acme,globex` — Comma-separated list of allowed tenants (optional)
+- `TENANT_DUAL_PUBLISH=0|1` — Publish to both tenant and legacy subjects during migration (default: 0)
+
+### Usage
+
+**Headers and Query Parameters:**
+- HTTP Header: `X-Demon-Tenant: tenant-name`
+- Query Parameter: `?tenant=tenant-name`
+
+**Event Subject Schema:**
+- **Enabled**: `demon.ritual.v1.<tenant>.<ritualId>.<runId>.events`
+- **Disabled**: `demon.ritual.v1.<ritualId>.<runId>.events` (legacy)
+
+### Examples
+
+```bash
+# Query runs for specific tenant
+curl -H 'X-Demon-Tenant: acme' 'http://127.0.0.1:3000/api/runs?limit=5'
+curl 'http://127.0.0.1:3000/api/runs?tenant=acme&limit=5'
+
+# Get run details for specific tenant
+curl 'http://127.0.0.1:3000/api/runs/<run_id>?tenant=acme'
+
+# Subscribe to tenant-scoped event stream
+curl 'http://127.0.0.1:3000/api/runs/<run_id>/events/stream?tenant=acme'
+
+# Run ritual with tenanting enabled
+TENANTING_ENABLED=1 TENANT_DEFAULT=acme make dev
+```
+
+**Migration Support:**
+Enable `TENANT_DUAL_PUBLISH=1` to publish events to both tenant-scoped and legacy subjects during transition periods.
+
 ## Layout
 
 - `engine/` — minimal ritual interpreter (M0).
