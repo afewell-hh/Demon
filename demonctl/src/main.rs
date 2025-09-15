@@ -36,7 +36,7 @@ fn main() -> Result<()> {
 
     match cli.cmd {
         Commands::Run { file, replay: _ } => {
-            let engine = engine::rituals::Engine::new();
+            let mut engine = engine::rituals::Engine::new();
             if let Err(e) = engine.run_from_file(&file) {
                 eprintln!("Error running ritual: {:?}", e);
                 std::process::exit(1);
