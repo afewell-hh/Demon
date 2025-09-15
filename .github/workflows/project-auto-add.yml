@@ -1,0 +1,182 @@
+name: Project Auto-Add
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  issues: read
+  repository-projects: write
+
+jobs:
+  add-to-project:
+    runs-on: ubuntu-latest
+    if: contains(github.event.label.name, 'story')
+    env:
+      GH_TOKEN: ${{ secrets.ADMINTOKEN_DEMON_AFEWELLHH }}
+    steps:
+      - name: Add issue to project
+        run: |
+          # Get the project ID (assuming project number 1)
+          PROJECT_ID=$(gh api graphql -f query='
+            query($owner: String!, $number: Int!) {
+              user(login: $owner) {
+                projectV2(number: $number) {
+                  id
+                }
+              }
+            }' -f owner="${{ github.repository_owner }}" -F number=1 --jq '.data.user.projectV2.id')
+
+          if [[ -z "$PROJECT_ID" ]]; then
+            echo "::error::Could not find project"
+            exit 1
+          fi
+
+          echo "Project ID: $PROJECT_ID"
+
+          # Add the issue to the project
+          ITEM_ID=$(gh api graphql -f query='
+            mutation($projectId: ID!, $contentId: ID!) {
+              addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
+                item {
+                  id
+                }
+              }
+            }' -f projectId="$PROJECT_ID" -f contentId="${{ github.event.issue.node_id }}" --jq '.data.addProjectV2ItemById.item.id')
+
+          if [[ -z "$ITEM_ID" ]]; then
+            echo "::warning::Issue may already be in project or add failed"
+            exit 0
+          fi
+
+          echo "Added issue #${{ github.event.issue.number }} to project (item: $ITEM_ID)"
+
+          # Get field IDs for Status, Area, Priority, Target Release
+          FIELDS=$(gh api graphql -f query='
+            query($projectId: ID!) {
+              node(id: $projectId) {
+                ... on ProjectV2 {
+                  fields(first: 20) {
+                    nodes {
+                      ... on ProjectV2Field {
+                        id
+                        name
+                      }
+                      ... on ProjectV2SingleSelectField {
+                        id
+                        name
+                        options {
+                          id
+                          name
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }' -f projectId="$PROJECT_ID")
+
+          # Parse field IDs and set defaults
+          # Status = Todo (default)
+          STATUS_FIELD=$(echo "$FIELDS" | jq -r '.data.node.fields.nodes[] | select(.name == "Status") | .id')
+          TODO_OPTION=$(echo "$FIELDS" | jq -r '.data.node.fields.nodes[] | select(.name == "Status") | .options[] | select(.name == "Todo") | .id')
+
+          if [[ -n "$STATUS_FIELD" ]] && [[ -n "$TODO_OPTION" ]]; then
+            gh api graphql -f query='
+              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: ProjectV2FieldValue!) {
+                updateProjectV2ItemFieldValue(input: {
+                  projectId: $projectId
+                  itemId: $itemId
+                  fieldId: $fieldId
+                  value: $value
+                }) {
+                  projectV2Item {
+                    id
+                  }
+                }
+              }' -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$STATUS_FIELD" -f value="{\"singleSelectOptionId\": \"$TODO_OPTION\"}"
+            echo "Set Status to Todo"
+          fi
+
+          # Try to infer Area from issue labels
+          if [[ "${{ contains(github.event.issue.labels.*.name, 'area:backend') }}" == "true" ]]; then
+            AREA_NAME="backend"
+          elif [[ "${{ contains(github.event.issue.labels.*.name, 'area:frontend') }}" == "true" ]]; then
+            AREA_NAME="frontend"
+          else
+            AREA_NAME=""
+          fi
+
+          if [[ -n "$AREA_NAME" ]]; then
+            AREA_FIELD=$(echo "$FIELDS" | jq -r '.data.node.fields.nodes[] | select(.name == "Area") | .id')
+            AREA_OPTION=$(echo "$FIELDS" | jq -r --arg area "$AREA_NAME" '.data.node.fields.nodes[] | select(.name == "Area") | .options[] | select(.name == $area) | .id')
+
+            if [[ -n "$AREA_FIELD" ]] && [[ -n "$AREA_OPTION" ]]; then
+              gh api graphql -f query='
+                mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: ProjectV2FieldValue!) {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: $projectId
+                    itemId: $itemId
+                    fieldId: $fieldId
+                    value: $value
+                  }) {
+                    projectV2Item {
+                      id
+                    }
+                  }
+                }' -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$AREA_FIELD" -f value="{\"singleSelectOptionId\": \"$AREA_OPTION\"}"
+              echo "Set Area to $AREA_NAME"
+            fi
+          fi
+
+          # Try to infer Priority from issue labels
+          if [[ "${{ contains(github.event.issue.labels.*.name, 'p0') }}" == "true" ]]; then
+            PRIORITY_NAME="p0"
+          elif [[ "${{ contains(github.event.issue.labels.*.name, 'p1') }}" == "true" ]]; then
+            PRIORITY_NAME="p1"
+          else
+            PRIORITY_NAME=""
+          fi
+
+          if [[ -n "$PRIORITY_NAME" ]]; then
+            PRIORITY_FIELD=$(echo "$FIELDS" | jq -r '.data.node.fields.nodes[] | select(.name == "Priority") | .id')
+            PRIORITY_OPTION=$(echo "$FIELDS" | jq -r --arg pri "$PRIORITY_NAME" '.data.node.fields.nodes[] | select(.name == "Priority") | .options[] | select(.name == $pri) | .id')
+
+            if [[ -n "$PRIORITY_FIELD" ]] && [[ -n "$PRIORITY_OPTION" ]]; then
+              gh api graphql -f query='
+                mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: ProjectV2FieldValue!) {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: $projectId
+                    itemId: $itemId
+                    fieldId: $fieldId
+                    value: $value
+                  }) {
+                    projectV2Item {
+                      id
+                    }
+                  }
+                }' -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$PRIORITY_FIELD" -f value="{\"singleSelectOptionId\": \"$PRIORITY_OPTION\"}"
+              echo "Set Priority to $PRIORITY_NAME"
+            fi
+          fi
+
+          # Set default Target Release to MVP-Alpha
+          TARGET_FIELD=$(echo "$FIELDS" | jq -r '.data.node.fields.nodes[] | select(.name == "Target Release") | .id')
+          ALPHA_OPTION=$(echo "$FIELDS" | jq -r '.data.node.fields.nodes[] | select(.name == "Target Release") | .options[] | select(.name == "MVP-Alpha") | .id')
+
+          if [[ -n "$TARGET_FIELD" ]] && [[ -n "$ALPHA_OPTION" ]]; then
+            gh api graphql -f query='
+              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: ProjectV2FieldValue!) {
+                updateProjectV2ItemFieldValue(input: {
+                  projectId: $projectId
+                  itemId: $itemId
+                  fieldId: $fieldId
+                  value: $value
+                }) {
+                  projectV2Item {
+                    id
+                  }
+                }
+              }' -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$TARGET_FIELD" -f value="{\"singleSelectOptionId\": \"$ALPHA_OPTION\"}"
+            echo "Set Target Release to MVP-Alpha"
+          fi
