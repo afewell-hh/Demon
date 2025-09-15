@@ -28,6 +28,8 @@ The echo capsule prints `Hello from Demon!`
 
 A JSON event for `ritual.completed:v1` is printed to stdout.
 
+**Note**: M0-3 includes per-capability quotas with policy decisions. Default quotas allow reasonable development usage without configuration.
+
 ## Layout
 
 - `engine/` — minimal ritual interpreter (M0).

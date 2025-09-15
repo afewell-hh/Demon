@@ -33,20 +33,57 @@ jobs:
         run: |
           gh api repos/${{ github.repository }} --jq .default_branch > default_branch.txt
           echo "branch=$(cat default_branch.txt)" >> "$GITHUB_OUTPUT"
-      - name: Assert replies guard required when flagged (admin)
+      - name: Assert MVP protection policy (admin)
         if: steps.gate.outputs.audit_skip_admin == 'false'
         shell: bash
         run: |
           set -euo pipefail
           BR="${{ steps.repo.outputs.branch }}"
-          if [[ -f .github/flags/guard-required ]]; then
-            echo "Flag present — asserting replies-guard is a required status check"
-            ctx=$(gh api repos/:owner/:repo/branches/$BR/protection -q '.required_status_checks.contexts')
-            echo "$ctx" | jq -e 'index("review-threads-guard (PR) / guard") != null' >/dev/null || {
-              echo "::error::Required checks missing: review-threads-guard (PR) / guard"; exit 1; }
-          else
-            echo "Flag absent — skipping replies-guard assertion (burn-in phase)"
+          echo "Asserting MVP protection policy per docs/process/branch_protection_mvp.md"
+
+          # Get protection settings
+          protection=$(gh api repos/:owner/:repo/branches/$BR/protection)
+
+          # Required checks (exactly these 3)
+          required_contexts='["Bootstrapper bundles — verify (offline, signature ok)","Bootstrapper bundles — negative verify (tamper ⇒ failed)","review-lock-guard"]'
+          actual_contexts=$(echo "$protection" | jq -c '.required_status_checks.contexts | sort')
+          expected_contexts=$(echo "$required_contexts" | jq -c 'sort')
+
+          if [[ "$actual_contexts" != "$expected_contexts" ]]; then
+            echo "::error::Required status checks mismatch"
+            echo "Expected: $expected_contexts"
+            echo "Actual: $actual_contexts"
+            exit 1
           fi
+
+          # Verify strict=false (avoid update branch churn)
+          strict=$(echo "$protection" | jq -r '.required_status_checks.strict')
+          if [[ "$strict" != "false" ]]; then
+            echo "::error::strict should be false but is $strict"
+            exit 1
+          fi
+
+          # Verify other MVP policy settings
+          enforce_admins=$(echo "$protection" | jq -r '.enforce_admins.enabled')
+          linear_history=$(echo "$protection" | jq -r '.required_linear_history.enabled')
+          conversation_resolution=$(echo "$protection" | jq -r '.required_conversation_resolution.enabled')
+
+          if [[ "$enforce_admins" != "true" ]]; then
+            echo "::error::enforce_admins should be true but is $enforce_admins"
+            exit 1
+          fi
+
+          if [[ "$linear_history" != "true" ]]; then
+            echo "::error::linear_history should be true but is $linear_history"
+            exit 1
+          fi
+
+          if [[ "$conversation_resolution" != "true" ]]; then
+            echo "::error::conversation_resolution should be true but is $conversation_resolution"
+            exit 1
+          fi
+
+          echo "✅ MVP protection policy verified"
       - name: Info mode (no admin token)
         if: steps.gate.outputs.audit_skip_admin == 'true'
         run: echo "Audit in info mode: no admin token; skipping protection assertions."
