@@ -1,160 +1,112 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
-# Script to backfill project fields for issues #56-#63
-# Requires GH_TOKEN with project write permissions
+# Backfill Project V2 fields for issues, tolerant of Single-select or Text fields.
+# Usage: GH_TOKEN=... ./scripts/backfill-project-fields.sh 56 57 58 59 60 61 62 63
 
-echo "Starting backfill of project fields for issues #56-#63"
-
-# Get the project ID (project number 1)
-PROJECT_ID=$(gh api graphql -f query='
-  query($owner: String!, $number: Int!) {
-    user(login: $owner) {
-      projectV2(number: $number) {
-        id
-      }
-    }
-  }' -f owner="afewell-hh" -F number=1 --jq '.data.user.projectV2.id')
-
-if [[ -z "$PROJECT_ID" ]]; then
-  echo "Error: Could not find project"
+if ! command -v gh >/dev/null; then
+  echo "gh CLI is required" >&2
   exit 1
 fi
 
-echo "Found project ID: $PROJECT_ID"
+OWNER=$(gh repo view --json owner -q .owner.login)
+REPO=$(gh repo view --json name -q .name)
+PROJ=$(gh api graphql -f query='query($login:String!){user(login:$login){projectV2(number:1){id}}}' -f login="$OWNER" -q .data.user.projectV2.id)
 
-# Get field IDs and options
-FIELDS=$(gh api graphql -f query='
-  query($projectId: ID!) {
-    node(id: $projectId) {
-      ... on ProjectV2 {
-        fields(first: 20) {
-          nodes {
-            ... on ProjectV2Field {
-              id
-              name
-            }
-            ... on ProjectV2SingleSelectField {
-              id
-              name
-              options {
-                id
-                name
-              }
-            }
-          }
-        }
-      }
-    }
-  }' -f projectId="$PROJECT_ID")
+FIELDS=$(gh api graphql -F proj="$PROJ" -f query='query($proj:ID!){node(id:$proj){... on ProjectV2{fields(first:50){nodes{__typename ... on ProjectV2FieldCommon{id name dataType} ... on ProjectV2SingleSelectField{id name dataType options{id name}}}} items(first:200){nodes{id content{__typename ... on Issue{number}}}}}}}')
 
-# Extract field and option IDs
-AREA_FIELD=$(echo "$FIELDS" | jq -r '.data.node.fields.nodes[] | select(.name == "Area") | .id')
-PRIORITY_FIELD=$(echo "$FIELDS" | jq -r '.data.node.fields.nodes[] | select(.name == "Priority") | .id')
-TARGET_FIELD=$(echo "$FIELDS" | jq -r '.data.node.fields.nodes[] | select(.name == "Target Release") | .id')
-
-BACKEND_OPTION=$(echo "$FIELDS" | jq -r '.data.node.fields.nodes[] | select(.name == "Area") | .options[] | select(.name == "backend") | .id')
-FRONTEND_OPTION=$(echo "$FIELDS" | jq -r '.data.node.fields.nodes[] | select(.name == "Area") | .options[] | select(.name == "frontend") | .id')
-P0_OPTION=$(echo "$FIELDS" | jq -r '.data.node.fields.nodes[] | select(.name == "Priority") | .options[] | select(.name == "p0") | .id')
-ALPHA_OPTION=$(echo "$FIELDS" | jq -r '.data.node.fields.nodes[] | select(.name == "Target Release") | .options[] | select(.name == "MVP-Alpha") | .id')
-
-# Function to update a field value
-update_field() {
-  local item_id=$1
-  local field_id=$2
-  local option_id=$3
-  local field_name=$4
-
-  if [[ -n "$field_id" ]] && [[ -n "$option_id" ]]; then
-    gh api graphql -f query='
-      mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: ProjectV2FieldValue!) {
-        updateProjectV2ItemFieldValue(input: {
-          projectId: $projectId
-          itemId: $itemId
-          fieldId: $fieldId
-          value: $value
-        }) {
-          projectV2Item {
-            id
-          }
-        }
-      }' -f projectId="$PROJECT_ID" -f itemId="$item_id" -f fieldId="$field_id" -f value="{\"singleSelectOptionId\": \"$option_id\"}" >/dev/null
-    echo "  ✓ Set $field_name"
-  else
-    echo "  ⚠ Could not set $field_name (field or option not found)"
-  fi
+get_item_id() {
+  local num=$1
+  echo "$FIELDS" | jq -r --argjson n "$num" '.data.node.items.nodes[] | select(.content.number == $n) | .id'
 }
 
-# Backend issues: #56-#59
-for issue_num in 56 57 58 59; do
-  echo "Processing issue #$issue_num (backend)..."
+get_field() {
+  local name=$1
+  echo "$FIELDS" | jq -r --arg n "$name" '.data.node.fields.nodes[] | select(.name == $n) | .id'
+}
 
-  # Get issue node ID
-  ISSUE_ID=$(gh api repos/afewell-hh/demon/issues/$issue_num --jq '.node_id')
+get_type() {
+  local name=$1
+  echo "$FIELDS" | jq -r --arg n "$name" '.data.node.fields.nodes[] | select(.name == $n) | .dataType'
+}
 
-  # Get project item ID for this issue
-  ITEM_ID=$(gh api graphql -f query='
-    query($projectId: ID!, $issueId: ID!) {
-      node(id: $projectId) {
-        ... on ProjectV2 {
-          items(first: 100) {
-            nodes {
-              id
-              content {
-                ... on Issue {
-                  id
-                }
-              }
-            }
-          }
-        }
-      }
-    }' -f projectId="$PROJECT_ID" -f issueId="$ISSUE_ID" | jq -r --arg id "$ISSUE_ID" '.data.node.items.nodes[] | select(.content.id == $id) | .id')
+get_option() {
+  local name=$1 opt=$2
+  echo "$FIELDS" | jq -r --arg n "$name" --arg o "$opt" '.data.node.fields.nodes[] | select(.name == $n) | (.options // [])[] | select(.name == $o) | .id'
+}
 
-  if [[ -z "$ITEM_ID" ]]; then
-    echo "  ⚠ Issue not found in project, skipping"
-    continue
+set_single() {
+  local item=$1 field=$2 option=$3
+  gh api graphql -F proj="$PROJ" -F item="$item" -F field="$field" -F option="$option" \
+    -f query='mutation($proj:ID!,$item:ID!,$field:ID!,$option:String!){updateProjectV2ItemFieldValue(input:{projectId:$proj,itemId:$item,fieldId:$field,value:{singleSelectOptionId:$option}}){projectV2Item{id}}}' >/dev/null
+}
+
+set_text() {
+  local item=$1 field=$2 text=$3
+  gh api graphql -F proj="$PROJ" -F item="$item" -F field="$field" -F text="$text" \
+    -f query='mutation($proj:ID!,$item:ID!,$field:ID!,$text:String!){updateProjectV2ItemFieldValue(input:{projectId:$proj,itemId:$item,fieldId:$field,value:{text:$text}}){projectV2Item{id}}}' >/dev/null
+}
+
+STATUS_FIELD=$(get_field "Status")
+TODO_OPT=$(get_option "Status" "Todo" || true)
+AREA_FIELD=$(get_field "Area" || true)
+AREA_TYPE=$(get_type "Area" || true)
+PRIORITY_FIELD=$(get_field "Priority" || true)
+PRIORITY_TYPE=$(get_type "Priority" || true)
+TARGET_FIELD=$(get_field "Target Release" || true)
+TARGET_TYPE=$(get_type "Target Release" || true)
+
+if [[ $# -eq 0 ]]; then
+  echo "No issue numbers provided; exiting" >&2
+  exit 1
+fi
+
+for n in "$@"; do
+  echo "Backfilling #$n"
+  item=$(get_item_id "$n")
+  if [[ -z "$item" ]]; then
+    node=$(gh api repos/$OWNER/$REPO/issues/$n -q .node_id)
+    item=$(gh api graphql -F proj="$PROJ" -F item="$node" -f query='mutation($proj:ID!,$item:ID!){addProjectV2ItemById(input:{projectId:$proj,contentId:$item}){item{id}}}' -q .data.addProjectV2ItemById.item.id)
   fi
-
-  update_field "$ITEM_ID" "$AREA_FIELD" "$BACKEND_OPTION" "Area=backend"
-  update_field "$ITEM_ID" "$PRIORITY_FIELD" "$P0_OPTION" "Priority=p0"
-  update_field "$ITEM_ID" "$TARGET_FIELD" "$ALPHA_OPTION" "Target Release=MVP-Alpha"
+  # Status
+  if [[ -n "$STATUS_FIELD" && -n "$TODO_OPT" ]]; then
+    set_single "$item" "$STATUS_FIELD" "$TODO_OPT" || true
+  fi
+  # Infer labels
+  labels=$(gh api repos/$OWNER/$REPO/issues/$n -q '[.labels[].name]|join(" ")')
+  area=""; pri=""
+  [[ "$labels" =~ area:backend ]] && area="backend"
+  [[ "$labels" =~ area:frontend ]] && area="frontend"
+  [[ "$labels" =~ p0 ]] && pri="p0"
+  [[ "$labels" =~ p1 ]] && pri="p1"
+  # Area
+  if [[ -n "$AREA_FIELD" ]]; then
+    if [[ "$AREA_TYPE" == "SINGLE_SELECT" ]]; then
+      opt=$(get_option "Area" "$area" || true)
+      [[ -n "$opt" ]] && set_single "$item" "$AREA_FIELD" "$opt" || true
+    elif [[ -n "$area" ]]; then
+      set_text "$item" "$AREA_FIELD" "$area" || true
+    fi
+  fi
+  # Priority
+  if [[ -n "$PRIORITY_FIELD" ]]; then
+    if [[ "$PRIORITY_TYPE" == "SINGLE_SELECT" ]]; then
+      opt=$(get_option "Priority" "$pri" || true)
+      [[ -n "$opt" ]] && set_single "$item" "$PRIORITY_FIELD" "$opt" || true
+    elif [[ -n "$pri" ]]; then
+      set_text "$item" "$PRIORITY_FIELD" "$pri" || true
+    fi
+  fi
+  # Target Release default
+  if [[ -n "$TARGET_FIELD" ]]; then
+    if [[ "$TARGET_TYPE" == "SINGLE_SELECT" ]]; then
+      opt=$(get_option "Target Release" "MVP-Alpha" || true)
+      [[ -n "$opt" ]] && set_single "$item" "$TARGET_FIELD" "$opt" || true
+    else
+      set_text "$item" "$TARGET_FIELD" "MVP-Alpha" || true
+    fi
+  fi
 done
 
-# Frontend issues: #60-#63
-for issue_num in 60 61 62 63; do
-  echo "Processing issue #$issue_num (frontend)..."
+echo "Done."
 
-  # Get issue node ID
-  ISSUE_ID=$(gh api repos/afewell-hh/demon/issues/$issue_num --jq '.node_id')
-
-  # Get project item ID for this issue
-  ITEM_ID=$(gh api graphql -f query='
-    query($projectId: ID!, $issueId: ID!) {
-      node(id: $projectId) {
-        ... on ProjectV2 {
-          items(first: 100) {
-            nodes {
-              id
-              content {
-                ... on Issue {
-                  id
-                }
-              }
-            }
-          }
-        }
-      }
-    }' -f projectId="$PROJECT_ID" -f issueId="$ISSUE_ID" | jq -r --arg id "$ISSUE_ID" '.data.node.items.nodes[] | select(.content.id == $id) | .id')
-
-  if [[ -z "$ITEM_ID" ]]; then
-    echo "  ⚠ Issue not found in project, skipping"
-    continue
-  fi
-
-  update_field "$ITEM_ID" "$AREA_FIELD" "$FRONTEND_OPTION" "Area=frontend"
-  update_field "$ITEM_ID" "$PRIORITY_FIELD" "$P0_OPTION" "Priority=p0"
-  update_field "$ITEM_ID" "$TARGET_FIELD" "$ALPHA_OPTION" "Target Release=MVP-Alpha"
-done
-
-echo "Backfill complete!"

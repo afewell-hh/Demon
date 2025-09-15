@@ -61,10 +61,12 @@ jobs:
                       ... on ProjectV2Field {
                         id
                         name
+                        dataType
                       }
                       ... on ProjectV2SingleSelectField {
                         id
                         name
+                        dataType
                         options {
                           id
                           name
@@ -109,9 +111,24 @@ jobs:
 
           if [[ -n "$AREA_NAME" ]]; then
             AREA_FIELD=$(echo "$FIELDS" | jq -r '.data.node.fields.nodes[] | select(.name == "Area") | .id')
-            AREA_OPTION=$(echo "$FIELDS" | jq -r --arg area "$AREA_NAME" '.data.node.fields.nodes[] | select(.name == "Area") | .options[] | select(.name == $area) | .id')
-
-            if [[ -n "$AREA_FIELD" ]] && [[ -n "$AREA_OPTION" ]]; then
+            AREA_TYPE=$(echo "$FIELDS" | jq -r '.data.node.fields.nodes[] | select(.name == "Area") | .dataType')
+            if [[ "$AREA_TYPE" == "SINGLE_SELECT" ]]; then
+              AREA_OPTION=$(echo "$FIELDS" | jq -r --arg area "$AREA_NAME" '.data.node.fields.nodes[] | select(.name == "Area") | .options[] | select(.name == $area) | .id')
+              if [[ -n "$AREA_OPTION" && "$AREA_OPTION" != "null" ]]; then
+                gh api graphql -f query='
+                  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: ProjectV2FieldValue!) {
+                    updateProjectV2ItemFieldValue(input: {
+                      projectId: $projectId
+                      itemId: $itemId
+                      fieldId: $fieldId
+                      value: $value
+                    }) {
+                      projectV2Item { id }
+                    }
+                  }' -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$AREA_FIELD" -f value="{\"singleSelectOptionId\": \"$AREA_OPTION\"}"
+                echo "Set Area (single-select) to $AREA_NAME"
+              fi
+            else
               gh api graphql -f query='
                 mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: ProjectV2FieldValue!) {
                   updateProjectV2ItemFieldValue(input: {
@@ -119,13 +136,9 @@ jobs:
                     itemId: $itemId
                     fieldId: $fieldId
                     value: $value
-                  }) {
-                    projectV2Item {
-                      id
-                    }
-                  }
-                }' -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$AREA_FIELD" -f value="{\"singleSelectOptionId\": \"$AREA_OPTION\"}"
-              echo "Set Area to $AREA_NAME"
+                  }) { projectV2Item { id } }
+                }' -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$AREA_FIELD" -f value="{\"text\": \"$AREA_NAME\"}"
+              echo "Set Area (text) to $AREA_NAME"
             fi
           fi
 
@@ -140,9 +153,22 @@ jobs:
 
           if [[ -n "$PRIORITY_NAME" ]]; then
             PRIORITY_FIELD=$(echo "$FIELDS" | jq -r '.data.node.fields.nodes[] | select(.name == "Priority") | .id')
-            PRIORITY_OPTION=$(echo "$FIELDS" | jq -r --arg pri "$PRIORITY_NAME" '.data.node.fields.nodes[] | select(.name == "Priority") | .options[] | select(.name == $pri) | .id')
-
-            if [[ -n "$PRIORITY_FIELD" ]] && [[ -n "$PRIORITY_OPTION" ]]; then
+            PRIORITY_TYPE=$(echo "$FIELDS" | jq -r '.data.node.fields.nodes[] | select(.name == "Priority") | .dataType')
+            if [[ "$PRIORITY_TYPE" == "SINGLE_SELECT" ]]; then
+              PRIORITY_OPTION=$(echo "$FIELDS" | jq -r --arg pri "$PRIORITY_NAME" '.data.node.fields.nodes[] | select(.name == "Priority") | .options[] | select(.name == $pri) | .id')
+              if [[ -n "$PRIORITY_OPTION" && "$PRIORITY_OPTION" != "null" ]]; then
+                gh api graphql -f query='
+                  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: ProjectV2FieldValue!) {
+                    updateProjectV2ItemFieldValue(input: {
+                      projectId: $projectId
+                      itemId: $itemId
+                      fieldId: $fieldId
+                      value: $value
+                    }) { projectV2Item { id } }
+                  }' -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$PRIORITY_FIELD" -f value="{\"singleSelectOptionId\": \"$PRIORITY_OPTION\"}"
+                echo "Set Priority (single-select) to $PRIORITY_NAME"
+              fi
+            else
               gh api graphql -f query='
                 mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: ProjectV2FieldValue!) {
                   updateProjectV2ItemFieldValue(input: {
@@ -150,21 +176,30 @@ jobs:
                     itemId: $itemId
                     fieldId: $fieldId
                     value: $value
-                  }) {
-                    projectV2Item {
-                      id
-                    }
-                  }
-                }' -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$PRIORITY_FIELD" -f value="{\"singleSelectOptionId\": \"$PRIORITY_OPTION\"}"
-              echo "Set Priority to $PRIORITY_NAME"
+                  }) { projectV2Item { id } }
+                }' -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$PRIORITY_FIELD" -f value="{\"text\": \"$PRIORITY_NAME\"}"
+              echo "Set Priority (text) to $PRIORITY_NAME"
             fi
           fi
 
           # Set default Target Release to MVP-Alpha
           TARGET_FIELD=$(echo "$FIELDS" | jq -r '.data.node.fields.nodes[] | select(.name == "Target Release") | .id')
-          ALPHA_OPTION=$(echo "$FIELDS" | jq -r '.data.node.fields.nodes[] | select(.name == "Target Release") | .options[] | select(.name == "MVP-Alpha") | .id')
-
-          if [[ -n "$TARGET_FIELD" ]] && [[ -n "$ALPHA_OPTION" ]]; then
+          TARGET_TYPE=$(echo "$FIELDS" | jq -r '.data.node.fields.nodes[] | select(.name == "Target Release") | .dataType')
+          if [[ "$TARGET_TYPE" == "SINGLE_SELECT" ]]; then
+            ALPHA_OPTION=$(echo "$FIELDS" | jq -r '.data.node.fields.nodes[] | select(.name == "Target Release") | .options[] | select(.name == "MVP-Alpha") | .id')
+            if [[ -n "$ALPHA_OPTION" && "$ALPHA_OPTION" != "null" ]]; then
+              gh api graphql -f query='
+                mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: ProjectV2FieldValue!) {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: $projectId
+                    itemId: $itemId
+                    fieldId: $fieldId
+                    value: $value
+                  }) { projectV2Item { id } }
+                }' -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$TARGET_FIELD" -f value="{\"singleSelectOptionId\": \"$ALPHA_OPTION\"}"
+              echo "Set Target Release (single-select) to MVP-Alpha"
+            fi
+          else
             gh api graphql -f query='
               mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: ProjectV2FieldValue!) {
                 updateProjectV2ItemFieldValue(input: {
@@ -172,11 +207,7 @@ jobs:
                   itemId: $itemId
                   fieldId: $fieldId
                   value: $value
-                }) {
-                  projectV2Item {
-                    id
-                  }
-                }
-              }' -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$TARGET_FIELD" -f value="{\"singleSelectOptionId\": \"$ALPHA_OPTION\"}"
-            echo "Set Target Release to MVP-Alpha"
+                }) { projectV2Item { id } }
+              }' -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$TARGET_FIELD" -f value='{"text":"MVP-Alpha"}'
+            echo "Set Target Release (text) to MVP-Alpha"
           fi
