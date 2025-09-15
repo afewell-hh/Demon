@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demon.meta/contracts/policy.decision.v1.json",
+  "title": "PolicyDecisionV1",
+  "type": "object",
+  "required": ["event", "ritualId", "runId", "ts", "tenantId", "capability", "decision", "quota"],
+  "properties": {
+    "event": { "const": "policy.decision:v1" },
+    "ritualId": { "type": "string" },
+    "runId": { "type": "string" },
+    "ts": { "type": "string", "format": "date-time" },
+    "tenantId": { "type": "string" },
+    "capability": { "type": "string" },
+    "decision": {
+      "type": "object",
+      "required": ["allowed"],
+      "properties": {
+        "allowed": { "type": "boolean" },
+        "reason": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "enum": ["limit_exceeded"] }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "quota": {
+      "type": "object",
+      "required": ["limit", "windowSeconds", "remaining"],
+      "properties": {
+        "limit": { "type": "integer", "minimum": 0 },
+        "windowSeconds": { "type": "integer", "minimum": 1 },
+        "remaining": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

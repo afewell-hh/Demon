@@ -1,0 +1,17 @@
+{
+  "event": "policy.decision:v1",
+  "ritualId": "echo-quota-test",
+  "runId": "550e8400-e29b-41d4-a716-446655440000",
+  "ts": "2025-01-06T10:30:02Z",
+  "tenantId": "default",
+  "capability": "capsule.echo",
+  "decision": {
+    "allowed": false,
+    "reason": "limit_exceeded"
+  },
+  "quota": {
+    "limit": 10,
+    "windowSeconds": 60,
+    "remaining": 0
+  }
+}
