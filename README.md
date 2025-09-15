@@ -19,6 +19,11 @@ Thin-slice bootstrapping of the Demon project.
 
 ```bash
 make dev            # bring up NATS JetStream & build workspace
+
+# Run with JetStream persistence (recommended)
+cargo run -p demonctl -- run examples/rituals/echo.yaml --jetstream
+
+# Run without JetStream (stdout only, backward compatible)
 cargo run -p demonctl -- run examples/rituals/echo.yaml
 ```
 
@@ -26,7 +31,8 @@ Expected output:
 
 The echo capsule prints `Hello from Demon!`
 
-A JSON event for `ritual.completed:v1` is printed to stdout.
+With `--jetstream`: Events are persisted to NATS JetStream stream `RITUAL_EVENTS`
+Without `--jetstream`: A JSON event for `ritual.completed:v1` is printed to stdout
 
 ## Layout
 

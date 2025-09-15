@@ -632,6 +632,7 @@ dependencies = [
  "anyhow",
  "clap",
  "engine",
+ "tokio",
  "tracing",
  "tracing-subscriber",
 ]
