@@ -1,0 +1,224 @@
+name: Project Backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_numbers:
+        description: 'Space-separated issue numbers to backfill'
+        required: true
+        default: '56 57 58 59 60 61 62 63'
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.ADMINTOKEN_DEMON_AFEWELLHH }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Backfill project fields
+        run: |
+          set -euo pipefail
+
+          # Get project ID (user project number 1)
+          PROJECT_ID=$(gh api graphql -f query='
+            query($owner: String!) {
+              user(login: $owner) {
+                projectV2(number: 1) {
+                  id
+                }
+              }
+            }' -f owner="${{ github.repository_owner }}" --jq '.data.user.projectV2.id')
+
+          if [[ -z "$PROJECT_ID" ]]; then
+            echo "::error::Could not find project"
+            exit 1
+          fi
+
+          echo "Found project ID: $PROJECT_ID"
+
+          # Get field IDs and types
+          FIELDS=$(gh api graphql -F proj="$PROJECT_ID" -f query='
+            query($proj: ID!) {
+              node(id: $proj) {
+                ... on ProjectV2 {
+                  fields(first: 50) {
+                    nodes {
+                      __typename
+                      ... on ProjectV2FieldCommon {
+                        id
+                        name
+                        dataType
+                      }
+                      ... on ProjectV2SingleSelectField {
+                        id
+                        name
+                        dataType
+                        options {
+                          id
+                          name
+                        }
+                      }
+                    }
+                  }
+                  items(first: 200) {
+                    nodes {
+                      id
+                      content {
+                        __typename
+                        ... on Issue {
+                          number
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }')
+
+          # Helper functions
+          get_field_id() {
+            echo "$FIELDS" | jq -r --arg name "$1" '.data.node.fields.nodes[] | select(.name == $name) | .id'
+          }
+
+          get_field_type() {
+            echo "$FIELDS" | jq -r --arg name "$1" '.data.node.fields.nodes[] | select(.name == $name) | .dataType'
+          }
+
+          get_option_id() {
+            echo "$FIELDS" | jq -r --arg name "$1" --arg opt "$2" '.data.node.fields.nodes[] | select(.name == $name) | (.options // [])[] | select(.name == $opt) | .id'
+          }
+
+          get_item_id() {
+            echo "$FIELDS" | jq -r --argjson num "$1" '.data.node.items.nodes[] | select(.content.number == $num) | .id'
+          }
+
+          set_single_select() {
+            local item=$1 field=$2 option=$3
+            gh api graphql -F proj="$PROJECT_ID" -F item="$item" -F field="$field" -F option="$option" \
+              -f query='mutation($proj:ID!,$item:ID!,$field:ID!,$option:String!){
+                updateProjectV2ItemFieldValue(input:{projectId:$proj,itemId:$item,fieldId:$field,value:{singleSelectOptionId:$option}}){
+                  projectV2Item{id}
+                }
+              }' >/dev/null 2>&1 || true
+          }
+
+          set_text() {
+            local item=$1 field=$2 text=$3
+            gh api graphql -F proj="$PROJECT_ID" -F item="$item" -F field="$field" -F text="$text" \
+              -f query='mutation($proj:ID!,$item:ID!,$field:ID!,$text:String!){
+                updateProjectV2ItemFieldValue(input:{projectId:$proj,itemId:$item,fieldId:$field,value:{text:$text}}){
+                  projectV2Item{id}
+                }
+              }' >/dev/null 2>&1 || true
+          }
+
+          # Get field IDs
+          STATUS_FIELD=$(get_field_id "Status")
+          AREA_FIELD=$(get_field_id "Area")
+          PRIORITY_FIELD=$(get_field_id "Priority")
+          TARGET_FIELD=$(get_field_id "Target Release")
+
+          AREA_TYPE=$(get_field_type "Area")
+          PRIORITY_TYPE=$(get_field_type "Priority")
+          TARGET_TYPE=$(get_field_type "Target Release")
+
+          TODO_OPT=$(get_option_id "Status" "Todo")
+
+          # Process each issue number
+          for num in ${{ github.event.inputs.issue_numbers }}; do
+            echo "Processing issue #$num"
+
+            # Get or add item to project
+            item=$(get_item_id "$num")
+            if [[ -z "$item" || "$item" == "null" ]]; then
+              # Add to project
+              issue_id=$(gh api repos/${{ github.repository }}/issues/$num -q .node_id)
+              item=$(gh api graphql -F proj="$PROJECT_ID" -F issue="$issue_id" \
+                -f query='mutation($proj:ID!,$issue:ID!){
+                  addProjectV2ItemById(input:{projectId:$proj,contentId:$issue}){
+                    item{id}
+                  }
+                }' -q .data.addProjectV2ItemById.item.id)
+              echo "  Added to project"
+            fi
+
+            # Set Status to Todo
+            if [[ -n "$STATUS_FIELD" && -n "$TODO_OPT" ]]; then
+              set_single_select "$item" "$STATUS_FIELD" "$TODO_OPT"
+              echo "  Set Status=Todo"
+            fi
+
+            # Get issue labels to infer Area and Priority
+            labels=$(gh api repos/${{ github.repository }}/issues/$num -q '[.labels[].name] | join(" ")')
+
+            # Determine Area from labels or issue number
+            area=""
+            if [[ "$labels" =~ area:backend ]]; then
+              area="backend"
+            elif [[ "$labels" =~ area:frontend ]]; then
+              area="frontend"
+            elif [[ $num -ge 56 && $num -le 59 ]]; then
+              area="backend"
+            elif [[ $num -ge 60 && $num -le 63 ]]; then
+              area="frontend"
+            fi
+
+            if [[ -n "$area" && -n "$AREA_FIELD" ]]; then
+              if [[ "$AREA_TYPE" == "SINGLE_SELECT" ]]; then
+                opt=$(get_option_id "Area" "$area")
+                if [[ -n "$opt" && "$opt" != "null" ]]; then
+                  set_single_select "$item" "$AREA_FIELD" "$opt"
+                  echo "  Set Area=$area (single-select)"
+                fi
+              else
+                set_text "$item" "$AREA_FIELD" "$area"
+                echo "  Set Area=$area (text)"
+              fi
+            fi
+
+            # Determine Priority from labels
+            priority=""
+            if [[ "$labels" =~ p0 ]]; then
+              priority="p0"
+            elif [[ "$labels" =~ p1 ]]; then
+              priority="p1"
+            else
+              priority="p0"  # Default to p0 for MVP issues
+            fi
+
+            if [[ -n "$priority" && -n "$PRIORITY_FIELD" ]]; then
+              if [[ "$PRIORITY_TYPE" == "SINGLE_SELECT" ]]; then
+                opt=$(get_option_id "Priority" "$priority")
+                if [[ -n "$opt" && "$opt" != "null" ]]; then
+                  set_single_select "$item" "$PRIORITY_FIELD" "$opt"
+                  echo "  Set Priority=$priority (single-select)"
+                fi
+              else
+                set_text "$item" "$PRIORITY_FIELD" "$priority"
+                echo "  Set Priority=$priority (text)"
+              fi
+            fi
+
+            # Set Target Release to MVP-Alpha
+            target="MVP-Alpha"
+            if [[ -n "$TARGET_FIELD" ]]; then
+              if [[ "$TARGET_TYPE" == "SINGLE_SELECT" ]]; then
+                opt=$(get_option_id "Target Release" "$target")
+                if [[ -n "$opt" && "$opt" != "null" ]]; then
+                  set_single_select "$item" "$TARGET_FIELD" "$opt"
+                  echo "  Set Target Release=$target (single-select)"
+                fi
+              else
+                set_text "$item" "$TARGET_FIELD" "$target"
+                echo "  Set Target Release=$target (text)"
+              fi
+            fi
+          done
+
+          echo "Backfill complete!"

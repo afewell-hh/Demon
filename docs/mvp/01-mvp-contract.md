@@ -5,8 +5,8 @@
 - Primary personas: Platform engineers, DevOps teams, security engineers requiring controlled automation
 
 ## Must-have Capabilities (M0)
-- [ ] M0-1: Basic Ritual Execution — Acceptance: Can run `cargo run -p demonctl -- run examples/rituals/echo.yaml`, echo capsule prints "Hello from Demon!", JSON event for `ritual.completed:v1` is emitted
-- [ ] M0-2: Event Persistence to JetStream — Acceptance: Events published to `demon.ritual.v1.<ritualId>.<runId>.events` subject, includes `ritual.started:v1`/`ritual.state.transitioned:v1`/`ritual.completed:v1`, `nats stream info RITUAL_EVENTS` shows non-zero message count, deterministic replay capability
+- [x] M0-1: Basic Ritual Execution — Acceptance: Can run `cargo run -p demonctl -- run examples/rituals/echo.yaml`, echo capsule prints "Hello from Demon!", JSON event for `ritual.completed:v1` is emitted
+- [x] M0-2: Event Persistence to JetStream — Acceptance: Events published to `demon.ritual.v1.<ritualId>.<runId>.events` subject, includes `ritual.started:v1`/`ritual.state.transitioned:v1`/`ritual.completed:v1`, `nats stream info RITUAL_EVENTS` shows non-zero message count, deterministic replay capability (PR #74)
 - [ ] M0-3: Policy Decisions (Wards) — Acceptance: Support `WARDS_CAP_QUOTAS` configuration, emit `policy.decision:v1` events with camelCase quota block `{limit, windowSeconds, remaining}`, allow → deny transitions when quotas exceeded, reason field shows `null` for allow, `"limit_exceeded"` for deny
 - [ ] M0-4: Approval Gates — Acceptance: Emit `approval.requested:v1` events, REST API for granting approvals, first-writer-wins semantics (200 OK vs 409 conflict), emit `approval.granted:v1` or `approval.denied:v1` events, idempotent approval resolution
 - [ ] M0-5: TTL Auto-Deny — Acceptance: TTL worker consumes timer events from JetStream, automatic emission of `approval.denied:v1` with `reason:"expired"`, configurable `APPROVAL_TTL_SECONDS`, timer cancellation on terminal decisions

@@ -18,6 +18,9 @@ enum Commands {
         file: String,
         #[arg(long, default_value = "false")]
         replay: bool,
+        /// Enable JetStream persistence (requires NATS to be running)
+        #[arg(long)]
+        jetstream: bool,
     },
     /// Print version and exit
     Version,
@@ -30,14 +33,32 @@ fn init_tracing() {
         .try_init();
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     init_tracing();
     let cli = Cli::parse();
 
     match cli.cmd {
-        Commands::Run { file, replay: _ } => {
-            let engine = engine::rituals::Engine::new();
-            if let Err(e) = engine.run_from_file(&file) {
+        Commands::Run { file, replay: _, jetstream } => {
+            let engine = if jetstream {
+                let nats_url = std::env::var("NATS_URL")
+                    .unwrap_or_else(|_| "nats://localhost:4222".to_string());
+                match engine::rituals::Engine::with_event_log(&nats_url).await {
+                    Ok(e) => {
+                        tracing::info!("Connected to JetStream at {}", nats_url);
+                        e
+                    },
+                    Err(e) => {
+                        eprintln!("Failed to connect to JetStream: {:?}", e);
+                        eprintln!("Falling back to stdout mode");
+                        engine::rituals::Engine::new()
+                    }
+                }
+            } else {
+                engine::rituals::Engine::new()
+            };
+
+            if let Err(e) = engine.run_from_file(&file).await {
                 eprintln!("Error running ritual: {:?}", e);
                 std::process::exit(1);
             }
