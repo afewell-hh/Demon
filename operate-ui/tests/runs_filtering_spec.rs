@@ -1,7 +1,6 @@
 use anyhow::Result;
 use async_nats::jetstream;
 use chrono::Utc;
-use futures_util::StreamExt;
 use reqwest::StatusCode;
 use tokio::task;
 
@@ -156,7 +155,7 @@ async fn given_runs_with_different_statuses_when_filtering_by_status_then_return
 
     // Test filtering by completed status
     let response = http
-        .get(&format!("{}/api/runs?status=completed", base))
+        .get(format!("{}/api/runs?status=completed", base))
         .send()
         .await?;
     assert_eq!(response.status(), StatusCode::OK);
@@ -171,13 +170,13 @@ async fn given_runs_with_different_statuses_when_filtering_by_status_then_return
         })
         .collect();
     assert!(
-        completed_runs.len() >= 1,
+        !completed_runs.is_empty(),
         "Should find at least one completed run"
     );
 
     // Test filtering by failed status
     let response = http
-        .get(&format!("{}/api/runs?status=failed", base))
+        .get(format!("{}/api/runs?status=failed", base))
         .send()
         .await?;
     assert_eq!(response.status(), StatusCode::OK);
@@ -191,7 +190,7 @@ async fn given_runs_with_different_statuses_when_filtering_by_status_then_return
         })
         .collect();
     assert!(
-        failed_runs.len() >= 1,
+        !failed_runs.is_empty(),
         "Should find at least one failed run"
     );
 
@@ -238,7 +237,7 @@ async fn given_runs_with_different_capabilities_when_filtering_by_capability_the
 
     // Test filtering by echo capability
     let response = http
-        .get(&format!("{}/api/runs?capability=echo", base))
+        .get(format!("{}/api/runs?capability=echo", base))
         .send()
         .await?;
     assert_eq!(response.status(), StatusCode::OK);
@@ -256,7 +255,7 @@ async fn given_runs_with_different_capabilities_when_filtering_by_capability_the
         })
         .collect();
     assert!(
-        echo_runs.len() >= 1,
+        !echo_runs.is_empty(),
         "Should find at least one run with echo capability"
     );
 
@@ -276,7 +275,7 @@ async fn given_invalid_query_params_when_calling_api_then_returns_400_with_helpf
 
     // Test invalid status
     let response = http
-        .get(&format!("{}/api/runs?status=invalid", base))
+        .get(format!("{}/api/runs?status=invalid", base))
         .send()
         .await?;
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -285,7 +284,7 @@ async fn given_invalid_query_params_when_calling_api_then_returns_400_with_helpf
 
     // Test invalid limit
     let response = http
-        .get(&format!("{}/api/runs?limit=0", base))
+        .get(format!("{}/api/runs?limit=0", base))
         .send()
         .await?;
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -294,7 +293,7 @@ async fn given_invalid_query_params_when_calling_api_then_returns_400_with_helpf
 
     // Test invalid timestamp
     let response = http
-        .get(&format!("{}/api/runs?since=invalid-timestamp", base))
+        .get(format!("{}/api/runs?since=invalid-timestamp", base))
         .send()
         .await?;
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -322,7 +321,7 @@ async fn given_valid_timestamp_filters_when_calling_api_then_filters_by_time_win
     let now = Utc::now();
     let since = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
     let response = http
-        .get(&format!("{}/api/runs?since={}", base, since))
+        .get(format!("{}/api/runs?since={}", base, since))
         .send()
         .await?;
     assert_eq!(response.status(), StatusCode::OK);
@@ -330,7 +329,7 @@ async fn given_valid_timestamp_filters_when_calling_api_then_filters_by_time_win
     // Test with Unix timestamp
     let unix_since = now.timestamp();
     let response = http
-        .get(&format!("{}/api/runs?since={}", base, unix_since))
+        .get(format!("{}/api/runs?since={}", base, unix_since))
         .send()
         .await?;
     assert_eq!(response.status(), StatusCode::OK);
@@ -350,7 +349,7 @@ async fn given_limit_parameter_when_calling_api_then_enforces_limit() -> Result<
 
     // Test with small limit
     let response = http
-        .get(&format!("{}/api/runs?limit=1", base))
+        .get(format!("{}/api/runs?limit=1", base))
         .send()
         .await?;
     assert_eq!(response.status(), StatusCode::OK);
