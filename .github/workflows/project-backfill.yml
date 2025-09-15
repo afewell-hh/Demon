@@ -11,7 +11,7 @@ on:
 jobs:
   backfill:
     runs-on: ubuntu-latest
-    if: ${{ env.GH_TOKEN != '' }}
+    if: ${{ secrets.ADMINTOKEN_DEMON_AFEWELLHH != '' }}
     permissions:
       contents: read
       issues: read
