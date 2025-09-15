@@ -44,3 +44,10 @@ A JSON event for `ritual.completed:v1` is printed to stdout.
 - Add Operate UI (read-only).
 
 <!-- audit-kick -->
+
+## Project Process
+
+- One‑pager: docs/process/MVP.md
+- Branch protections (MVP): docs/process/branch_protection_mvp.md
+- Project board: https://github.com/users/afewell-hh/projects/1
+
