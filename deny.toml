@@ -32,4 +32,3 @@ allow = [
     "CDLA-Permissive-2.0",  # Community Data License Agreement - needed for webpki-roots
 ]
 confidence-threshold = 0.8
-private = { ignore = true }  # Allow private/unlicensed workspace crates
