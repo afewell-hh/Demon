@@ -62,6 +62,7 @@ fn create_test_app() -> axum::Router {
         jetstream_client: None, // Simulate JetStream unavailable for testing
         tera,
         admin_token: None,
+        tenant_config: operate_ui::tenant::TenantConfig::default(),
     };
 
     operate_ui::create_app(state)

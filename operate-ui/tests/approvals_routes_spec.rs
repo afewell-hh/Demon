@@ -92,6 +92,76 @@ async fn publish_requested(
 
 #[tokio::test]
 #[ignore]
+async fn approval_buttons_render_correctly_for_pending_state() -> Result<()> {
+    std::env::set_var("APPROVER_ALLOWLIST", "ops@example.com");
+    std::env::set_var("RITUAL_STREAM_NAME", "RITUAL_EVENTS");
+    ensure_stream().await?;
+    let port = start_ui().await?;
+    let base = format!("http://127.0.0.1:{}", port);
+
+    let url = std::env::var("NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".into());
+    let client = async_nats::connect(url).await?;
+    let js = jetstream::new(client);
+
+    let ritual = "echo-ritual";
+    let run = format!("rr-ui-{}", uuid::Uuid::new_v4());
+    let gate = "gate-1";
+
+    // Publish approval.requested event
+    publish_requested(&js, ritual, &run, gate).await?;
+
+    let http = reqwest::Client::new();
+
+    // Get HTML page and check that buttons are rendered for pending approval
+    let response = http.get(format!("{}/runs/{}", base, run)).send().await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let html = response.text().await?;
+
+    // Check that approval buttons are present
+    assert!(
+        html.contains("Grant"),
+        "Grant button should be present for pending approval"
+    );
+    assert!(
+        html.contains("Deny"),
+        "Deny button should be present for pending approval"
+    );
+    assert!(
+        html.contains("handleApproval"),
+        "JavaScript handler should be present"
+    );
+
+    // Grant the approval
+    let grant_response = http
+        .post(format!("{}/api/approvals/{}/{}/grant", base, run, gate))
+        .json(&serde_json::json!({"approver":"ops@example.com","note":"approved"}))
+        .send()
+        .await?;
+    assert_eq!(grant_response.status(), StatusCode::OK);
+
+    // Wait a moment for the event to propagate
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    // Get HTML page again and verify buttons are no longer present for terminal state
+    let response2 = http.get(format!("{}/runs/{}", base, run)).send().await?;
+    assert_eq!(response2.status(), StatusCode::OK);
+    let html2 = response2.text().await?;
+
+    // Buttons should not be present for granted approval
+    assert!(
+        !html2.contains("Grant"),
+        "Grant button should not be present for granted approval"
+    );
+    assert!(
+        !html2.contains("Deny"),
+        "Deny button should not be present for granted approval"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore]
 async fn grant_then_grant_is_noop_and_deny_conflicts() -> Result<()> {
     std::env::set_var("APPROVER_ALLOWLIST", "ops@example.com");
     std::env::set_var("RITUAL_STREAM_NAME", "RITUAL_EVENTS");
