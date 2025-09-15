@@ -50,8 +50,6 @@
     </div>
 </div>
 
-<<<<<<< HEAD
-=======
 {% if approvals %}
 <div class="card">
     <div class="card-header">
@@ -88,10 +86,32 @@
         </div>
         {% endif %}
     </div>
+
+    {% if approvals.status == "Pending" %}
+    <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e0e0e0;">
+        <div style="display: flex; gap: 1rem; align-items: center;">
+            <div style="display: flex; gap: 0.5rem;">
+                <button id="grant-btn" class="btn btn-primary" onclick="handleApproval('grant')">
+                    Grant
+                </button>
+                <button id="deny-btn" class="btn btn-secondary" onclick="handleApproval('deny')">
+                    Deny
+                </button>
+            </div>
+            <div id="approval-status" style="display: none; font-size: 0.9rem;"></div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endif %}
 
->>>>>>> origin/main
+<div class="card" id="connection-status" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title">Live Updates</h3>
+        <span id="connection-indicator" class="status-indicator status-unknown">Connecting...</span>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">Event Timeline</h3>
@@ -202,13 +222,343 @@
 {% endif %}
 
 {% if jetstream_available %}
+<style>
+    .approval-status {
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        font-weight: 500;
+    }
+    .approval-status-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    .approval-status-error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    .approval-status-warning {
+        background-color: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+    }
+    .approval-status-info {
+        background-color: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+    }
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+</style>
 <script>
-    // Auto-refresh every 10 seconds for running rituals
-    {% if run and run.is_running %}
-    setTimeout(function() {
-        window.location.reload();
-    }, 10000);
+    // SSE-based live updates instead of auto-refresh
+    let eventSource = null;
+    let reconnectAttempts = 0;
+    let maxReconnectAttempts = 10;
+    let reconnectDelay = 1000; // Start with 1 second
+    let eventIds = new Set();
+
+    // Initialize existing event IDs to prevent duplicates
+    {% if run and run.events %}
+    {% for event in run.events %}
+    {% if event.extra.messageId %}
+    eventIds.add("{{ event.extra.messageId }}");
     {% endif %}
+    {% endfor %}
+    {% endif %}
+
+    function updateConnectionStatus(status, message) {
+        const statusCard = document.getElementById('connection-status');
+        const indicator = document.getElementById('connection-indicator');
+
+        statusCard.style.display = 'block';
+        indicator.className = 'status-indicator';
+
+        switch(status) {
+            case 'connected':
+                indicator.classList.add('status-running');
+                indicator.textContent = 'Connected';
+                break;
+            case 'connecting':
+                indicator.classList.add('status-pending');
+                indicator.textContent = message || 'Connecting...';
+                break;
+            case 'error':
+                indicator.classList.add('status-failed');
+                indicator.textContent = message || 'Connection Error';
+                break;
+            case 'closed':
+                indicator.classList.add('status-unknown');
+                indicator.textContent = 'Disconnected';
+                break;
+        }
+    }
+
+    function addEventToTimeline(event) {
+        const tbody = document.querySelector('.table tbody');
+        if (!tbody) return;
+
+        // Create new row
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><code>${event.ts || '-'}</code></td>
+            <td>
+                <strong>${formatEventName(event.event)}</strong>
+                <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                    <code>${event.event}</code>
+                </div>
+            </td>
+            <td>${formatStateTransition(event)}</td>
+            <td>${formatEventDetails(event.extra)}</td>
+        `;
+
+        // Add with fade-in effect
+        row.style.backgroundColor = '#ffffcc';
+        tbody.appendChild(row);
+        setTimeout(() => { row.style.backgroundColor = ''; }, 2000);
+
+        // Update event count
+        const eventCountEl = document.querySelector('[data-event-count]');
+        if (eventCountEl) {
+            const count = tbody.querySelectorAll('tr').length;
+            eventCountEl.textContent = count + ' events';
+        }
+    }
+
+    function formatEventName(eventName) {
+        const eventMappings = {
+            'ritual.started:v1': 'Ritual Started',
+            'ritual.completed:v1': 'Ritual Completed',
+            'ritual.failed:v1': 'Ritual Failed',
+            'ritual.transitioned:v1': 'State Transition',
+            'timer.scheduled:v1': 'Timer Scheduled',
+            'approval.requested:v1': 'Approval Requested',
+            'approval.granted:v1': 'Approval Granted',
+            'approval.denied:v1': 'Approval Denied'
+        };
+        return eventMappings[eventName] || eventName;
+    }
+
+    function formatStateTransition(event) {
+        if (event.stateFrom || event.stateTo) {
+            const from = event.stateFrom || '-';
+            const to = event.stateTo || '-';
+            return `<div style="display: flex; align-items: center; gap: 0.5rem;">
+                <code>${from}</code>
+                <span>→</span>
+                <code>${to}</code>
+            </div>`;
+        }
+        return '<span style="color: var(--text-secondary);">-</span>';
+    }
+
+    function formatEventDetails(extra) {
+        if (extra && Object.keys(extra).length > 0) {
+            return `<details>
+                <summary style="cursor: pointer; color: var(--primary-color);">
+                    ${Object.keys(extra).length} field(s)
+                </summary>
+                <pre style="margin-top: 0.5rem; font-size: 0.8rem; background: #f5f5f5; padding: 0.5rem; border-radius: 4px; overflow-x: auto;">${JSON.stringify(extra, null, 2)}</pre>
+            </details>`;
+        }
+        return '<span style="color: var(--text-secondary);">-</span>';
+    }
+
+    function connectSSE() {
+        const runId = "{{ run_id }}";
+        const url = `/api/runs/${runId}/events/stream`;
+
+        updateConnectionStatus('connecting', `Attempt ${reconnectAttempts + 1}/${maxReconnectAttempts}`);
+
+        eventSource = new EventSource(url);
+
+        eventSource.onopen = function() {
+            console.log('SSE connection established');
+            reconnectAttempts = 0;
+            reconnectDelay = 1000;
+            updateConnectionStatus('connected');
+        };
+
+    }
+
+    // Handle approval actions
+    async function handleApproval(action) {
+        const runId = "{{ run_id }}";
+        {% if approvals %}
+        const gateId = "{{ approvals.gateId }}";
+        {% else %}
+        const gateId = null;
+        {% endif %}
+
+        if (!gateId) {
+            showApprovalStatus('No gate ID available', 'error');
+            return;
+        }
+
+        const grantBtn = document.getElementById('grant-btn');
+        const denyBtn = document.getElementById('deny-btn');
+
+        // Disable buttons during request
+        grantBtn.disabled = true;
+        denyBtn.disabled = true;
+
+        try {
+            const endpoint = action === 'grant' ? 'grant' : 'deny';
+            const url = `/api/approvals/${runId}/${gateId}/${endpoint}`;
+
+            let body;
+            if (action === 'grant') {
+                // Get approver email from user (for demo purposes, using a prompt)
+                const approver = prompt('Enter your email address:');
+                if (!approver) {
+                    showApprovalStatus('Approval cancelled', 'warning');
+                    grantBtn.disabled = false;
+                    denyBtn.disabled = false;
+                    return;
+                }
+                const note = prompt('Optional note:') || '';
+                body = { approver, note };
+            } else {
+                const approver = prompt('Enter your email address:');
+                if (!approver) {
+                    showApprovalStatus('Denial cancelled', 'warning');
+                    grantBtn.disabled = false;
+                    denyBtn.disabled = false;
+                    return;
+                }
+                const reason = prompt('Reason for denial:') || 'Denied via UI';
+                body = { approver, reason };
+            }
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                if (result.status === 'noop') {
+                    showApprovalStatus(`Already ${action === 'grant' ? 'granted' : 'denied'}`, 'info');
+                } else {
+                    showApprovalStatus(`Approval ${action === 'grant' ? 'granted' : 'denied'} successfully`, 'success');
+                    // Keep buttons disabled since action was successful
+                }
+            } else if (response.status === 409) {
+                const result = await response.json();
+                showApprovalStatus(`Conflict: ${result.error}`, 'warning');
+                // Keep buttons disabled since gate is already resolved
+            } else if (response.status === 403) {
+                showApprovalStatus('Not authorized - check APPROVER_ALLOWLIST', 'error');
+                grantBtn.disabled = false;
+                denyBtn.disabled = false;
+            } else {
+                const result = await response.json();
+                showApprovalStatus(`Error: ${result.error || 'Unknown error'}`, 'error');
+                grantBtn.disabled = false;
+                denyBtn.disabled = false;
+            }
+        } catch (error) {
+            console.error('Approval action failed:', error);
+            showApprovalStatus(`Network error: ${error.message}`, 'error');
+            grantBtn.disabled = false;
+            denyBtn.disabled = false;
+        }
+    }
+
+    function showApprovalStatus(message, type) {
+        const statusEl = document.getElementById('approval-status');
+        statusEl.style.display = 'block';
+        statusEl.textContent = message;
+        statusEl.className = `approval-status approval-status-${type}`;
+
+        // Auto-hide success/info messages after 5 seconds
+        if (type === 'success' || type === 'info') {
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 5000);
+        }
+    }
+
+    function connectSSE() {
+        const runId = "{{ run_id }}";
+        const url = `/api/runs/${runId}/events/stream`;
+
+        updateConnectionStatus('connecting', `Attempt ${reconnectAttempts + 1}/${maxReconnectAttempts}`);
+
+        eventSource = new EventSource(url);
+
+        eventSource.onopen = function() {
+            console.log('SSE connection established');
+            reconnectAttempts = 0;
+            reconnectDelay = 1000;
+            updateConnectionStatus('connected');
+        };
+
+        eventSource.onmessage = function(e) {
+            console.log('SSE message received:', e);
+        };
+
+        eventSource.addEventListener('message', function(e) {
+            try {
+                const event = JSON.parse(e.data);
+                console.log('Event received:', event);
+
+                // Check for duplicate using message ID or fallback to content hash
+                const eventId = event.extra?.messageId || JSON.stringify(event);
+                if (!eventIds.has(eventId)) {
+                    eventIds.add(eventId);
+                    addEventToTimeline(event);
+                } else {
+                    console.log('Duplicate event ignored:', eventId);
+                }
+            } catch (err) {
+                console.error('Failed to parse event:', err);
+            }
+        });
+
+        eventSource.addEventListener('replay-complete', function(e) {
+            console.log('Replay complete, now streaming live events');
+        });
+
+        eventSource.addEventListener('error', function(e) {
+            console.error('SSE error event:', e);
+        });
+
+        eventSource.onerror = function(err) {
+            console.error('SSE connection error:', err);
+            eventSource.close();
+            updateConnectionStatus('error', 'Connection lost');
+
+            // Implement exponential backoff reconnection
+            if (reconnectAttempts < maxReconnectAttempts) {
+                reconnectAttempts++;
+                const delay = Math.min(reconnectDelay * Math.pow(2, reconnectAttempts - 1), 30000);
+
+                updateConnectionStatus('connecting', `Reconnecting in ${delay/1000}s...`);
+                setTimeout(connectSSE, delay);
+            } else {
+                updateConnectionStatus('error', 'Max reconnection attempts reached');
+            }
+        };
+    }
+
+    // Start SSE connection when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        connectSSE();
+    });
+
+    // Clean up on page unload
+    window.addEventListener('beforeunload', function() {
+        if (eventSource) {
+            eventSource.close();
+        }
+    });
 </script>
 {% endif %}
 {% endblock %}

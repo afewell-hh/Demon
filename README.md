@@ -48,6 +48,25 @@ curl -X POST http://localhost:3000/api/approvals/{run_id}/{gate_id}/deny \
 
 **Behavior**: First terminal decision wins (200 OK), subsequent conflicts return 409. Duplicate decisions return 200 with noop status.
 
+### In-UI Approvals
+
+Starting with Sprint 3, pending approvals can be managed directly from the Operate UI run detail page. When a run contains a pending approval gate, "Grant" and "Deny" buttons are automatically displayed.
+
+**Environment Configuration:**
+- `APPROVER_ALLOWLIST`: Comma-separated list of authorized approver emails (e.g., `ops@example.com,security@example.com`)
+
+**Features:**
+- Click "Grant" or "Deny" to take action on pending approvals
+- Real-time updates via Server-Sent Events (SSE) — timeline updates within ~1 second
+- First-writer-wins semantics with conflict detection (409 responses)
+- Buttons automatically disable after successful action
+- Clear error messages for authorization failures
+
+**Example:**
+1. Start the UI: `APPROVER_ALLOWLIST="ops@example.com" cargo run -p operate-ui`
+2. Navigate to a run with pending approval: `/runs/{run_id}`
+3. Click "Grant" or "Deny" and provide your email when prompted
+
 ## Layout
 
 - `engine/` — minimal ritual interpreter (M0).
