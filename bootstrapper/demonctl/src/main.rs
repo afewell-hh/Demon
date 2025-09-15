@@ -84,7 +84,10 @@ async fn main() -> Result<()> {
         tracing::warn!("[deprecation] using DEMON_RITUAL_EVENTS; set RITUAL_STREAM_NAME instead");
     }
     // Don't pass lib:// URIs to compute_effective_config - they need resolution first
-    let bundle_for_config = cli.bundle.as_deref().filter(|uri| !uri.starts_with("lib://"));
+    let bundle_for_config = cli
+        .bundle
+        .as_deref()
+        .filter(|uri| !uri.starts_with("lib://"));
     let (cfg, provenance) = bootstrapper_demonctl::compute_effective_config(
         bundle_for_config.map(std::path::Path::new),
         cli.nats_url.as_deref(),

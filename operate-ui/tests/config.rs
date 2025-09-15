@@ -1,4 +1,4 @@
-use operate_ui::jetstream::JetStreamClient;
+// Config test - no imports needed
 
 #[test]
 fn env_defaults_are_applied() {

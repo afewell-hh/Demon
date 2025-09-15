@@ -136,10 +136,10 @@ pub fn compute_effective_config(
     ui_url: Option<&str>,
 ) -> Result<(BootstrapConfig, Option<serde_json::Value>)> {
     let mut cfg = BootstrapConfig::default();
-    
+
     let provenance = if let Some(path) = bundle_path {
         let bundle = bundle::load_bundle(path)?;
-        
+
         // Override config from bundle
         if !bundle.nats.url.is_empty() {
             cfg.nats_url = bundle.nats.url.clone();
@@ -155,13 +155,13 @@ pub fn compute_effective_config(
                 cfg.ui_url = url.clone();
             }
         }
-        
+
         // Return bundle as provenance
         Some(serde_json::to_value(bundle)?)
     } else {
         None
     };
-    
+
     // Command line overrides
     if let Some(url) = nats_url {
         cfg.nats_url = url.to_string();
@@ -175,15 +175,15 @@ pub fn compute_effective_config(
     if let Some(ui) = ui_url {
         cfg.ui_url = ui.to_string();
     }
-    
+
     Ok((cfg, provenance))
 }
 
 pub async fn seed_from_bundle(
-    js: &jetstream::Context, 
+    js: &jetstream::Context,
     _bundle: &serde_json::Value,
     stream_name: &str,
-    ui_url: &str
+    ui_url: &str,
 ) -> Result<()> {
     // For now, just seed preview min
     seed_preview_min(js, stream_name, ui_url).await

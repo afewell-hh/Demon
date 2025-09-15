@@ -61,11 +61,7 @@ fn create_test_app() -> axum::Router {
     let state = AppState {
         jetstream_client: None, // Simulate JetStream unavailable for testing
         tera,
-<<<<<<< HEAD
-        stream_ready: false,
-=======
         admin_token: None,
->>>>>>> origin/main
     };
 
     operate_ui::create_app(state)
@@ -128,25 +124,14 @@ async fn test_runs_api_without_jetstream() {
         .await
         .unwrap();
 
-<<<<<<< HEAD
-    // New behavior: 200 with empty list and warning header
-    assert_eq!(response.status(), StatusCode::OK);
-    let hdr = response.headers().get("X-Demon-Warn").cloned();
-    assert!(hdr.is_some());
-=======
     assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
->>>>>>> origin/main
 
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
     let json_response: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
-<<<<<<< HEAD
-    assert_eq!(json_response["runs"].as_array().unwrap().len(), 0);
-=======
     assert_eq!(json_response["error"], "JetStream is not available");
->>>>>>> origin/main
 }
 
 #[tokio::test]
@@ -238,11 +223,7 @@ async fn test_runs_api_with_limit_param() {
         .await
         .unwrap();
 
-<<<<<<< HEAD
-    assert_eq!(response.status(), StatusCode::OK); // JetStream unavailable returns empty list
-=======
     assert_eq!(response.status(), StatusCode::BAD_GATEWAY); // JetStream unavailable
->>>>>>> origin/main
 }
 
 #[tokio::test]
@@ -270,11 +251,7 @@ async fn test_content_type_headers() {
         .await
         .unwrap();
 
-<<<<<<< HEAD
-    assert_eq!(json_response.status(), StatusCode::OK);
-=======
     assert_eq!(json_response.status(), StatusCode::BAD_GATEWAY);
->>>>>>> origin/main
     // JSON responses should have application/json content type (handled by Axum)
 }
 
