@@ -21,6 +21,8 @@ futures-util.workspace = true
 axum = { version = "0.7", features = ["macros"] }
 tower = "0.5"
 tower-http = { version = "0.5", features = ["fs", "trace"] }
+async-stream = "0.3"
+tokio-stream = "0.1"
 
 # HTML templating  
 tera = "1"

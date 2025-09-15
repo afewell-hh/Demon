@@ -50,8 +50,6 @@
     </div>
 </div>
 
-<<<<<<< HEAD
-=======
 {% if approvals %}
 <div class="card">
     <div class="card-header">
@@ -91,7 +89,13 @@
 </div>
 {% endif %}
 
->>>>>>> origin/main
+<div class="card" id="connection-status" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title">Live Updates</h3>
+        <span id="connection-indicator" class="status-indicator status-unknown">Connecting...</span>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">Event Timeline</h3>
@@ -203,12 +207,193 @@
 
 {% if jetstream_available %}
 <script>
-    // Auto-refresh every 10 seconds for running rituals
-    {% if run and run.is_running %}
-    setTimeout(function() {
-        window.location.reload();
-    }, 10000);
+    // SSE-based live updates instead of auto-refresh
+    let eventSource = null;
+    let reconnectAttempts = 0;
+    let maxReconnectAttempts = 10;
+    let reconnectDelay = 1000; // Start with 1 second
+    let eventIds = new Set();
+
+    // Initialize existing event IDs to prevent duplicates
+    {% if run and run.events %}
+    {% for event in run.events %}
+    {% if event.extra.messageId %}
+    eventIds.add("{{ event.extra.messageId }}");
     {% endif %}
+    {% endfor %}
+    {% endif %}
+
+    function updateConnectionStatus(status, message) {
+        const statusCard = document.getElementById('connection-status');
+        const indicator = document.getElementById('connection-indicator');
+
+        statusCard.style.display = 'block';
+        indicator.className = 'status-indicator';
+
+        switch(status) {
+            case 'connected':
+                indicator.classList.add('status-running');
+                indicator.textContent = 'Connected';
+                break;
+            case 'connecting':
+                indicator.classList.add('status-pending');
+                indicator.textContent = message || 'Connecting...';
+                break;
+            case 'error':
+                indicator.classList.add('status-failed');
+                indicator.textContent = message || 'Connection Error';
+                break;
+            case 'closed':
+                indicator.classList.add('status-unknown');
+                indicator.textContent = 'Disconnected';
+                break;
+        }
+    }
+
+    function addEventToTimeline(event) {
+        const tbody = document.querySelector('.table tbody');
+        if (!tbody) return;
+
+        // Create new row
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><code>${event.ts || '-'}</code></td>
+            <td>
+                <strong>${formatEventName(event.event)}</strong>
+                <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                    <code>${event.event}</code>
+                </div>
+            </td>
+            <td>${formatStateTransition(event)}</td>
+            <td>${formatEventDetails(event.extra)}</td>
+        `;
+
+        // Add with fade-in effect
+        row.style.backgroundColor = '#ffffcc';
+        tbody.appendChild(row);
+        setTimeout(() => { row.style.backgroundColor = ''; }, 2000);
+
+        // Update event count
+        const eventCountEl = document.querySelector('[data-event-count]');
+        if (eventCountEl) {
+            const count = tbody.querySelectorAll('tr').length;
+            eventCountEl.textContent = count + ' events';
+        }
+    }
+
+    function formatEventName(eventName) {
+        const eventMappings = {
+            'ritual.started:v1': 'Ritual Started',
+            'ritual.completed:v1': 'Ritual Completed',
+            'ritual.failed:v1': 'Ritual Failed',
+            'ritual.transitioned:v1': 'State Transition',
+            'timer.scheduled:v1': 'Timer Scheduled',
+            'approval.requested:v1': 'Approval Requested',
+            'approval.granted:v1': 'Approval Granted',
+            'approval.denied:v1': 'Approval Denied'
+        };
+        return eventMappings[eventName] || eventName;
+    }
+
+    function formatStateTransition(event) {
+        if (event.stateFrom || event.stateTo) {
+            const from = event.stateFrom || '-';
+            const to = event.stateTo || '-';
+            return `<div style="display: flex; align-items: center; gap: 0.5rem;">
+                <code>${from}</code>
+                <span>→</span>
+                <code>${to}</code>
+            </div>`;
+        }
+        return '<span style="color: var(--text-secondary);">-</span>';
+    }
+
+    function formatEventDetails(extra) {
+        if (extra && Object.keys(extra).length > 0) {
+            return `<details>
+                <summary style="cursor: pointer; color: var(--primary-color);">
+                    ${Object.keys(extra).length} field(s)
+                </summary>
+                <pre style="margin-top: 0.5rem; font-size: 0.8rem; background: #f5f5f5; padding: 0.5rem; border-radius: 4px; overflow-x: auto;">${JSON.stringify(extra, null, 2)}</pre>
+            </details>`;
+        }
+        return '<span style="color: var(--text-secondary);">-</span>';
+    }
+
+    function connectSSE() {
+        const runId = "{{ run_id }}";
+        const url = `/api/runs/${runId}/events/stream`;
+
+        updateConnectionStatus('connecting', `Attempt ${reconnectAttempts + 1}/${maxReconnectAttempts}`);
+
+        eventSource = new EventSource(url);
+
+        eventSource.onopen = function() {
+            console.log('SSE connection established');
+            reconnectAttempts = 0;
+            reconnectDelay = 1000;
+            updateConnectionStatus('connected');
+        };
+
+        eventSource.onmessage = function(e) {
+            console.log('SSE message received:', e);
+        };
+
+        eventSource.addEventListener('message', function(e) {
+            try {
+                const event = JSON.parse(e.data);
+                console.log('Event received:', event);
+
+                // Check for duplicate using message ID or fallback to content hash
+                const eventId = event.extra?.messageId || JSON.stringify(event);
+                if (!eventIds.has(eventId)) {
+                    eventIds.add(eventId);
+                    addEventToTimeline(event);
+                } else {
+                    console.log('Duplicate event ignored:', eventId);
+                }
+            } catch (err) {
+                console.error('Failed to parse event:', err);
+            }
+        });
+
+        eventSource.addEventListener('replay-complete', function(e) {
+            console.log('Replay complete, now streaming live events');
+        });
+
+        eventSource.addEventListener('error', function(e) {
+            console.error('SSE error event:', e);
+        });
+
+        eventSource.onerror = function(err) {
+            console.error('SSE connection error:', err);
+            eventSource.close();
+            updateConnectionStatus('error', 'Connection lost');
+
+            // Implement exponential backoff reconnection
+            if (reconnectAttempts < maxReconnectAttempts) {
+                reconnectAttempts++;
+                const delay = Math.min(reconnectDelay * Math.pow(2, reconnectAttempts - 1), 30000);
+
+                updateConnectionStatus('connecting', `Reconnecting in ${delay/1000}s...`);
+                setTimeout(connectSSE, delay);
+            } else {
+                updateConnectionStatus('error', 'Max reconnection attempts reached');
+            }
+        };
+    }
+
+    // Start SSE connection when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        connectSSE();
+    });
+
+    // Clean up on page unload
+    window.addEventListener('beforeunload', function() {
+        if (eventSource) {
+            eventSource.close();
+        }
+    });
 </script>
 {% endif %}
 {% endblock %}

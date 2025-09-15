@@ -2,13 +2,18 @@ use crate::jetstream::{RunDetail, RunSummary};
 use crate::{AppError, AppState};
 
 use axum::http::HeaderMap;
+use axum::response::sse::{Event, KeepAlive};
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
-    response::{Html, IntoResponse, Response},
+    response::{Html, IntoResponse, Response, Sse},
     Json,
 };
+use futures_util::stream::Stream;
 use serde::{Deserialize, Serialize};
+use std::convert::Infallible;
+use std::time::Duration;
+use tokio::time::{interval, MissedTickBehavior};
 use tracing::{debug, error, info};
 
 // Query parameters for list runs API
@@ -726,6 +731,112 @@ pub async fn deny_approval_api(
     }
 
     (StatusCode::OK, Json(payload)).into_response()
+}
+
+/// Stream run events via Server-Sent Events (SSE)
+#[axum::debug_handler]
+pub async fn stream_run_events(
+    State(state): State<AppState>,
+    Path(run_id): Path<String>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    debug!("Starting SSE stream for run: {}", run_id);
+
+    // Configuration from environment
+    let heartbeat_seconds = std::env::var("SSE_HEARTBEAT_SECONDS")
+        .unwrap_or_else(|_| "10".to_string())
+        .parse()
+        .unwrap_or(10);
+    let replay_count = std::env::var("SSE_REPLAY_COUNT")
+        .unwrap_or_else(|_| "10".to_string())
+        .parse()
+        .unwrap_or(10);
+
+    // Create a stream that combines events and heartbeats
+    let stream = async_stream::stream! {
+        // First, replay the last N events
+        if let Some(client) = &state.jetstream_client {
+            match client.get_run_detail(&run_id).await {
+                Ok(Some(run_detail)) => {
+                    let events = &run_detail.events;
+                    let start_idx = events.len().saturating_sub(replay_count);
+
+                    for event in &events[start_idx..] {
+                        let data = serde_json::to_string(&event).unwrap_or_default();
+                        yield Ok(Event::default()
+                            .event("message")
+                            .id(format!("replay-{}", event.extra.get("messageId").and_then(|v| v.as_str()).unwrap_or("unknown")))
+                            .data(data));
+                    }
+
+                    // Send a marker event to indicate replay is complete
+                    yield Ok(Event::default()
+                        .event("replay-complete")
+                        .data("{}"));
+                }
+                _ => {
+                    error!("Failed to get run detail for SSE stream: {}", run_id);
+                }
+            }
+
+            // Now start live streaming
+            // For now, we'll use a polling approach with heartbeats
+            // In production, this should use NATS JetStream consumer with push
+            let mut heartbeat = interval(Duration::from_secs(heartbeat_seconds));
+            heartbeat.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+            let mut last_event_count = 0;
+
+            loop {
+                heartbeat.tick().await;
+
+                // Check for new events
+                match client.get_run_detail(&run_id).await {
+                    Ok(Some(run_detail)) => {
+                        let events = &run_detail.events;
+                        if events.len() > last_event_count {
+                            // Send new events
+                            for event in &events[last_event_count..] {
+                                let data = serde_json::to_string(&event).unwrap_or_default();
+                                yield Ok(Event::default()
+                                    .event("message")
+                                    .id(format!("live-{}", event.extra.get("messageId").and_then(|v| v.as_str()).unwrap_or("unknown")))
+                                    .data(data));
+                            }
+                            last_event_count = events.len();
+                        } else {
+                            // Send heartbeat
+                            yield Ok(Event::default()
+                                .comment(format!("heartbeat: {}", chrono::Utc::now())));
+                        }
+                    }
+                    Err(e) => {
+                        error!("Failed to poll run detail: {}", e);
+                        yield Ok(Event::default()
+                            .event("error")
+                            .data(format!("{{\"error\": \"{}\"}}", e)));
+                        break;
+                    }
+                    _ => {
+                        // Run not found or JetStream unavailable
+                        yield Ok(Event::default()
+                            .event("error")
+                            .data("{\"error\": \"Run not found\"}"));
+                        break;
+                    }
+                }
+            }
+        } else {
+            yield Ok(Event::default()
+                .event("error")
+                .data("{\"error\": \"JetStream not available\"}"));
+        }
+    };
+
+    Sse::new(stream).keep_alive(
+        KeepAlive::new()
+            .interval(Duration::from_secs(heartbeat_seconds))
+            .text("heartbeat"),
+    )
 }
 
 #[cfg(test)]
