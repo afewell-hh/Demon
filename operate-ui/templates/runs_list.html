@@ -25,14 +25,48 @@
         <div class="alert alert-warning">
             <strong>Warning:</strong> JetStream is not available. Unable to retrieve runs from the event store.
         </div>
-<<<<<<< HEAD
-    {% elif not stream_ready %}
-        <div class="alert alert-info">
-            <strong>No event stream found.</strong>
-            See <a href="https://github.com/afewell-hh/Demon/blob/main/docs/operate-ui/README.md#local-bootstrap--troubleshooting" target="_blank">Runbook: setup</a>.
-        </div>
-=======
->>>>>>> origin/main
+    {% endif %}
+
+    <!-- Filter Form -->
+    {% if jetstream_available %}
+    <div class="card-body">
+        <form method="GET" action="/runs" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; align-items: end;">
+            <div>
+                <label for="status" style="display: block; font-weight: 500; margin-bottom: 0.25rem;">Status</label>
+                <select id="status" name="status" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.25rem; background: var(--bg-primary);">
+                    <option value="">All</option>
+                    <option value="running" {% if filter_status == "running" %}selected{% endif %}>Running</option>
+                    <option value="completed" {% if filter_status == "completed" %}selected{% endif %}>Completed</option>
+                    <option value="failed" {% if filter_status == "failed" %}selected{% endif %}>Failed</option>
+                </select>
+            </div>
+            <div>
+                <label for="capability" style="display: block; font-weight: 500; margin-bottom: 0.25rem;">Capability</label>
+                <input type="text" id="capability" name="capability" value="{{ filter_capability }}" placeholder="e.g., echo, approval" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.25rem; background: var(--bg-primary);">
+            </div>
+            <div>
+                <label for="since" style="display: block; font-weight: 500; margin-bottom: 0.25rem;">Since</label>
+                <input type="text" id="since" name="since" value="{{ filter_since }}" placeholder="2025-09-15T00:00:00Z" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.25rem; background: var(--bg-primary);">
+            </div>
+            <div>
+                <label for="until" style="display: block; font-weight: 500; margin-bottom: 0.25rem;">Until</label>
+                <input type="text" id="until" name="until" value="{{ filter_until }}" placeholder="2025-09-15T23:59:59Z" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.25rem; background: var(--bg-primary);">
+            </div>
+            <div>
+                <label for="limit" style="display: block; font-weight: 500; margin-bottom: 0.25rem;">Limit</label>
+                <select id="limit" name="limit" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.25rem; background: var(--bg-primary);">
+                    <option value="20" {% if filter_limit == 20 %}selected{% endif %}>20</option>
+                    <option value="50" {% if filter_limit == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if filter_limit == 100 %}selected{% endif %}>100</option>
+                    <option value="200" {% if filter_limit == 200 %}selected{% endif %}>200</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <button type="submit" class="btn btn-primary">Filter</button>
+                <a href="/runs" class="btn btn-secondary">Clear</a>
+            </div>
+        </form>
+    </div>
     {% endif %}
 
     {% if runs %}
@@ -98,8 +132,13 @@
     <p>Access the same data programmatically:</p>
     <ul style="margin-top: 1rem; margin-left: 1rem;">
         <li><a href="/api/runs" target="_blank"><code>GET /api/runs</code></a> - List runs (JSON)</li>
+        <li><a href="/api/runs?status=completed&limit=20" target="_blank"><code>GET /api/runs?status=completed&limit=20</code></a> - List filtered runs</li>
         <li><code>GET /api/runs/:runId</code> - Get run details (JSON)</li>
     </ul>
+    <p style="margin-top: 1rem; font-size: 0.875rem; color: var(--text-secondary);">
+        Query parameters: <code>status</code> (running|completed|failed), <code>capability</code> (string),
+        <code>since</code>/<code>until</code> (RFC3339 or Unix seconds), <code>limit</code> (1-200)
+    </p>
 </div>
 {% endif %}
 

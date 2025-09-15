@@ -179,18 +179,184 @@ impl JetStreamClient {
         Ok(runs)
     }
 
-    /// Get detailed information for a specific run
-    pub async fn get_run_detail(&self, run_id: &str) -> Result<Option<RunDetail>> {
+    /// List runs with filtering and tenant scoping
+    pub async fn list_runs_filtered(
+        &self,
+        query: crate::routes::ListRunsQuery,
+        tenant: &str,
+        tenant_config: &crate::tenant::TenantConfig,
+    ) -> Result<Vec<RunSummary>> {
+        let default_limit = std::env::var("RUNS_LIST_DEFAULT_LIMIT")
+            .unwrap_or_else(|_| "50".to_string())
+            .parse()
+            .unwrap_or(50);
+        let max_limit = std::env::var("RUNS_LIST_MAX_LIMIT")
+            .unwrap_or_else(|_| "200".to_string())
+            .parse()
+            .unwrap_or(200);
+
+        let limit = query.limit.unwrap_or(default_limit).min(max_limit);
+        debug!(
+            "Listing filtered runs with limit: {}, query: {:?}",
+            limit, query
+        );
+
+        // Subject pattern with tenant support
+        let subject_filter = &tenant_config.get_subject_pattern(tenant, None, None);
+
+        let mut runs_map: HashMap<String, (RunSummary, Vec<String>)> = HashMap::new();
+        let mut message_count = 0;
+
+        // Parse timestamp filters
+        let since_filter = query.since.as_ref().and_then(|s| parse_timestamp(s));
+        let until_filter = query.until.as_ref().and_then(|s| parse_timestamp(s));
+
+        // Status filter
+        let status_filter = query.status.as_ref().map(|s| s.to_lowercase());
+
+        match self
+            .query_stream_messages(subject_filter, None, DeliverPolicy::All)
+            .await
+        {
+            Ok(messages) => {
+                for message in messages {
+                    message_count += 1;
+
+                    match self.parse_message_for_run_summary(&message) {
+                        Ok(Some(summary)) => {
+                            let key = format!("{}:{}", summary.ritual_id, summary.run_id);
+
+                            // Time filtering on start_ts (if this is a start event)
+                            if let Some(since) = since_filter {
+                                if summary.start_ts < since {
+                                    continue;
+                                }
+                            }
+                            if let Some(until) = until_filter {
+                                if summary.start_ts > until {
+                                    continue;
+                                }
+                            }
+
+                            // Extract capabilities from the message for capability filtering
+                            let capabilities = extract_capabilities_from_message(&message);
+
+                            if let Some((mut existing, mut existing_caps)) = runs_map.remove(&key) {
+                                // Merge capabilities
+                                existing_caps.extend(capabilities);
+                                existing_caps.sort();
+                                existing_caps.dedup();
+
+                                // Keep the earliest start time (unless it's the placeholder)
+                                if summary.start_ts
+                                    != DateTime::from_timestamp(0, 0).unwrap_or_else(Utc::now)
+                                    && (existing.start_ts
+                                        == DateTime::from_timestamp(0, 0).unwrap_or_else(Utc::now)
+                                        || summary.start_ts < existing.start_ts)
+                                {
+                                    existing.start_ts = summary.start_ts;
+                                }
+                                // Always update to the most definitive status
+                                match (existing.status, summary.status) {
+                                    (_, RunStatus::Completed) | (_, RunStatus::Failed) => {
+                                        existing.status = summary.status
+                                    }
+                                    (RunStatus::Running, _) => existing.status = summary.status,
+                                    _ => {} // Keep existing status
+                                }
+                                runs_map.insert(key, (existing, existing_caps));
+                            } else {
+                                runs_map.insert(key, (summary, capabilities));
+                            }
+                        }
+                        Ok(None) => {
+                            // Message didn't contain useful run info
+                        }
+                        Err(e) => {
+                            debug!("Failed to parse message for run summary: {}", e);
+                        }
+                    }
+
+                    // Early stop optimization - collect more than needed to ensure completeness
+                    if runs_map.len() >= limit * 3 && message_count >= limit * 5 {
+                        debug!(
+                            "Collected {} runs from {} messages, stopping early",
+                            runs_map.len(),
+                            message_count
+                        );
+                        break;
+                    }
+                }
+            }
+            Err(e) => {
+                error!("Failed to query stream messages: {}", e);
+                return Err(e);
+            }
+        }
+
+        // Apply final filters and sort
+        let mut runs: Vec<RunSummary> = runs_map
+            .into_iter()
+            .filter_map(|(_, (run, capabilities))| {
+                // Apply status filter
+                if let Some(ref status_filter) = status_filter {
+                    let run_status = match run.status {
+                        RunStatus::Running => "running",
+                        RunStatus::Completed => "completed",
+                        RunStatus::Failed => "failed",
+                    };
+                    if run_status != status_filter {
+                        return None;
+                    }
+                }
+
+                // Apply capability filter
+                if let Some(ref capability_filter) = query.capability {
+                    if !capabilities
+                        .iter()
+                        .any(|cap| cap.contains(capability_filter))
+                    {
+                        return None;
+                    }
+                }
+
+                Some(run)
+            })
+            .collect();
+
+        // Sort by start time (most recent first) and limit
+        runs.sort_by(|a, b| b.start_ts.cmp(&a.start_ts));
+        runs.truncate(limit);
+
+        info!(
+            "Retrieved {} filtered runs from {} messages",
+            runs.len(),
+            message_count
+        );
+        Ok(runs)
+    }
+
+    /// Get detailed information for a specific run with tenant scoping
+    pub async fn get_run_detail(
+        &self,
+        run_id: &str,
+        tenant: Option<&str>,
+        tenant_config: Option<&crate::tenant::TenantConfig>,
+    ) -> Result<Option<RunDetail>> {
         debug!("Getting run detail for: {}", run_id);
 
-        // Subject pattern for specific run: demon.ritual.v1.*.<runId>.events
-        let subject_filter = &format!("demon.ritual.v1.*.{}.events", run_id);
+        // Subject pattern for specific run with tenant support
+        let subject_filter = if let (Some(tenant), Some(config)) = (tenant, tenant_config) {
+            config.get_subject_pattern(tenant, None, Some(run_id))
+        } else {
+            format!("demon.ritual.v1.*.{}.events", run_id)
+        };
 
         let mut events = Vec::new();
         let mut ritual_id: Option<String> = None;
 
         // Use multiple batches to get complete event history for long-running rituals
-        match self.query_all_stream_messages(subject_filter).await {
+        match self.query_all_stream_messages(&subject_filter).await {
             Ok(messages) => {
                 for message in messages {
                     match self.parse_message_for_event(&message) {
@@ -577,6 +743,67 @@ fn extract_ritual_id_from_subject(subject: &str) -> Option<String> {
     }
 }
 
+/// Parse timestamp from string (RFC3339 or Unix seconds)
+fn parse_timestamp(ts: &str) -> Option<DateTime<Utc>> {
+    // Try parsing as RFC3339
+    if let Ok(dt) = DateTime::parse_from_rfc3339(ts) {
+        return Some(dt.with_timezone(&Utc));
+    }
+
+    // Try parsing as Unix seconds (must be non-negative)
+    if let Ok(seconds) = ts.parse::<i64>() {
+        if seconds >= 0 {
+            return DateTime::from_timestamp(seconds, 0);
+        }
+    }
+
+    None
+}
+
+/// Extract capabilities from a message
+fn extract_capabilities_from_message(message: &async_nats::jetstream::Message) -> Vec<String> {
+    let mut capabilities = Vec::new();
+
+    if let Ok(payload) = serde_json::from_slice::<serde_json::Value>(&message.message.payload) {
+        // Look for capabilities in various places in the event
+        if let Some(event_type) = payload.get("event").and_then(|v| v.as_str()) {
+            // Extract capability from event type (e.g., "approval.requested:v1" -> "approval")
+            if let Some(capability) = event_type.split(':').next() {
+                if capability.contains('.') {
+                    capabilities.push(capability.to_string());
+                }
+            }
+        }
+
+        // Look for specific capability fields
+        if let Some(capability) = payload.get("capability").and_then(|v| v.as_str()) {
+            capabilities.push(capability.to_string());
+        }
+
+        // Look for capsule information that might indicate capabilities
+        if let Some(capsule) = payload.get("capsule").and_then(|v| v.as_str()) {
+            capabilities.push(format!("capsule.{}", capsule));
+        }
+
+        // Look for state transitions that might indicate capabilities
+        if let Some(state_from) = payload.get("stateFrom").and_then(|v| v.as_str()) {
+            capabilities.push(format!("state.{}", state_from));
+        }
+        if let Some(state_to) = payload.get("stateTo").and_then(|v| v.as_str()) {
+            capabilities.push(format!("state.{}", state_to));
+        }
+
+        // Look for policy decisions
+        if payload.get("policy").is_some() {
+            capabilities.push("policy.decision".to_string());
+        }
+    }
+
+    capabilities.sort();
+    capabilities.dedup();
+    capabilities
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -598,4 +825,37 @@ mod tests {
         assert_eq!(RunStatus::Completed.to_string(), "Completed");
         assert_eq!(RunStatus::Failed.to_string(), "Failed");
     }
+
+    #[test]
+    fn test_parse_timestamp_rfc3339() {
+        let ts = parse_timestamp("2025-09-15T00:00:00Z");
+        assert!(ts.is_some());
+
+        let ts = parse_timestamp("2025-09-15T12:30:45.123Z");
+        assert!(ts.is_some());
+    }
+
+    #[test]
+    fn test_parse_timestamp_unix_seconds() {
+        let ts = parse_timestamp("1726358400");
+        assert!(ts.is_some());
+
+        let ts = parse_timestamp("0");
+        assert!(ts.is_some());
+    }
+
+    #[test]
+    fn test_parse_timestamp_invalid() {
+        let ts = parse_timestamp("invalid");
+        assert!(ts.is_none());
+
+        let ts = parse_timestamp("2025-09-15");
+        assert!(ts.is_none());
+
+        let ts = parse_timestamp("-1");
+        assert!(ts.is_none());
+    }
+
+    // Note: JetStream message structure tests would require more complex setup
+    // Integration tests in tests/ directory cover the actual message processing
 }

@@ -17,6 +17,18 @@ use std::time::Duration;
 use tokio::time::{interval, MissedTickBehavior};
 use tracing::{debug, error, info};
 
+/// Extract tenant from headers and query parameters
+fn extract_tenant(
+    headers: &HeaderMap,
+    query_tenant: Option<&str>,
+    tenant_config: &crate::tenant::TenantConfig,
+) -> String {
+    let header_tenant = headers.get("X-Demon-Tenant").and_then(|v| v.to_str().ok());
+
+    let requested_tenant = query_tenant.or(header_tenant);
+    tenant_config.resolve_tenant(requested_tenant)
+}
+
 // Query parameters for list runs API
 #[derive(Deserialize, Debug, Clone)]
 pub struct ListRunsQuery {
@@ -25,6 +37,7 @@ pub struct ListRunsQuery {
     pub since: Option<String>,
     pub until: Option<String>,
     pub limit: Option<usize>,
+    pub tenant: Option<String>,
 }
 
 /// Validate query parameters
@@ -97,12 +110,16 @@ fn is_valid_timestamp(ts: &str) -> bool {
 #[axum::debug_handler]
 pub async fn list_runs_html(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Query(query): Query<ListRunsQuery>,
 ) -> Html<String> {
     debug!(
         "Handling HTML request to list runs with params: {:?}",
         query
     );
+
+    // Extract tenant from headers and query parameters
+    let tenant = extract_tenant(&headers, query.tenant.as_deref(), &state.tenant_config);
 
     // Validate query parameters
     let validation_error = validate_query_params(&query).err();
@@ -111,7 +128,10 @@ pub async fn list_runs_html(
         (vec![], Some(err))
     } else {
         match &state.jetstream_client {
-            Some(client) => match client.list_runs_filtered(query.clone()).await {
+            Some(client) => match client
+                .list_runs_filtered(query.clone(), &tenant, &state.tenant_config)
+                .await
+            {
                 Ok(runs) => {
                     info!("Successfully retrieved {} runs for HTML", runs.len());
                     (runs, None)
@@ -167,12 +187,16 @@ pub async fn list_runs_html(
 #[axum::debug_handler]
 pub async fn list_runs_api(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Query(query): Query<ListRunsQuery>,
 ) -> Response {
     debug!(
         "Handling JSON API request to list runs with params: {:?}",
         query
     );
+
+    // Extract tenant from headers and query parameters
+    let tenant = extract_tenant(&headers, query.tenant.as_deref(), &state.tenant_config);
 
     // Validate query parameters
     if let Err(error) = validate_query_params(&query) {
@@ -186,7 +210,10 @@ pub async fn list_runs_api(
     }
 
     match &state.jetstream_client {
-        Some(client) => match client.list_runs_filtered(query.clone()).await {
+        Some(client) => match client
+            .list_runs_filtered(query.clone(), &tenant, &state.tenant_config)
+            .await
+        {
             Ok(runs) => {
                 info!("Successfully retrieved {} runs for API", runs.len());
                 Json(runs).into_response()
@@ -221,12 +248,20 @@ pub async fn list_runs_api(
 #[axum::debug_handler]
 pub async fn get_run_html(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Path(run_id): Path<String>,
+    Query(query): Query<ListRunsQuery>,
 ) -> Html<String> {
     debug!("Handling HTML request for run detail: {}", run_id);
 
+    // Extract tenant from headers and query parameters
+    let tenant = extract_tenant(&headers, query.tenant.as_deref(), &state.tenant_config);
+
     let (run, error) = match &state.jetstream_client {
-        Some(client) => match client.get_run_detail(&run_id).await {
+        Some(client) => match client
+            .get_run_detail(&run_id, Some(&tenant), Some(&state.tenant_config))
+            .await
+        {
             Ok(run) => {
                 if run.is_some() {
                     info!("Successfully retrieved run detail for HTML: {}", run_id);
@@ -299,11 +334,22 @@ pub async fn get_run_html(
 
 /// Get run detail - JSON API response
 #[axum::debug_handler]
-pub async fn get_run_api(State(state): State<AppState>, Path(run_id): Path<String>) -> Response {
+pub async fn get_run_api(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(run_id): Path<String>,
+    Query(query): Query<ListRunsQuery>,
+) -> Response {
     debug!("Handling JSON API request for run detail: {}", run_id);
 
+    // Extract tenant from headers and query parameters
+    let tenant = extract_tenant(&headers, query.tenant.as_deref(), &state.tenant_config);
+
     match &state.jetstream_client {
-        Some(client) => match client.get_run_detail(&run_id).await {
+        Some(client) => match client
+            .get_run_detail(&run_id, Some(&tenant), Some(&state.tenant_config))
+            .await
+        {
             Ok(Some(run)) => {
                 info!("Successfully retrieved run detail for API: {}", run_id);
                 Json(run).into_response()
@@ -646,7 +692,7 @@ pub async fn grant_approval_api(
 
     // Discover ritualId by looking up run and enforce first-writer-wins on approvals
     let ritual_id = match &state.jetstream_client {
-        Some(js) => match js.get_run_detail(&run_id).await {
+        Some(js) => match js.get_run_detail(&run_id, None, None).await {
             Ok(Some(rd)) => {
                 // Enforce: if a terminal approval already exists for this gate, prevent conflicting writes
                 if let Some(last) = rd.events.iter().rev().find(|e| {
@@ -757,7 +803,7 @@ pub async fn deny_approval_api(
     }
 
     let ritual_id = match &state.jetstream_client {
-        Some(js) => match js.get_run_detail(&run_id).await {
+        Some(js) => match js.get_run_detail(&run_id, None, None).await {
             Ok(Some(rd)) => {
                 if let Some(last) = rd.events.iter().rev().find(|e| {
                     (e.event == "approval.granted:v1" || e.event == "approval.denied:v1")
@@ -838,9 +884,14 @@ pub async fn deny_approval_api(
 #[axum::debug_handler]
 pub async fn stream_run_events(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Path(run_id): Path<String>,
+    Query(query): Query<ListRunsQuery>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     debug!("Starting SSE stream for run: {}", run_id);
+
+    // Extract tenant from headers and query parameters
+    let tenant = extract_tenant(&headers, query.tenant.as_deref(), &state.tenant_config);
 
     // Configuration from environment
     let heartbeat_seconds = std::env::var("SSE_HEARTBEAT_SECONDS")
@@ -856,7 +907,7 @@ pub async fn stream_run_events(
     let stream = async_stream::stream! {
         // First, replay the last N events
         if let Some(client) = &state.jetstream_client {
-            match client.get_run_detail(&run_id).await {
+            match client.get_run_detail(&run_id, Some(&tenant), Some(&state.tenant_config)).await {
                 Ok(Some(run_detail)) => {
                     let events = &run_detail.events;
                     let start_idx = events.len().saturating_sub(replay_count);
@@ -891,7 +942,7 @@ pub async fn stream_run_events(
                 heartbeat.tick().await;
 
                 // Check for new events
-                match client.get_run_detail(&run_id).await {
+                match client.get_run_detail(&run_id, Some(&tenant), Some(&state.tenant_config)).await {
                     Ok(Some(run_detail)) => {
                         let events = &run_detail.events;
                         if events.len() > last_event_count {
@@ -1016,6 +1067,7 @@ mod tests {
             since: None,
             until: None,
             limit: None,
+            tenant: None,
         };
         assert!(validate_query_params(&query).is_ok());
 
@@ -1025,6 +1077,7 @@ mod tests {
             since: None,
             until: None,
             limit: None,
+            tenant: None,
         };
         assert!(validate_query_params(&query).is_ok());
     }
@@ -1037,6 +1090,7 @@ mod tests {
             since: None,
             until: None,
             limit: None,
+            tenant: None,
         };
         let result = validate_query_params(&query);
         assert!(result.is_err());
@@ -1052,6 +1106,7 @@ mod tests {
             since: Some("2025-09-15T00:00:00Z".to_string()),
             until: Some("2025-09-15T23:59:59Z".to_string()),
             limit: None,
+            tenant: None,
         };
         assert!(validate_query_params(&query).is_ok());
 
@@ -1062,6 +1117,7 @@ mod tests {
             since: Some("1726358400".to_string()),
             until: Some("1726444799".to_string()),
             limit: None,
+            tenant: None,
         };
         assert!(validate_query_params(&query).is_ok());
     }
@@ -1074,6 +1130,7 @@ mod tests {
             since: Some("invalid-timestamp".to_string()),
             until: None,
             limit: None,
+            tenant: None,
         };
         let result = validate_query_params(&query);
         assert!(result.is_err());
@@ -1088,6 +1145,7 @@ mod tests {
             since: None,
             until: None,
             limit: Some(50),
+            tenant: None,
         };
         assert!(validate_query_params(&query).is_ok());
     }
@@ -1101,6 +1159,7 @@ mod tests {
             since: None,
             until: None,
             limit: Some(0),
+            tenant: None,
         };
         let result = validate_query_params(&query);
         assert!(result.is_err());
@@ -1113,6 +1172,7 @@ mod tests {
             since: None,
             until: None,
             limit: Some(1000),
+            tenant: None,
         };
         let result = validate_query_params(&query);
         assert!(result.is_err());

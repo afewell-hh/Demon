@@ -2,6 +2,7 @@
 
 pub mod jetstream;
 pub mod routes;
+pub mod tenant;
 
 use anyhow::Result;
 use axum::{
@@ -23,6 +24,7 @@ pub struct AppState {
     pub jetstream_client: Option<jetstream::JetStreamClient>,
     pub tera: Tera,
     pub admin_token: Option<String>,
+    pub tenant_config: tenant::TenantConfig,
 }
 
 impl AppState {
@@ -64,11 +66,13 @@ impl AppState {
         tera.register_filter("tojson", tojson);
 
         let admin_token = std::env::var("ADMIN_TOKEN").ok();
+        let tenant_config = tenant::TenantConfig::from_env();
 
         Self {
             jetstream_client,
             tera,
             admin_token,
+            tenant_config,
         }
     }
 }
