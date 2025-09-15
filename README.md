@@ -30,6 +30,24 @@ A JSON event for `ritual.completed:v1` is printed to stdout.
 
 **Note**: M0-3 includes per-capability quotas with policy decisions. Default quotas allow reasonable development usage without configuration.
 
+## Approvals API
+
+The M0-4 Approvals API provides REST endpoints for granting and denying approval gates:
+
+```bash
+# Grant approval (first-writer-wins)
+curl -X POST http://localhost:3000/api/approvals/{run_id}/{gate_id}/grant \
+  -H "Content-Type: application/json" \
+  -d '{"approver": "ops@example.com", "note": "approved for production"}'
+
+# Deny approval
+curl -X POST http://localhost:3000/api/approvals/{run_id}/{gate_id}/deny \
+  -H "Content-Type: application/json" \
+  -d '{"approver": "ops@example.com", "reason": "security review required"}'
+```
+
+**Behavior**: First terminal decision wins (200 OK), subsequent conflicts return 409. Duplicate decisions return 200 with noop status.
+
 ## Layout
 
 - `engine/` — minimal ritual interpreter (M0).
