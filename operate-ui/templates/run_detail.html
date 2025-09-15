@@ -86,6 +86,22 @@
         </div>
         {% endif %}
     </div>
+
+    {% if approvals.status == "Pending" %}
+    <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e0e0e0;">
+        <div style="display: flex; gap: 1rem; align-items: center;">
+            <div style="display: flex; gap: 0.5rem;">
+                <button id="grant-btn" class="btn btn-primary" onclick="handleApproval('grant')">
+                    Grant
+                </button>
+                <button id="deny-btn" class="btn btn-secondary" onclick="handleApproval('deny')">
+                    Deny
+                </button>
+            </div>
+            <div id="approval-status" style="display: none; font-size: 0.9rem;"></div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endif %}
 
@@ -206,6 +222,37 @@
 {% endif %}
 
 {% if jetstream_available %}
+<style>
+    .approval-status {
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        font-weight: 500;
+    }
+    .approval-status-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    .approval-status-error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    .approval-status-warning {
+        background-color: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+    }
+    .approval-status-info {
+        background-color: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+    }
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+</style>
 <script>
     // SSE-based live updates instead of auto-refresh
     let eventSource = null;
@@ -318,6 +365,124 @@
             </details>`;
         }
         return '<span style="color: var(--text-secondary);">-</span>';
+    }
+
+    function connectSSE() {
+        const runId = "{{ run_id }}";
+        const url = `/api/runs/${runId}/events/stream`;
+
+        updateConnectionStatus('connecting', `Attempt ${reconnectAttempts + 1}/${maxReconnectAttempts}`);
+
+        eventSource = new EventSource(url);
+
+        eventSource.onopen = function() {
+            console.log('SSE connection established');
+            reconnectAttempts = 0;
+            reconnectDelay = 1000;
+            updateConnectionStatus('connected');
+        };
+
+    }
+
+    // Handle approval actions
+    async function handleApproval(action) {
+        const runId = "{{ run_id }}";
+        {% if approvals %}
+        const gateId = "{{ approvals.gateId }}";
+        {% else %}
+        const gateId = null;
+        {% endif %}
+
+        if (!gateId) {
+            showApprovalStatus('No gate ID available', 'error');
+            return;
+        }
+
+        const grantBtn = document.getElementById('grant-btn');
+        const denyBtn = document.getElementById('deny-btn');
+
+        // Disable buttons during request
+        grantBtn.disabled = true;
+        denyBtn.disabled = true;
+
+        try {
+            const endpoint = action === 'grant' ? 'grant' : 'deny';
+            const url = `/api/approvals/${runId}/${gateId}/${endpoint}`;
+
+            let body;
+            if (action === 'grant') {
+                // Get approver email from user (for demo purposes, using a prompt)
+                const approver = prompt('Enter your email address:');
+                if (!approver) {
+                    showApprovalStatus('Approval cancelled', 'warning');
+                    grantBtn.disabled = false;
+                    denyBtn.disabled = false;
+                    return;
+                }
+                const note = prompt('Optional note:') || '';
+                body = { approver, note };
+            } else {
+                const approver = prompt('Enter your email address:');
+                if (!approver) {
+                    showApprovalStatus('Denial cancelled', 'warning');
+                    grantBtn.disabled = false;
+                    denyBtn.disabled = false;
+                    return;
+                }
+                const reason = prompt('Reason for denial:') || 'Denied via UI';
+                body = { approver, reason };
+            }
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                if (result.status === 'noop') {
+                    showApprovalStatus(`Already ${action === 'grant' ? 'granted' : 'denied'}`, 'info');
+                } else {
+                    showApprovalStatus(`Approval ${action === 'grant' ? 'granted' : 'denied'} successfully`, 'success');
+                    // Keep buttons disabled since action was successful
+                }
+            } else if (response.status === 409) {
+                const result = await response.json();
+                showApprovalStatus(`Conflict: ${result.error}`, 'warning');
+                // Keep buttons disabled since gate is already resolved
+            } else if (response.status === 403) {
+                showApprovalStatus('Not authorized - check APPROVER_ALLOWLIST', 'error');
+                grantBtn.disabled = false;
+                denyBtn.disabled = false;
+            } else {
+                const result = await response.json();
+                showApprovalStatus(`Error: ${result.error || 'Unknown error'}`, 'error');
+                grantBtn.disabled = false;
+                denyBtn.disabled = false;
+            }
+        } catch (error) {
+            console.error('Approval action failed:', error);
+            showApprovalStatus(`Network error: ${error.message}`, 'error');
+            grantBtn.disabled = false;
+            denyBtn.disabled = false;
+        }
+    }
+
+    function showApprovalStatus(message, type) {
+        const statusEl = document.getElementById('approval-status');
+        statusEl.style.display = 'block';
+        statusEl.textContent = message;
+        statusEl.className = `approval-status approval-status-${type}`;
+
+        // Auto-hide success/info messages after 5 seconds
+        if (type === 'success' || type === 'info') {
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 5000);
+        }
     }
 
     function connectSSE() {

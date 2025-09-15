@@ -9,6 +9,7 @@ use axum::{
     response::{Html, IntoResponse, Response, Sse},
     Json,
 };
+use chrono::DateTime;
 use futures_util::stream::Stream;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
@@ -17,9 +18,79 @@ use tokio::time::{interval, MissedTickBehavior};
 use tracing::{debug, error, info};
 
 // Query parameters for list runs API
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct ListRunsQuery {
-    limit: Option<usize>,
+    pub status: Option<String>,
+    pub capability: Option<String>,
+    pub since: Option<String>,
+    pub until: Option<String>,
+    pub limit: Option<usize>,
+}
+
+/// Validate query parameters
+fn validate_query_params(query: &ListRunsQuery) -> Result<(), String> {
+    // Validate status
+    if let Some(ref status) = query.status {
+        let valid_statuses = ["running", "completed", "failed"];
+        if !valid_statuses.contains(&status.to_lowercase().as_str()) {
+            return Err(format!(
+                "invalid status: {}; expected running|completed|failed",
+                status
+            ));
+        }
+    }
+
+    // Validate since/until timestamps
+    if let Some(ref since) = query.since {
+        if !is_valid_timestamp(since) {
+            return Err(format!(
+                "invalid since timestamp: {}; expected RFC3339 or Unix seconds",
+                since
+            ));
+        }
+    }
+
+    if let Some(ref until) = query.until {
+        if !is_valid_timestamp(until) {
+            return Err(format!(
+                "invalid until timestamp: {}; expected RFC3339 or Unix seconds",
+                until
+            ));
+        }
+    }
+
+    // Validate limit
+    if let Some(limit) = query.limit {
+        let max_limit = std::env::var("RUNS_LIST_MAX_LIMIT")
+            .unwrap_or_else(|_| "200".to_string())
+            .parse()
+            .unwrap_or(200);
+        if limit == 0 || limit > max_limit {
+            return Err(format!(
+                "invalid limit: {}; must be between 1 and {}",
+                limit, max_limit
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// Check if a timestamp string is valid (RFC3339 or Unix seconds)
+fn is_valid_timestamp(ts: &str) -> bool {
+    // Try parsing as RFC3339
+    if DateTime::parse_from_rfc3339(ts).is_ok() {
+        return true;
+    }
+
+    // Try parsing as Unix seconds (must be non-negative)
+    if let Ok(seconds) = ts.parse::<i64>() {
+        if seconds >= 0 && DateTime::from_timestamp(seconds, 0).is_some() {
+            return true;
+        }
+    }
+
+    false
 }
 
 /// List runs - HTML response
@@ -29,22 +100,29 @@ pub async fn list_runs_html(
     Query(query): Query<ListRunsQuery>,
 ) -> Html<String> {
     debug!(
-        "Handling HTML request to list runs with limit: {:?}",
-        query.limit
+        "Handling HTML request to list runs with params: {:?}",
+        query
     );
 
-    let (runs, error) = match &state.jetstream_client {
-        Some(client) => match client.list_runs(query.limit).await {
-            Ok(runs) => {
-                info!("Successfully retrieved {} runs for HTML", runs.len());
-                (runs, None)
-            }
-            Err(e) => {
-                error!("Failed to retrieve runs: {}", e);
-                (vec![], Some(format!("Failed to retrieve runs: {}", e)))
-            }
-        },
-        None => (vec![], Some("JetStream is not available".to_string())),
+    // Validate query parameters
+    let validation_error = validate_query_params(&query).err();
+
+    let (runs, error) = if let Some(err) = validation_error {
+        (vec![], Some(err))
+    } else {
+        match &state.jetstream_client {
+            Some(client) => match client.list_runs_filtered(query.clone()).await {
+                Ok(runs) => {
+                    info!("Successfully retrieved {} runs for HTML", runs.len());
+                    (runs, None)
+                }
+                Err(e) => {
+                    error!("Failed to retrieve runs: {}", e);
+                    (vec![], Some(format!("Failed to retrieve runs: {}", e)))
+                }
+            },
+            None => (vec![], Some("JetStream is not available".to_string())),
+        }
     };
 
     let mut context = tera::Context::new();
@@ -52,6 +130,16 @@ pub async fn list_runs_html(
     context.insert("error", &error);
     context.insert("jetstream_available", &state.jetstream_client.is_some());
     context.insert("current_page", &"runs");
+
+    // Insert filter values for form persistence
+    context.insert("filter_status", &query.status.as_deref().unwrap_or(""));
+    context.insert(
+        "filter_capability",
+        &query.capability.as_deref().unwrap_or(""),
+    );
+    context.insert("filter_since", &query.since.as_deref().unwrap_or(""));
+    context.insert("filter_until", &query.until.as_deref().unwrap_or(""));
+    context.insert("filter_limit", &query.limit.unwrap_or(50));
 
     let html = state
         .tera
@@ -82,22 +170,35 @@ pub async fn list_runs_api(
     Query(query): Query<ListRunsQuery>,
 ) -> Response {
     debug!(
-        "Handling JSON API request to list runs with limit: {:?}",
-        query.limit
+        "Handling JSON API request to list runs with params: {:?}",
+        query
     );
 
+    // Validate query parameters
+    if let Err(error) = validate_query_params(&query) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": error
+            })),
+        )
+            .into_response();
+    }
+
     match &state.jetstream_client {
-        Some(client) => match client.list_runs(query.limit).await {
+        Some(client) => match client.list_runs_filtered(query.clone()).await {
             Ok(runs) => {
                 info!("Successfully retrieved {} runs for API", runs.len());
                 Json(runs).into_response()
             }
             Err(e) => {
                 error!("Failed to retrieve runs: {}", e);
+                let error_id = chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default() as u32;
+                error!("Internal error (ref: {:x}): {}", error_id, e);
                 (
-                    StatusCode::BAD_GATEWAY,
+                    StatusCode::INTERNAL_SERVER_ERROR,
                     Json(serde_json::json!({
-                        "error": format!("Failed to retrieve runs: {}", e)
+                        "error": format!("internal error (ref: {:x})", error_id)
                     })),
                 )
                     .into_response()
@@ -843,7 +944,6 @@ pub async fn stream_run_events(
 mod tests {
     use super::*;
     use crate::jetstream::{RitualEvent, RunStatus};
-    use chrono::Utc;
     use std::collections::HashMap;
 
     #[test]
@@ -851,7 +951,7 @@ mod tests {
         let run = RunSummary {
             run_id: "test-run".to_string(),
             ritual_id: "test-ritual".to_string(),
-            start_ts: Utc::now(),
+            start_ts: chrono::Utc::now(),
             status: RunStatus::Completed,
         };
 
@@ -862,7 +962,7 @@ mod tests {
     #[test]
     fn test_ritual_event_helpers() {
         let event = RitualEvent {
-            ts: Utc::now(),
+            ts: chrono::Utc::now(),
             event: "ritual.started:v1".to_string(),
             state_from: Some("idle".to_string()),
             state_to: Some("running".to_string()),
@@ -876,7 +976,7 @@ mod tests {
     #[test]
     fn test_run_detail_status_determination() {
         let mut events = vec![RitualEvent {
-            ts: Utc::now(),
+            ts: chrono::Utc::now(),
             event: "ritual.started:v1".to_string(),
             state_from: None,
             state_to: None,
@@ -892,7 +992,7 @@ mod tests {
         assert_eq!(run.status(), RunStatus::Running);
 
         events.push(RitualEvent {
-            ts: Utc::now(),
+            ts: chrono::Utc::now(),
             event: "ritual.completed:v1".to_string(),
             state_from: None,
             state_to: None,
@@ -906,5 +1006,132 @@ mod tests {
         };
 
         assert_eq!(completed_run.status(), RunStatus::Completed);
+    }
+
+    #[test]
+    fn test_validate_query_params_valid_status() {
+        let query = ListRunsQuery {
+            status: Some("running".to_string()),
+            capability: None,
+            since: None,
+            until: None,
+            limit: None,
+        };
+        assert!(validate_query_params(&query).is_ok());
+
+        let query = ListRunsQuery {
+            status: Some("COMPLETED".to_string()), // case insensitive
+            capability: None,
+            since: None,
+            until: None,
+            limit: None,
+        };
+        assert!(validate_query_params(&query).is_ok());
+    }
+
+    #[test]
+    fn test_validate_query_params_invalid_status() {
+        let query = ListRunsQuery {
+            status: Some("invalid".to_string()),
+            capability: None,
+            since: None,
+            until: None,
+            limit: None,
+        };
+        let result = validate_query_params(&query);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("invalid status"));
+    }
+
+    #[test]
+    fn test_validate_query_params_valid_timestamps() {
+        // RFC3339 format
+        let query = ListRunsQuery {
+            status: None,
+            capability: None,
+            since: Some("2025-09-15T00:00:00Z".to_string()),
+            until: Some("2025-09-15T23:59:59Z".to_string()),
+            limit: None,
+        };
+        assert!(validate_query_params(&query).is_ok());
+
+        // Unix timestamp format
+        let query = ListRunsQuery {
+            status: None,
+            capability: None,
+            since: Some("1726358400".to_string()),
+            until: Some("1726444799".to_string()),
+            limit: None,
+        };
+        assert!(validate_query_params(&query).is_ok());
+    }
+
+    #[test]
+    fn test_validate_query_params_invalid_timestamps() {
+        let query = ListRunsQuery {
+            status: None,
+            capability: None,
+            since: Some("invalid-timestamp".to_string()),
+            until: None,
+            limit: None,
+        };
+        let result = validate_query_params(&query);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("invalid since timestamp"));
+    }
+
+    #[test]
+    fn test_validate_query_params_valid_limit() {
+        let query = ListRunsQuery {
+            status: None,
+            capability: None,
+            since: None,
+            until: None,
+            limit: Some(50),
+        };
+        assert!(validate_query_params(&query).is_ok());
+    }
+
+    #[test]
+    fn test_validate_query_params_invalid_limit() {
+        // Zero limit
+        let query = ListRunsQuery {
+            status: None,
+            capability: None,
+            since: None,
+            until: None,
+            limit: Some(0),
+        };
+        let result = validate_query_params(&query);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("invalid limit"));
+
+        // Too high limit
+        let query = ListRunsQuery {
+            status: None,
+            capability: None,
+            since: None,
+            until: None,
+            limit: Some(1000),
+        };
+        let result = validate_query_params(&query);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("invalid limit"));
+    }
+
+    #[test]
+    fn test_is_valid_timestamp() {
+        // Valid RFC3339
+        assert!(is_valid_timestamp("2025-09-15T00:00:00Z"));
+        assert!(is_valid_timestamp("2025-09-15T12:30:45.123Z"));
+
+        // Valid Unix seconds
+        assert!(is_valid_timestamp("1726358400"));
+        assert!(is_valid_timestamp("0"));
+
+        // Invalid formats
+        assert!(!is_valid_timestamp("invalid"));
+        assert!(!is_valid_timestamp("2025-09-15"));
+        assert!(!is_valid_timestamp("-1"));
     }
 }
