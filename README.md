@@ -42,3 +42,5 @@ A JSON event for `ritual.completed:v1` is printed to stdout.
 - Wire the event to NATS (JetStream) instead of stdout (M1).
 - Add durable timers & replays.
 - Add Operate UI (read-only).
+
+<!-- audit-kick -->
