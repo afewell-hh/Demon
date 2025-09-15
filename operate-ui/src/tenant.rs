@@ -102,8 +102,8 @@ impl TenantConfig {
                     format!("demon.ritual.v1.{}.{}.{}.events", tenant, ritual, run)
                 }
                 (Some(ritual), None) => format!("demon.ritual.v1.{}.{}.*.events", tenant, ritual),
-                (None, None) => format!("demon.ritual.v1.{}.*.*events", tenant),
-                _ => format!("demon.ritual.v1.{}.*.*events", tenant),
+                (None, None) => format!("demon.ritual.v1.{}.*.*.events", tenant),
+                _ => format!("demon.ritual.v1.{}.*.*.events", tenant),
             }
         }
     }
@@ -212,7 +212,7 @@ mod tests {
         );
         assert_eq!(
             config.get_subject_pattern("tenant-a", None, None),
-            "demon.ritual.v1.tenant-a.*.*events"
+            "demon.ritual.v1.tenant-a.*.*.events"
         );
     }
 
