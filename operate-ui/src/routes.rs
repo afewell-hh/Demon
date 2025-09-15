@@ -9,6 +9,9 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
+use tokio_stream::wrappers::IntervalStream;
+use futures_util::StreamExt as _;
 use tracing::{debug, error, info};
 
 // Query parameters for list runs API
@@ -238,6 +241,46 @@ pub async fn get_run_api(State(state): State<AppState>, Path(run_id): Path<Strin
 }
 
 // ---------------- Admin ----------------
+
+/// SSE: minimal heartbeat stream for a run. Works even if JetStream is unavailable.
+pub async fn stream_run_events_sse(
+    State(_state): State<AppState>,
+    Path(run_id): Path<String>,
+) -> Response {
+    let hb_secs: u64 = std::env::var("SSE_HEARTBEAT_SECONDS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(15);
+
+    let interval = tokio::time::interval(Duration::from_secs(hb_secs.max(1)));
+    let mut ticks = IntervalStream::new(interval)
+        .enumerate()
+        .map(move |(i, _)| {
+            let payload = serde_json::json!({"type":"heartbeat","runId": run_id, "seq": i as u64});
+            format!("event: heartbeat\ndata: {}\n\n", payload)
+        });
+
+    let body_stream = async_stream::stream! {
+        while let Some(frame) = ticks.next().await {
+            yield Ok::<_, std::io::Error>(frame);
+        }
+    };
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        axum::http::header::CONTENT_TYPE,
+        axum::http::HeaderValue::from_static("text/event-stream"),
+    );
+    headers.insert(
+        axum::http::header::CACHE_CONTROL,
+        axum::http::HeaderValue::from_static("no-cache"),
+    );
+    headers.insert(
+        axum::http::header::CONNECTION,
+        axum::http::HeaderValue::from_static("keep-alive"),
+    );
+    (headers, axum::body::Body::from_stream(body_stream)).into_response()
+}
 #[derive(Serialize)]
 pub struct TemplateReport {
     pub templates: Vec<String>,

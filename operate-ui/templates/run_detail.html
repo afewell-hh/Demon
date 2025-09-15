@@ -203,12 +203,60 @@
 
 {% if jetstream_available %}
 <script>
-    // Auto-refresh every 10 seconds for running rituals
-    {% if run and run.is_running %}
-    setTimeout(function() {
-        window.location.reload();
-    }, 10000);
-    {% endif %}
+// Sprint 6: SSE connection with capped backoff + jitter; heartbeats are logged at debug noise level.
+(function() {
+  const runId = {{ run_id | json }};
+  const base = window.location.origin;
+  const BASE_MS = parseInt((window.SSE_RETRY_BASE_MS || '250'), 10) || 250;
+  const MAX_MS  = parseInt((window.SSE_RETRY_MAX_MS  || '5000'), 10) || 5000;
+  let attempt = 0;
+  let es = null;
+
+  function jitter(ms) {
+    const delta = Math.floor(ms * 0.2);
+    return ms + Math.floor((Math.random() * 2 - 1) * delta);
+  }
+
+  function connect() {
+    const url = `${base}/api/runs/${runId}/events/stream`;
+    es = new EventSource(url);
+    attempt = 0;
+
+    es.addEventListener('open', () => {
+      console.info('[SSE] connected');
+    });
+    es.addEventListener('error', () => {
+      es.close();
+      scheduleReconnect();
+    });
+    es.addEventListener('heartbeat', (e) => {
+      if (attempt === 0) {
+        // Debug-level only to avoid noisy logs
+        // console.debug('[SSE] heartbeat', e.data);
+      }
+    });
+  }
+
+  function scheduleReconnect() {
+    attempt += 1;
+    const backoff = Math.min(MAX_MS, BASE_MS * Math.pow(2, attempt - 1));
+    const delay = jitter(backoff);
+    if (attempt === 1) {
+      console.info(`[SSE] reconnecting in ${delay}ms`);
+    } else {
+      // Debug-level only to reduce noise
+      // console.debug(`[SSE] reconnecting in ${delay}ms (attempt ${attempt})`);
+    }
+    setTimeout(connect, delay);
+  }
+
+  connect();
+})();
+
+// Keep existing auto-refresh for running rituals as a safety net
+{% if run and run.is_running %}
+setTimeout(function() { window.location.reload(); }, 10000);
+{% endif %}
 </script>
 {% endif %}
 {% endblock %}

@@ -165,6 +165,10 @@ pub fn create_app(state: AppState) -> Router {
         .route("/api/runs", get(routes::list_runs_api))
         .route("/api/runs/:run_id", get(routes::get_run_api))
         .route(
+            "/api/runs/:run_id/events/stream",
+            get(routes::stream_run_events_sse),
+        )
+        .route(
             "/admin/templates/report",
             get(routes::admin_templates_report),
         )
