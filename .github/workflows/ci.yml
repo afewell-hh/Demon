@@ -253,9 +253,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Install cargo-audit (+stable)
-        run: cargo +stable install cargo-audit
+        run: |
+          set -euo pipefail
+          cargo +stable install cargo-audit \
+            || (echo "cargo-audit install failed; retrying in 10s" && sleep 10 && cargo +stable install cargo-audit)
       - name: Audit (+stable)
-        run: cargo +stable audit --deny warnings
+        run: |
+          set -euo pipefail
+          cargo +stable audit --deny warnings \
+            || (echo "cargo-audit run failed; retrying in 10s" && sleep 10 && cargo +stable audit --deny warnings)
 
   cargo-deny:
     name: Cargo deny (licenses/bans)
