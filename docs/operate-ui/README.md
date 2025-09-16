@@ -94,6 +94,38 @@ The UI now supports real-time event streaming via Server-Sent Events (SSE):
 - Optional auth: set `ADMIN_TOKEN` in the environment to require header `X-Admin-Token: <token>`; without it, the probe is unauthenticated (dev-only).
 - Admin: `/admin/templates/report` shows `template_ready=true` and `has_filter_tojson=true`.
 
+## In-UI Approval Actions
+
+The UI now provides interactive approval controls for pending approval gates:
+
+### Features
+- **Approval buttons**: Grant/Deny buttons appear only for pending approvals on run detail pages
+- **Real-time updates**: Approval status updates immediately via SSE when actions are taken
+- **Input validation**: Email format validation and required reason for denials
+- **User feedback**: Toast notifications for success, errors, and validation messages
+- **Progressive enhancement**: Falls back gracefully if JavaScript is disabled
+
+### Security & Authorization
+- **Approver allowlist**: Set `APPROVER_ALLOWLIST=email1@company.com,email2@company.com` environment variable
+- **CSRF protection**: Requires `X-Requested-With: XMLHttpRequest` header
+- **Input validation**: Email format and required fields enforced both client and server-side
+- **Audit trail**: All approval actions are logged and traceable via event timeline
+
+### User Experience
+1. Navigate to run detail page (`/runs/:runId`) with pending approval
+2. Enter your email address in the approver field
+3. Optionally add a note/reason in the text area
+4. Click "Grant Approval" or "Deny Approval" button
+5. See immediate feedback via toast notification
+6. Watch approval status update in real-time
+7. Approval actions section hides after resolution
+
+### Error Handling
+- **403 Forbidden**: User not in approver allowlist
+- **409 Conflict**: Approval already resolved by another user
+- **400 Bad Request**: Missing CSRF header or invalid input
+- **Network errors**: Graceful handling with retry suggestions
+
 ## Approvals Endpoints — HTTP Semantics
 
 Endpoints:
@@ -105,9 +137,14 @@ Behavior (first‑writer‑wins):
 - Duplicate terminal (same as current state) → `200 OK` with `{ "status": "noop" }` (no new event).
 - Conflicting terminal (opposite of current state) → `409 CONFLICT` with `{ "error": "gate already resolved", "state": "granted|denied" }` (no new event).
 
+Security Headers:
+- `X-Requested-With: XMLHttpRequest` required for CSRF protection
+- `Content-Type: application/json` required
+
 Notes:
 - Endpoints append events; they never mutate history. The run timeline is the source of truth.
 - Idempotency keys: `approval.requested` uses `"<runId>:approval:<gateId>"`; terminals append `":granted"` or `":denied"`.
+- Authorization checked against `APPROVER_ALLOWLIST` environment variable.
 
 ## Local Bootstrap & Troubleshooting
 1) Start NATS

@@ -726,8 +726,19 @@ fn approver_allowed(email: &str) -> bool {
 pub async fn grant_approval_api(
     State(state): State<AppState>,
     Path((run_id, gate_id)): Path<(String, String)>,
+    headers: HeaderMap,
     Json(body): Json<ApproveBody>,
 ) -> Response {
+    // CSRF protection: require X-Requested-With header for API calls
+    if headers.get("X-Requested-With").is_none() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "X-Requested-With header required"
+            })),
+        )
+            .into_response();
+    }
     if !approver_allowed(&body.approver) {
         return (StatusCode::FORBIDDEN, "approver not allowed").into_response();
     }
@@ -835,8 +846,19 @@ pub async fn grant_approval_api(
 pub async fn deny_approval_api(
     State(state): State<AppState>,
     Path((run_id, gate_id)): Path<(String, String)>,
+    headers: HeaderMap,
     Json(body): Json<DenyBody>,
 ) -> Response {
+    // CSRF protection: require X-Requested-With header for API calls
+    if headers.get("X-Requested-With").is_none() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "X-Requested-With header required"
+            })),
+        )
+            .into_response();
+    }
     if !approver_allowed(&body.approver) {
         return (StatusCode::FORBIDDEN, "approver not allowed").into_response();
     }
