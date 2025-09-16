@@ -217,10 +217,10 @@
   function connect() {
     const url = `${base}/api/runs/${runId}/events/stream`;
     es = new EventSource(url);
-    attempt = 0;
 
     es.addEventListener('open', () => {
       console.info('[SSE] connected');
+      attempt = 0; // Reset backoff counter on successful connection
     });
     es.addEventListener('error', () => {
       es.close();
