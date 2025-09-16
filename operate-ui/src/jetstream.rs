@@ -584,6 +584,13 @@ impl JetStreamClient {
             None => Vec::new(),
         };
 
+        // Track the last published stream sequence that we emitted from the snapshot so we can
+        // resume streaming without dropping mid-flight events (PR review feedback).
+        let resume_sequence = initial_events
+            .iter()
+            .filter_map(|evt| evt.stream_sequence)
+            .max();
+
         let subject_filter = format!("demon.ritual.v1.*.{}.events", run_id);
 
         // Clone self for use in the async stream
@@ -619,10 +626,15 @@ impl JetStreamClient {
             };
 
             // Create ephemeral consumer for tailing new events
+            let deliver_policy = resume_sequence
+                .and_then(|seq| seq.checked_add(1))
+                .map(|next| DeliverPolicy::ByStartSequence { start_sequence: next })
+                .unwrap_or(DeliverPolicy::New);
+
             let consumer_config = jetstream::consumer::pull::Config {
                 filter_subject: subject_filter.clone(),
                 durable_name: None,
-                deliver_policy: DeliverPolicy::New, // Only get new messages
+                deliver_policy,
                 ack_policy: async_nats::jetstream::consumer::AckPolicy::None,
                 inactive_threshold: std::time::Duration::from_secs(300), // 5 minute timeout
                 ..Default::default()
@@ -631,9 +643,8 @@ impl JetStreamClient {
             let consumer = stream.create_consumer(consumer_config).await?;
             debug!("Created ephemeral consumer for streaming run {}", run_id_owned);
 
-            // Continuously poll for new messages
-            // DeliverPolicy::New already prevents replaying the initial snapshot,
-            // so we can safely emit every message the consumer yields
+            // Continuously poll for new messages. The deliver policy resumes at the first
+            // sequence after the snapshot so we can safely emit each message without gaps.
             loop {
                 let mut messages = consumer
                     .batch()
