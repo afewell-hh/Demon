@@ -8,10 +8,10 @@ use axum::{
     response::{Html, IntoResponse, Response},
     Json,
 };
+use futures_util::StreamExt as _;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio_stream::wrappers::IntervalStream;
-use futures_util::StreamExt as _;
 use tracing::{debug, error, info};
 
 // Query parameters for list runs API

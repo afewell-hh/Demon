@@ -1,6 +1,6 @@
+use serial_test::serial;
 use wards::config::{load_from_env, QuotaCfg, WardsConfig};
 use wards::policy::PolicyKernel;
-use serial_test::serial;
 
 #[test]
 #[serial]
