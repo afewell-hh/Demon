@@ -626,13 +626,9 @@ impl JetStreamClient {
             let consumer = stream.create_consumer(consumer_config).await?;
             debug!("Created ephemeral consumer for streaming run {}", run_id_owned);
 
-            // Keep track of seen events to avoid duplicates
-            let mut seen_timestamps = std::collections::HashSet::new();
-            for event in &initial_events {
-                seen_timestamps.insert(event.ts);
-            }
-
             // Continuously poll for new messages
+            // DeliverPolicy::New already prevents replaying the initial snapshot,
+            // so we can safely emit every message the consumer yields
             loop {
                 let mut messages = consumer
                     .batch()
@@ -645,11 +641,8 @@ impl JetStreamClient {
                     match msg_result {
                         Ok(msg) => {
                             if let Ok(Some(event)) = js_client.parse_message_for_event(&msg) {
-                                // Only emit if we haven't seen this timestamp before
-                                if !seen_timestamps.contains(&event.ts) {
-                                    seen_timestamps.insert(event.ts);
-                                    yield event;
-                                }
+                                // Emit all events - DeliverPolicy::New ensures no duplicates
+                                yield event;
                             }
                         }
                         Err(e) => {
