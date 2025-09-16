@@ -11,12 +11,19 @@ on:
 jobs:
   backfill:
     runs-on: ubuntu-latest
-    if: ${{ secrets.ADMINTOKEN_DEMON_AFEWELLHH != '' }}
     # Use a minimal default GITHUB_TOKEN; all privileged calls go through GH_TOKEN (PAT)
     permissions:
       contents: read
       issues: read
     steps:
+      - name: Check for required admin token
+        run: |
+          if [ -z "${{ secrets.ADMINTOKEN_DEMON_AFEWELLHH }}" ]; then
+            echo "::error::ADMINTOKEN_DEMON_AFEWELLHH secret is not configured. This workflow requires admin privileges to manage project items."
+            exit 1
+          fi
+          echo "Admin token is configured, proceeding with backfill"
+
       - name: Checkout
         uses: actions/checkout@v4
 
