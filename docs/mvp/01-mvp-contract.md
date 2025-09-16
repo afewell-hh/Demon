@@ -25,11 +25,11 @@
 - User management and authentication (integrate with existing systems)
 
 ## Release Criteria
-- [ ] All M0 checked
-- [ ] CI green on main (all required checks)
-- [ ] "replies-guard" required + passing
-- [ ] Docs: README quickstart + HOWTOs updated
-- [ ] Smoke demo script passes (Playwright)
+- [x] All M0 checked
+- [x] CI green on main (all required checks)
+- [x] "replies-guard" required + passing
+- [x] Docs: README quickstart + HOWTOs updated
+- [x] Smoke demo script passes (Playwright)
 
 ## Risks & Open Questions
 - NATS JetStream operational complexity in production environments
