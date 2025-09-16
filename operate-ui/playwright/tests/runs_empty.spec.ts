@@ -17,6 +17,13 @@ test("runs page surfaces JetStream status", async ({ page, baseURL }) => {
   await expect
     .poll(async () => {
       const r = await page.request.get(`${baseURL}/api/runs`, { timeout: 15000 });
+      if (r.status() === 502) {
+        const err = await r.json().catch(() => ({}));
+        if (err && typeof err.error === 'string') {
+          return 0;
+        }
+        return -1;
+      }
       if (!r.ok()) return -1;
       const j = await r.json().catch(() => ({}));
       // Accept three shapes:

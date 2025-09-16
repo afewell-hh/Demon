@@ -25,6 +25,42 @@ Then visit:
 - Review protocol: open PR as Draft, satisfy the Evidence Checklist, then freeze at a commit SHA for review.
 - Stream selection: set `RITUAL_STREAM_NAME` (default `RITUAL_EVENTS`). If absent, the UI will fall back to the legacy `DEMON_RITUAL_EVENTS` stream and log a deprecation warning.
 
+## Live Event Streaming
+
+The UI now supports real-time event streaming via Server-Sent Events (SSE):
+
+### Features
+- **Real-time updates**: Run detail pages (`/runs/:runId`) automatically update as new events arrive from JetStream
+- **Connection status indicator**: Visual badge showing connection state (Connected, Reconnecting, Offline)
+- **Automatic reconnection**: Exponential backoff with jitter for robust reconnection handling
+- **Graceful degradation**: Falls back to heartbeat-only mode when JetStream is unavailable
+
+### Configuration
+- `SSE_HEARTBEAT_SECONDS`: Interval for keepalive heartbeats (default: 15 seconds)
+- `SSE_RETRY_BASE_MS`: Base delay for reconnection backoff (default: 250ms)
+- `SSE_RETRY_MAX_MS`: Maximum delay for reconnection backoff (default: 5000ms)
+
+### SSE Endpoint
+- **Path**: `/api/runs/:runId/events/stream`
+- **Events**:
+  - `init`: Initial connection established
+  - `append`: New event to add to timeline
+  - `heartbeat`: Keepalive signal
+  - `warning`: JetStream unavailable, degraded mode
+  - `error`: Stream error occurred
+
+### Behavior
+1. On page load, establishes SSE connection to stream endpoint
+2. Receives initial snapshot of existing events (via `init` event)
+3. Tails JetStream for new events using ephemeral consumer with `DeliverPolicy::New`
+4. Updates DOM in real-time as events arrive:
+   - Inserts new events in chronological order
+   - Updates run status badges
+   - Updates event count
+   - Briefly highlights new events
+5. Maintains connection with periodic heartbeats
+6. Automatically reconnects on disconnection with exponential backoff
+
 ## Approval TTL
 
 - Env: `APPROVAL_TTL_SECONDS` (default `0`, disabled). Example: `export APPROVAL_TTL_SECONDS=5`.

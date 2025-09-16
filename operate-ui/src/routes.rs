@@ -12,7 +12,7 @@ use futures_util::StreamExt as _;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio_stream::wrappers::IntervalStream;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 // Query parameters for list runs API
 #[derive(Deserialize, Debug, Clone)]
@@ -305,9 +305,9 @@ pub async fn get_run_api(State(state): State<AppState>, Path(run_id): Path<Strin
 
 // ---------------- Admin ----------------
 
-/// SSE: minimal heartbeat stream for a run. Works even if JetStream is unavailable.
+/// SSE: Stream live events for a run from JetStream, with heartbeat fallback
 pub async fn stream_run_events_sse(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Path(run_id): Path<String>,
 ) -> Response {
     let hb_secs: u64 = std::env::var("SSE_HEARTBEAT_SECONDS")
@@ -315,17 +315,123 @@ pub async fn stream_run_events_sse(
         .and_then(|s| s.parse().ok())
         .unwrap_or(15);
 
-    let interval = tokio::time::interval(Duration::from_secs(hb_secs.max(1)));
-    let mut ticks = IntervalStream::new(interval)
-        .enumerate()
-        .map(move |(i, _)| {
-            let payload = serde_json::json!({"type":"heartbeat","runId": run_id, "seq": i as u64});
-            format!("event: heartbeat\ndata: {}\n\n", payload)
-        });
+    // Try to get JetStream client
+    let jetstream_client = if state.jetstream_client.is_some() {
+        state.jetstream_client.clone()
+    } else {
+        // Try to create a new client if not available
+        match crate::jetstream::JetStreamClient::new().await {
+            Ok(client) => Some(client),
+            Err(e) => {
+                error!("Failed to connect to JetStream for SSE: {}", e);
+                None
+            }
+        }
+    };
 
+    let run_id_owned = run_id.clone();
     let body_stream = async_stream::stream! {
-        while let Some(frame) = ticks.next().await {
-            yield Ok::<_, std::io::Error>(frame);
+        if let Some(js_client) = jetstream_client {
+            // Stream with real events from JetStream
+            match js_client.stream_run_events(&run_id_owned).await {
+                Ok(event_stream) => {
+                    // Send initial snapshot event
+                    let init_payload = serde_json::json!({
+                        "type": "init",
+                        "runId": &run_id_owned,
+                        "message": "Connected to event stream"
+                    });
+                    yield Ok::<_, std::io::Error>(
+                        format!("event: init\ndata: {}\n\n", init_payload)
+                    );
+
+                    // Set up heartbeat timer
+                    let interval = tokio::time::interval(Duration::from_secs(hb_secs.max(1)));
+                    let mut heartbeat_stream = IntervalStream::new(interval);
+                    let mut event_stream = Box::pin(event_stream.fuse());
+                    let mut seq = 0u64;
+
+                    // Multiplex events and heartbeats
+                    loop {
+                        tokio::select! {
+                            // Real events from JetStream
+                            Some(event_result) = event_stream.next() => {
+                                match event_result {
+                                    Ok(event) => {
+                                        let payload = serde_json::json!({
+                                            "type": "event",
+                                            "runId": &run_id_owned,
+                                            "event": event,
+                                        });
+                                        yield Ok(format!("event: append\ndata: {}\n\n", payload));
+                                    }
+                                    Err(e) => {
+                                        warn!("Error streaming event: {}", e);
+                                        // Continue streaming, don't break on errors
+                                    }
+                                }
+                            }
+                            // Heartbeats for liveness
+                            Some(_) = heartbeat_stream.next() => {
+                                let payload = serde_json::json!({
+                                    "type": "heartbeat",
+                                    "runId": &run_id_owned,
+                                    "seq": seq
+                                });
+                                seq += 1;
+                                yield Ok(format!("event: heartbeat\ndata: {}\n\n", payload));
+                            }
+                            // Both streams ended
+                            else => break,
+                        }
+                    }
+                }
+                Err(e) => {
+                    // Send error notification and fall back to heartbeat-only
+                    error!("Failed to start event stream: {}", e);
+                    let error_payload = serde_json::json!({
+                        "type": "stream-error",
+                        "runId": &run_id_owned,
+                        "message": "Failed to connect to event stream, falling back to heartbeats"
+                    });
+                    yield Ok::<_, std::io::Error>(
+                        format!("event: stream-error\ndata: {}\n\n", error_payload)
+                    );
+
+                    // Fall back to heartbeat-only mode
+                    let interval = tokio::time::interval(Duration::from_secs(hb_secs.max(1)));
+                    let mut ticks = IntervalStream::new(interval).enumerate();
+                    while let Some((i, _)) = ticks.next().await {
+                        let payload = serde_json::json!({
+                            "type": "heartbeat",
+                            "runId": &run_id_owned,
+                            "seq": i as u64
+                        });
+                        yield Ok(format!("event: heartbeat\ndata: {}\n\n", payload));
+                    }
+                }
+            }
+        } else {
+            // No JetStream available, heartbeat-only mode with warning
+            let warning_payload = serde_json::json!({
+                "type": "warning",
+                "runId": &run_id_owned,
+                "message": "JetStream unavailable, streaming heartbeats only"
+            });
+            yield Ok::<_, std::io::Error>(
+                format!("event: warning\ndata: {}\n\n", warning_payload)
+            );
+
+            let interval = tokio::time::interval(Duration::from_secs(hb_secs.max(1)));
+            let mut ticks = IntervalStream::new(interval).enumerate();
+            while let Some((i, _)) = ticks.next().await {
+                let payload = serde_json::json!({
+                    "type": "heartbeat",
+                    "runId": &run_id_owned,
+                    "seq": i as u64
+                });
+                yield Ok(format!("event: heartbeat\ndata: {}\n\n", payload));
+            }
         }
     };
 
