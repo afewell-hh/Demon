@@ -12,10 +12,10 @@ jobs:
   backfill:
     runs-on: ubuntu-latest
     if: ${{ secrets.ADMINTOKEN_DEMON_AFEWELLHH != '' }}
+    # Use a minimal default GITHUB_TOKEN; all privileged calls go through GH_TOKEN (PAT)
     permissions:
       contents: read
       issues: read
-      repository-projects: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
