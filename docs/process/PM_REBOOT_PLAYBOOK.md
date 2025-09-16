@@ -26,7 +26,8 @@ Purpose: enable a fresh PM session (new context window) to regain full mastery q
   - `REVIEWER_TOKEN` — collaborator context (fallback only when necessary).
   - `PROTECTION_TOKEN` — admin read‑only for audits.
 - Actions Secrets (never print): repo settings
-  - `ADMINTOKEN_DEMON_AFEWELLHH` — fine‑grained for Project V2 automation.
+  - `PROJECT_ADMIN_TOKEN` — primary secret for project automation/backfill workflows.
+  - `ADMINTOKEN_DEMON_AFEWELLHH` — fallback for Project V2 automation (used only if PROJECT_ADMIN_TOKEN absent).
   - `PROTECTION_TOKEN` — protection audit workflow.
   - `REVIEWER_TOKEN` — collaborator automation if needed.
 - Pattern: `export GH_TOKEN="$GITHUB_TOKEN"` for CLI; never echo tokens.
@@ -42,7 +43,7 @@ Purpose: enable a fresh PM session (new context window) to regain full mastery q
 - Project board (V2): https://github.com/users/afewell-hh/projects/1 (configure views Backlog/Area/Target Release).
 - Automation:
   - Auto‑add: .github/workflows/project-auto-add.yml:1 — adds `story` issues, sets defaults (handles single‑select/text).
-  - Backfill: .github/workflows/project-backfill.yml:1 — manual `workflow_dispatch` with `issue_numbers`.
+  - Backfill: .github/workflows/project-backfill.yml:1 — manual `workflow_dispatch` with `issue_numbers`; now schedules normally after recent fixes.
 - GraphQL quick‑refs (Project V2): see docs/process/MVP.md:1 and .github/GOVERNANCE.md:29 for API usage patterns.
 
 ## 6) First Hour In A New Session (Checklist)

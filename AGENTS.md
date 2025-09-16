@@ -90,7 +90,8 @@
 ## CI, Tokens & Secrets
 - **Local GH auth**: `gh` must be authenticated as `afewell-hh`. `.env` may export `GH_TOKEN` for CLI use (do not commit).
 - **Admin/tokenized calls in CI**:
-  - Use `PROTECTION_TOKEN` (or `ADMINTOKEN_DEMON_AFEWELLHH`) **only** in workflows that gate admin endpoints; guard with `if: env.PROTECTION_TOKEN != ''` and request minimal `permissions`.
+  - Use `PROJECT_ADMIN_TOKEN` for Project V2 automation (Project Backfill workflow); falls back to `ADMINTOKEN_DEMON_AFEWELLHH` if absent.
+  - Use `PROTECTION_TOKEN` **only** in workflows that gate admin endpoints; guard with `if: env.PROTECTION_TOKEN != ''` and request minimal `permissions`.
   - Never print tokens; never echo secrets to logs.
 - **Cargo/security**:
   - `cargo-deny` step may be `continue-on-error: true` (non-protected signal).
