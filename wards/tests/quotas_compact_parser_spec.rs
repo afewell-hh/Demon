@@ -1,5 +1,5 @@
-use wards::config::{load_from_env, QuotaCfg};
 use serial_test::serial;
+use wards::config::{load_from_env, QuotaCfg};
 
 #[test]
 #[serial]
