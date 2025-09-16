@@ -88,7 +88,7 @@ docker exec nats nats stream ls || true
 ```bash
 DEMON_SKIP_STREAM_BOOTSTRAP=1 cargo run -p operate-ui
 # GET /api/runs -> 200 {"runs":[]} with X-Demon-Warn
-# Visit /runs -> shows "No event stream found. See Runbook: setup."
+# Visit /runs -> shows "JetStream is not available. Unable to retrieve runs from the event store."
 ```
 
 4) Create stream and publish two fixtures

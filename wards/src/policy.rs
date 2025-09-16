@@ -101,9 +101,11 @@ impl PolicyKernel {
 mod tests {
     use super::*;
     use crate::config::WardsConfig;
+    use serial_test::serial;
     use std::collections::HashMap;
 
     #[test]
+    #[serial]
     fn quota_key_scopes_by_tenant_when_enabled() {
         std::env::set_var("TENANTING_ENABLED", "1");
         assert_eq!(
@@ -114,6 +116,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn quota_key_is_global_when_disabled() {
         std::env::set_var("TENANTING_ENABLED", "0");
         assert_eq!(super::quota_key(Some("t1"), "capsule.echo"), "capsule.echo");
@@ -121,6 +124,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn separate_counters_per_capability() {
         let mut cfg = WardsConfig::default();
         cfg.cap_quotas.insert(

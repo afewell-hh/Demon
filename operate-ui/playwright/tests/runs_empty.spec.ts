@@ -1,10 +1,17 @@
 import { test, expect } from "@playwright/test";
 
-test("runs page shows banner when stream is missing", async ({ page, baseURL }) => {
+test("runs page surfaces JetStream status", async ({ page, baseURL }) => {
   await page.goto(`${baseURL}/runs`);
-  await expect(page.locator("body")).toContainText(
-    "No event stream found. See Runbook: setup."
-  );
+
+  const statusBadge = page.locator(".status-indicator").first();
+  await expect(statusBadge).toContainText(/JetStream (Connected|Unavailable)/);
+
+  const badgeText = (await statusBadge.textContent()) || "";
+  if (badgeText.includes("JetStream Unavailable")) {
+    await expect(page.locator(".alert.alert-warning")).toContainText(
+      "JetStream is not available. Unable to retrieve runs from the event store."
+    );
+  }
 
   // Poll for the API response to be properly shaped (handles race conditions)
   await expect
@@ -23,4 +30,3 @@ test("runs page shows banner when stream is missing", async ({ page, baseURL }) 
     }, { timeout: 30000, intervals: [500, 1000, 2000] })
     .not.toBe(-1);
 });
-
