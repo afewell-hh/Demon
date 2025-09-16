@@ -45,4 +45,3 @@ async fn list_runs_api_rejects_invalid_limit() {
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 }
-
