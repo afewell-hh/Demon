@@ -15,6 +15,30 @@
         </div>
     </div>
 
+    <div style="display:flex; gap: 0.75rem; align-items: end; flex-wrap: wrap; margin-bottom: 0.5rem;">
+        <div>
+            <label for="f-ritual" class="form-label">Ritual</label>
+            <input id="f-ritual" type="text" class="form-input" placeholder="contains…" value="{{ ritual_filter | default(value="") }}">
+        </div>
+        <div>
+            <label for="f-run" class="form-label">Run ID</label>
+            <input id="f-run" type="text" class="form-input" placeholder="contains…" value="{{ run_id_filter | default(value="") }}">
+        </div>
+        <div>
+            <label for="f-status" class="form-label">Status</label>
+            <select id="f-status" class="form-input">
+                {% set sel = status_filter | default(value="") | lower %}
+                <option value="">Any</option>
+                <option value="Running" {% if sel == "running" %}selected{% endif %}>Running</option>
+                <option value="Completed" {% if sel == "completed" %}selected{% endif %}>Completed</option>
+                <option value="Failed" {% if sel == "failed" %}selected{% endif %}>Failed</option>
+            </select>
+        </div>
+        <div style="margin-left:auto;">
+            <button id="btn-clear" class="btn btn-secondary" type="button">Clear filters</button>
+        </div>
+    </div>
+
     {% if error %}
         <div class="alert alert-error">
             <strong>Error:</strong> {{ error }}
@@ -104,11 +128,83 @@
 {% endif %}
 
 <script>
-    // Auto-refresh every 30 seconds if JetStream is available
-    {% if jetstream_available %}
-    setTimeout(function() {
-        window.location.reload();
-    }, 30000);
-    {% endif %}
+(function() {
+  const lsKey = 'operateRunsFilters';
+  const ritualEl = document.getElementById('f-ritual');
+  const runEl = document.getElementById('f-run');
+  const statusEl = document.getElementById('f-status');
+  const clearBtn = document.getElementById('btn-clear');
+
+  function readUrl() {
+    const p = new URLSearchParams(window.location.search);
+    return {
+      ritual: p.get('ritual') || '',
+      runId: p.get('runId') || '',
+      status: p.get('status') || ''
+    };
+  }
+  function writeUrl(filters) {
+    const p = new URLSearchParams();
+    if (filters.ritual) p.set('ritual', filters.ritual);
+    if (filters.runId) p.set('runId', filters.runId);
+    if (filters.status) p.set('status', filters.status);
+    const qs = p.toString();
+    const url = qs ? `?${qs}` : window.location.pathname;
+    window.history.replaceState({}, '', url);
+  }
+  function saveLS(filters) {
+    try { localStorage.setItem(lsKey, JSON.stringify(filters)); } catch {}
+  }
+  function loadLS() {
+    try { return JSON.parse(localStorage.getItem(lsKey) || '{}'); } catch { return {}; }
+  }
+  function debounce(fn, ms) {
+    let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+  }
+
+  function currentFilters() {
+    return { ritual: ritualEl.value.trim(), runId: runEl.value.trim(), status: statusEl.value };
+  }
+  function applyFrom(filters) {
+    ritualEl.value = filters.ritual || '';
+    runEl.value = filters.runId || '';
+    statusEl.value = filters.status || '';
+  }
+
+  // Initialize: prefer URL, then fallback to localStorage (and sync URL)
+  const fromUrl = readUrl();
+  if (!(fromUrl.ritual || fromUrl.runId || fromUrl.status)) {
+    const ls = loadLS();
+    if (ls.ritual || ls.runId || ls.status) {
+      applyFrom(ls);
+      writeUrl(ls);
+    }
+  }
+
+  const sync = debounce(() => {
+    const f = currentFilters();
+    writeUrl(f);
+    saveLS(f);
+    // Reload to fetch filtered server-side results (keeps HTML simple and canonical)
+    window.location.href = window.location.pathname + window.location.search;
+  }, 250);
+
+  ritualEl.addEventListener('input', sync);
+  runEl.addEventListener('input', sync);
+  statusEl.addEventListener('change', sync);
+  clearBtn.addEventListener('click', () => {
+    ritualEl.value = '';
+    runEl.value = '';
+    statusEl.value = '';
+    writeUrl({});
+    saveLS({});
+    window.location.href = window.location.pathname;
+  });
+
+  // Auto-refresh every 30s when JetStream is available and no active SSE on details page
+  {% if jetstream_available %}
+  setTimeout(function() { window.location.reload(); }, 30000);
+  {% endif %}
+})();
 </script>
 {% endblock %}

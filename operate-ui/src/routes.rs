@@ -12,9 +12,23 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info};
 
 // Query parameters for list runs API
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct ListRunsQuery {
-    limit: Option<usize>,
+    pub limit: Option<usize>,
+    #[serde(rename = "ritual")]
+    pub ritual_filter: Option<String>,
+    #[serde(rename = "runId")]
+    pub run_id_filter: Option<String>,
+    pub status: Option<String>, // Running | Completed | Failed
+}
+
+fn parse_status_filter(s: &str) -> Option<crate::jetstream::RunStatus> {
+    match s.to_ascii_lowercase().as_str() {
+        "running" => Some(crate::jetstream::RunStatus::Running),
+        "completed" => Some(crate::jetstream::RunStatus::Completed),
+        "failed" => Some(crate::jetstream::RunStatus::Failed),
+        _ => None,
+    }
 }
 
 /// List runs - HTML response
@@ -23,14 +37,25 @@ pub async fn list_runs_html(
     State(state): State<AppState>,
     Query(query): Query<ListRunsQuery>,
 ) -> Html<String> {
-    debug!(
-        "Handling HTML request to list runs with limit: {:?}",
-        query.limit
-    );
+    debug!("Handling HTML list runs: {:?}", query);
 
     let (runs, error) = match &state.jetstream_client {
         Some(client) => match client.list_runs(query.limit).await {
-            Ok(runs) => {
+            Ok(mut runs) => {
+                // Apply in-memory filters (fast, bounded by limit)
+                if let Some(ref r) = query.ritual_filter {
+                    let needle = r.to_ascii_lowercase();
+                    runs.retain(|x| x.ritual_id.to_ascii_lowercase().contains(&needle));
+                }
+                if let Some(ref r) = query.run_id_filter {
+                    let needle = r.to_ascii_lowercase();
+                    runs.retain(|x| x.run_id.to_ascii_lowercase().contains(&needle));
+                }
+                if let Some(ref s) = query.status {
+                    if let Some(want) = parse_status_filter(s) {
+                        runs.retain(|x| x.status == want);
+                    }
+                }
                 info!("Successfully retrieved {} runs for HTML", runs.len());
                 (runs, None)
             }
@@ -47,6 +72,10 @@ pub async fn list_runs_html(
     context.insert("error", &error);
     context.insert("jetstream_available", &state.jetstream_client.is_some());
     context.insert("current_page", &"runs");
+    // Reflect current filters in the template for persistence helpers
+    context.insert("ritual_filter", &query.ritual_filter);
+    context.insert("run_id_filter", &query.run_id_filter);
+    context.insert("status_filter", &query.status);
 
     let html = state
         .tera
@@ -76,14 +105,48 @@ pub async fn list_runs_api(
     State(state): State<AppState>,
     Query(query): Query<ListRunsQuery>,
 ) -> Response {
-    debug!(
-        "Handling JSON API request to list runs with limit: {:?}",
-        query.limit
-    );
+    debug!("Handling JSON API list runs: {:?}", query);
+
+    // Validate inputs
+    if let Some(limit) = query.limit {
+        if limit == 0 || limit > 1000 {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({
+                    "error": "invalid 'limit': must be 1..=1000"
+                })),
+            )
+                .into_response();
+        }
+    }
+    if let Some(ref s) = query.status {
+        if parse_status_filter(s).is_none() {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({
+                    "error": "invalid 'status': expected one of Running, Completed, Failed"
+                })),
+            )
+                .into_response();
+        }
+    }
 
     match &state.jetstream_client {
         Some(client) => match client.list_runs(query.limit).await {
-            Ok(runs) => {
+            Ok(mut runs) => {
+                if let Some(ref r) = query.ritual_filter {
+                    let needle = r.to_ascii_lowercase();
+                    runs.retain(|x| x.ritual_id.to_ascii_lowercase().contains(&needle));
+                }
+                if let Some(ref r) = query.run_id_filter {
+                    let needle = r.to_ascii_lowercase();
+                    runs.retain(|x| x.run_id.to_ascii_lowercase().contains(&needle));
+                }
+                if let Some(ref s) = query.status {
+                    if let Some(want) = parse_status_filter(s) {
+                        runs.retain(|x| x.status == want);
+                    }
+                }
                 info!("Successfully retrieved {} runs for API", runs.len());
                 Json(runs).into_response()
             }
