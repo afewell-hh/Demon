@@ -1,7 +1,7 @@
 # Governance & Protection Status
 
 ## Branch Protection Configuration
-**Last verified:** 2025-09-12  
+**Last verified:** 2025-09-16  
 **Status:** ✅ ACTIVE
 
 ### Required Checks (main branch)
@@ -11,11 +11,11 @@
 
 ### Protection Settings
 - ✅ Require pull request before merging
-- ✅ Require review from Code Owners  
+- ❌ Require review from Code Owners  
 - ✅ Dismiss stale approvals on new commits
-- ✅ Require status checks to pass
+- ✅ Require status checks to pass (strict = false)
 - ✅ Require linear history
-- ✅ Require branches to be up to date
+- ❌ Require branches to be up to date (strict = false)
 
 ## Secrets & PAT Management
 **PROTECTION_TOKEN**
