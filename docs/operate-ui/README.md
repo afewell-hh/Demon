@@ -23,7 +23,55 @@ Then visit:
 - Deterministic fetch: multi-batch reads until a short batch; no hangs.
 - Failure mode: if NATS is down, HTML pages render a friendly error; APIs return 502.
 - Review protocol: open PR as Draft, satisfy the Evidence Checklist, then freeze at a commit SHA for review.
-<<<<<<< HEAD
+- Stream selection: set `RITUAL_STREAM_NAME` (default `RITUAL_EVENTS`). If absent, the UI will fall back to the legacy `DEMON_RITUAL_EVENTS` stream and log a deprecation warning.
+
+## Approval TTL
+
+- Env: `APPROVAL_TTL_SECONDS` (default `0`, disabled). Example: `export APPROVAL_TTL_SECONDS=5`.
+- Behavior: when `approval.requested:v1` is appended (via engine hook), a timer is scheduled for `requested_ts + TTL` with ID `"{runId}:approval:{gateId}:expiry"`.
+- On expiry: if no terminal exists for the gate, the system appends `approval.denied:v1` with `{"reason":"expired","approver":"system"}` using idempotency key `"{runId}:approval:{gateId}:denied"`.
+- UI: shows status as `Denied — expired` when the denial reason is `expired`.
+
+## TTL Worker (approvals expiry)
+
+- Start: `TTL_WORKER_ENABLED=1 cargo run -p engine --bin demon-ttl-worker`
+- Env:
+  - `NATS_URL` (default `nats://127.0.0.1:4222`)
+  - `RITUAL_STREAM_NAME` (optional; else `RITUAL_EVENTS` then `DEMON_RITUAL_EVENTS`)
+  - `TTL_CONSUMER_NAME` (default `ttl-worker`), `TTL_BATCH` (100), `TTL_PULL_TIMEOUT_MS` (1500)
+- Behavior: consumes `timer.scheduled:v1` on `demon.ritual.v1.*.*.events`, calls auto-expiry, acks on success/no-op.
+- Monitoring: logs `ttl_worker` events and in-process counters.
+
+## Preview Mode
+
+- See docs/preview/alpha/runbook.md for a 10‑minute, one‑command demo.
+ - After starting the UI and TTL worker, run `./examples/seed/seed_preview.sh` and open `/runs`.
+- Preview Mode links:
+   - Runbook (One‑Pager): `docs/preview/alpha/runbook.md`
+   - Client Deck (5 slides): `docs/preview/alpha/deck.md`
+   - Presenter Script (60‑sec): `docs/preview/alpha/presenter_script.md`
+  - Dry‑Run Checklist: `docs/preview/alpha/dry_run_checklist.md`
+
+## Admin Probe (dev-only)
+
+- Endpoint: `/admin/templates/report` returns JSON `{ template_ready, has_filter_tojson, templates }` used by the bootstrapper verify phase.
+- Optional auth: set `ADMIN_TOKEN` in the environment to require header `X-Admin-Token: <token>`; without it, the probe is unauthenticated (dev-only).
+- Admin: `/admin/templates/report` shows `template_ready=true` and `has_filter_tojson=true`.
+
+## Approvals Endpoints — HTTP Semantics
+
+Endpoints:
+- `POST /api/approvals/:runId/:gateId/grant` body `{ approver, note? }`
+- `POST /api/approvals/:runId/:gateId/deny` body `{ approver, reason }`
+
+Behavior (first‑writer‑wins):
+- First terminal for a gate → `200 OK` with JSON body of the published event.
+- Duplicate terminal (same as current state) → `200 OK` with `{ "status": "noop" }` (no new event).
+- Conflicting terminal (opposite of current state) → `409 CONFLICT` with `{ "error": "gate already resolved", "state": "granted|denied" }` (no new event).
+
+Notes:
+- Endpoints append events; they never mutate history. The run timeline is the source of truth.
+- Idempotency keys: `approval.requested` uses `"<runId>:approval:<gateId>"`; terminals append `":granted"` or `":denied"`.
 
 ## Local Bootstrap & Troubleshooting
 1) Start NATS
@@ -83,54 +131,3 @@ nats pub -H 'Nats-Msg-Id: e2e-run:2' \
 - /api/runs now lists the run
 - /api/runs/e2e-run shows ordered events
 - /runs and /runs/e2e-run render correctly
-=======
-- Stream selection: set `RITUAL_STREAM_NAME` (default `RITUAL_EVENTS`). If absent, the UI will fall back to the legacy `DEMON_RITUAL_EVENTS` stream and log a deprecation warning.
-
-## Approval TTL
-
-- Env: `APPROVAL_TTL_SECONDS` (default `0`, disabled). Example: `export APPROVAL_TTL_SECONDS=5`.
-- Behavior: when `approval.requested:v1` is appended (via engine hook), a timer is scheduled for `requested_ts + TTL` with ID `"{runId}:approval:{gateId}:expiry"`.
-- On expiry: if no terminal exists for the gate, the system appends `approval.denied:v1` with `{"reason":"expired","approver":"system"}` using idempotency key `"{runId}:approval:{gateId}:denied"`.
-- UI: shows status as `Denied — expired` when the denial reason is `expired`.
-
-## TTL Worker (approvals expiry)
-
-- Start: `TTL_WORKER_ENABLED=1 cargo run -p engine --bin demon-ttl-worker`
-- Env:
-  - `NATS_URL` (default `nats://127.0.0.1:4222`)
-  - `RITUAL_STREAM_NAME` (optional; else `RITUAL_EVENTS` then `DEMON_RITUAL_EVENTS`)
-  - `TTL_CONSUMER_NAME` (default `ttl-worker`), `TTL_BATCH` (100), `TTL_PULL_TIMEOUT_MS` (1500)
-- Behavior: consumes `timer.scheduled:v1` on `demon.ritual.v1.*.*.events`, calls auto-expiry, acks on success/no-op.
-- Monitoring: logs `ttl_worker` events and in-process counters.
-
-## Preview Mode
-
-- See docs/preview/alpha/runbook.md for a 10‑minute, one‑command demo.
- - After starting the UI and TTL worker, run `./examples/seed/seed_preview.sh` and open `/runs`.
-- Preview Mode links:
-   - Runbook (One‑Pager): `docs/preview/alpha/runbook.md`
-   - Client Deck (5 slides): `docs/preview/alpha/deck.md`
-   - Presenter Script (60‑sec): `docs/preview/alpha/presenter_script.md`
-  - Dry‑Run Checklist: `docs/preview/alpha/dry_run_checklist.md`
-
-## Admin Probe (dev-only)
-
-- Endpoint: `/admin/templates/report` returns JSON `{ template_ready, has_filter_tojson, templates }` used by the bootstrapper verify phase.
-- Optional auth: set `ADMIN_TOKEN` in the environment to require header `X-Admin-Token: <token>`; without it, the probe is unauthenticated (dev-only).
-- Admin: `/admin/templates/report` shows `template_ready=true` and `has_filter_tojson=true`.
-
-## Approvals Endpoints — HTTP Semantics
-
-Endpoints:
-- `POST /api/approvals/:runId/:gateId/grant` body `{ approver, note? }`
-- `POST /api/approvals/:runId/:gateId/deny` body `{ approver, reason }`
-
-Behavior (first‑writer‑wins):
-- First terminal for a gate → `200 OK` with JSON body of the published event.
-- Duplicate terminal (same as current state) → `200 OK` with `{ "status": "noop" }` (no new event).
-- Conflicting terminal (opposite of current state) → `409 CONFLICT` with `{ "error": "gate already resolved", "state": "granted|denied" }` (no new event).
-
-Notes:
-- Endpoints append events; they never mutate history. The run timeline is the source of truth.
-- Idempotency keys: `approval.requested` uses `"<runId>:approval:<gateId>"`; terminals append `":granted"` or `":denied"`.
->>>>>>> origin/main
