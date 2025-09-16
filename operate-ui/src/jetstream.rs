@@ -62,6 +62,8 @@ pub struct RitualEvent {
     pub state_from: Option<String>,
     #[serde(rename = "stateTo", skip_serializing_if = "Option::is_none")]
     pub state_to: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub stream_sequence: Option<u64>,
     #[serde(flatten)]
     pub extra: HashMap<String, serde_json::Value>,
 }
@@ -517,6 +519,8 @@ impl JetStreamClient {
         let payload: serde_json::Value = serde_json::from_slice(&message.message.payload)
             .context("Failed to parse message payload as JSON")?;
 
+        let stream_sequence = message.info().ok().map(|info| info.stream_sequence);
+
         let ts = if let Some(ts_str) = payload.get("ts").and_then(|v| v.as_str()) {
             ts_str
                 .parse::<DateTime<Utc>>()
@@ -557,6 +561,7 @@ impl JetStreamClient {
             event,
             state_from,
             state_to,
+            stream_sequence,
             extra,
         }))
     }

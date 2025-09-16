@@ -665,12 +665,19 @@ pub struct DenyBody {
     reason: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PublishOutcome {
+    Published,
+    Conflict,
+}
+
 async fn publish_approval_event(
     ritual_id: &str,
     run_id: &str,
     payload: serde_json::Value,
     msg_id: String,
-) -> anyhow::Result<()> {
+    expected_stream_sequence: Option<u64>,
+) -> anyhow::Result<PublishOutcome> {
     use async_nats::jetstream;
     let url = std::env::var("NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".to_string());
     let client = async_nats::connect(&url).await?;
@@ -705,10 +712,27 @@ async fn publish_approval_event(
     let subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
     let mut headers = async_nats::HeaderMap::new();
     headers.insert("Nats-Msg-Id", msg_id.as_str());
-    js.publish_with_headers(subject, headers, serde_json::to_vec(&payload)?.into())
+    if let Some(seq) = expected_stream_sequence {
+        let expected_header = seq.to_string();
+        headers.insert(
+            "Nats-Expected-Last-Subject-Sequence",
+            expected_header.as_str(),
+        );
+    }
+    match js
+        .publish_with_headers(subject, headers, serde_json::to_vec(&payload)?.into())
         .await?
-        .await?;
-    Ok(())
+        .await
+    {
+        Ok(_) => Ok(PublishOutcome::Published),
+        Err(err)
+            if err.kind()
+                == async_nats::jetstream::context::PublishErrorKind::WrongLastSequence =>
+        {
+            Ok(PublishOutcome::Conflict)
+        }
+        Err(err) => Err(err.into()),
+    }
 }
 
 fn approver_allowed(email: &str) -> bool {
@@ -740,7 +764,11 @@ pub async fn grant_approval_api(
             .into_response();
     }
     if !approver_allowed(&body.approver) {
-        return (StatusCode::FORBIDDEN, "approver not allowed").into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "approver not allowed" })),
+        )
+            .into_response();
     }
 
     // Ensure stream exists before attempting to read (if explicit name set)
@@ -762,7 +790,7 @@ pub async fn grant_approval_api(
     }
 
     // Discover ritualId by looking up run and enforce first-writer-wins on approvals
-    let ritual_id = match &state.jetstream_client {
+    let (ritual_id, expected_sequence) = match &state.jetstream_client {
         Some(js) => match js.get_run_detail(&run_id).await {
             Ok(Some(rd)) => {
                 // Enforce: if a terminal approval already exists for this gate, prevent conflicting writes
@@ -796,15 +824,34 @@ pub async fn grant_approval_api(
                     )
                         .into_response();
                 }
-                rd.ritual_id
+                (
+                    rd.ritual_id,
+                    rd.events.last().and_then(|evt| evt.stream_sequence),
+                )
             }
-            Ok(None) => return (StatusCode::NOT_FOUND, "run not found").into_response(),
+            Ok(None) => {
+                return (
+                    StatusCode::NOT_FOUND,
+                    Json(serde_json::json!({ "error": "run not found" })),
+                )
+                    .into_response()
+            }
             Err(e) => {
                 error!("get_run_detail failed: {}", e);
-                return (StatusCode::BAD_GATEWAY, "JetStream error").into_response();
+                return (
+                    StatusCode::BAD_GATEWAY,
+                    Json(serde_json::json!({ "error": "JetStream error" })),
+                )
+                    .into_response();
             }
         },
-        None => return (StatusCode::BAD_GATEWAY, "JetStream unavailable").into_response(),
+        None => {
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({ "error": "JetStream unavailable" })),
+            )
+                .into_response()
+        }
     };
 
     let now = chrono::Utc::now().to_rfc3339();
@@ -823,23 +870,65 @@ pub async fn grant_approval_api(
         payload["runId"].as_str().unwrap(),
         payload["gateId"].as_str().unwrap()
     );
-    if let Err(e) = publish_approval_event(
+    match publish_approval_event(
         payload["ritualId"].as_str().unwrap(),
         payload["runId"].as_str().unwrap(),
         payload.clone(),
         msg_id,
+        expected_sequence,
     )
     .await
     {
-        error!("failed to publish: {}", e);
-        return (
-            StatusCode::BAD_GATEWAY,
-            Json(serde_json::json!({"error": format!("publish failed: {}", e)})),
-        )
-            .into_response();
+        Ok(PublishOutcome::Published) => (StatusCode::OK, Json(payload)).into_response(),
+        Ok(PublishOutcome::Conflict) => {
+            // Attempt to refresh state to report the final gate disposition
+            let state_info = match &state.jetstream_client {
+                Some(js) => js
+                    .get_run_detail(&run_id)
+                    .await
+                    .ok()
+                    .and_then(|opt| opt)
+                    .and_then(|rd| {
+                        rd.events.iter().rev().find_map(|evt| {
+                            if (evt.event == "approval.granted:v1"
+                                || evt.event == "approval.denied:v1")
+                                && evt
+                                    .extra
+                                    .get("gateId")
+                                    .and_then(|v| v.as_str())
+                                    .map(|g| g == gate_id)
+                                    .unwrap_or(false)
+                            {
+                                Some(if evt.event == "approval.granted:v1" {
+                                    "granted"
+                                } else {
+                                    "denied"
+                                })
+                            } else {
+                                None
+                            }
+                        })
+                    }),
+                None => None,
+            };
+            let mut body = serde_json::json!({
+                "error": "approval write conflict",
+                "hint": "refresh run timeline",
+            });
+            if let Some(state) = state_info {
+                body["state"] = serde_json::Value::String(state.to_string());
+            }
+            (StatusCode::CONFLICT, Json(body)).into_response()
+        }
+        Err(e) => {
+            error!("failed to publish: {}", e);
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({"error": format!("publish failed: {}", e)})),
+            )
+                .into_response()
+        }
     }
-
-    (StatusCode::OK, Json(payload)).into_response()
 }
 
 #[axum::debug_handler]
@@ -860,7 +949,11 @@ pub async fn deny_approval_api(
             .into_response();
     }
     if !approver_allowed(&body.approver) {
-        return (StatusCode::FORBIDDEN, "approver not allowed").into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "approver not allowed" })),
+        )
+            .into_response();
     }
 
     // Ensure stream exists before attempting to read
@@ -884,7 +977,7 @@ pub async fn deny_approval_api(
         }
     }
 
-    let ritual_id = match &state.jetstream_client {
+    let (ritual_id, expected_sequence) = match &state.jetstream_client {
         Some(js) => match js.get_run_detail(&run_id).await {
             Ok(Some(rd)) => {
                 if let Some(last) = rd.events.iter().rev().find(|e| {
@@ -916,15 +1009,34 @@ pub async fn deny_approval_api(
                     )
                         .into_response();
                 }
-                rd.ritual_id
+                (
+                    rd.ritual_id,
+                    rd.events.last().and_then(|evt| evt.stream_sequence),
+                )
             }
-            Ok(None) => return (StatusCode::NOT_FOUND, "run not found").into_response(),
+            Ok(None) => {
+                return (
+                    StatusCode::NOT_FOUND,
+                    Json(serde_json::json!({ "error": "run not found" })),
+                )
+                    .into_response()
+            }
             Err(e) => {
                 error!("get_run_detail failed: {}", e);
-                return (StatusCode::BAD_GATEWAY, "JetStream error").into_response();
+                return (
+                    StatusCode::BAD_GATEWAY,
+                    Json(serde_json::json!({ "error": "JetStream error" })),
+                )
+                    .into_response();
             }
         },
-        None => return (StatusCode::BAD_GATEWAY, "JetStream unavailable").into_response(),
+        None => {
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({ "error": "JetStream unavailable" })),
+            )
+                .into_response()
+        }
     };
 
     let now = chrono::Utc::now().to_rfc3339();
@@ -943,23 +1055,64 @@ pub async fn deny_approval_api(
         payload["runId"].as_str().unwrap(),
         payload["gateId"].as_str().unwrap()
     );
-    if let Err(e) = publish_approval_event(
+    match publish_approval_event(
         payload["ritualId"].as_str().unwrap(),
         payload["runId"].as_str().unwrap(),
         payload.clone(),
         msg_id,
+        expected_sequence,
     )
     .await
     {
-        error!("failed to publish: {}", e);
-        return (
-            StatusCode::BAD_GATEWAY,
-            Json(serde_json::json!({"error": format!("publish failed: {}", e)})),
-        )
-            .into_response();
+        Ok(PublishOutcome::Published) => (StatusCode::OK, Json(payload)).into_response(),
+        Ok(PublishOutcome::Conflict) => {
+            let state_info = match &state.jetstream_client {
+                Some(js) => js
+                    .get_run_detail(&run_id)
+                    .await
+                    .ok()
+                    .and_then(|opt| opt)
+                    .and_then(|rd| {
+                        rd.events.iter().rev().find_map(|evt| {
+                            if (evt.event == "approval.granted:v1"
+                                || evt.event == "approval.denied:v1")
+                                && evt
+                                    .extra
+                                    .get("gateId")
+                                    .and_then(|v| v.as_str())
+                                    .map(|g| g == gate_id)
+                                    .unwrap_or(false)
+                            {
+                                Some(if evt.event == "approval.granted:v1" {
+                                    "granted"
+                                } else {
+                                    "denied"
+                                })
+                            } else {
+                                None
+                            }
+                        })
+                    }),
+                None => None,
+            };
+            let mut body = serde_json::json!({
+                "error": "approval write conflict",
+                "hint": "refresh run timeline",
+            });
+            if let Some(state) = state_info {
+                body["state"] = serde_json::Value::String(state.to_string());
+            }
+            (StatusCode::CONFLICT, Json(body)).into_response()
+        }
+        Err(e) => {
+            error!("failed to publish: {}", e);
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({"error": format!("publish failed: {}", e)})),
+            )
+                .into_response()
+        }
     }
-
-    (StatusCode::OK, Json(payload)).into_response()
 }
 
 #[cfg(test)]
@@ -989,6 +1142,7 @@ mod tests {
             event: "ritual.started:v1".to_string(),
             state_from: Some("idle".to_string()),
             state_to: Some("running".to_string()),
+            stream_sequence: None,
             extra: HashMap::new(),
         };
 
@@ -1003,6 +1157,7 @@ mod tests {
             event: "ritual.started:v1".to_string(),
             state_from: None,
             state_to: None,
+            stream_sequence: None,
             extra: HashMap::new(),
         }];
 
@@ -1019,6 +1174,7 @@ mod tests {
             event: "ritual.completed:v1".to_string(),
             state_from: None,
             state_to: None,
+            stream_sequence: None,
             extra: HashMap::new(),
         });
 
