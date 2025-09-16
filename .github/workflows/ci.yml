@@ -147,10 +147,12 @@ jobs:
         working-directory: operate-ui/playwright
         env:
           BASE_URL: http://127.0.0.1:3000
+          APPROVER_EMAIL: tester@example.com
         run: |
-          # Start server on 3000 without stream bootstrap
+          # Start server on 3000 without stream bootstrap and allow the test approver email
           export DEMON_SKIP_STREAM_BOOTSTRAP=1
-          (cd ../.. && RUST_LOG=info cargo run -p operate-ui --quiet &) 
+          export APPROVER_ALLOWLIST="${APPROVER_EMAIL:-tester@example.com}"
+          (cd ../.. && APPROVER_ALLOWLIST="$APPROVER_ALLOWLIST" RUST_LOG=info cargo run -p operate-ui --quiet &) 
           # Wait for port 3000 to open
           for i in {1..60}; do nc -z 127.0.0.1 3000 && break; sleep 0.5; done
           # Stronger readiness: require HTTP 200 and JSON body from /api/runs
