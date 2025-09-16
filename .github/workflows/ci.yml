@@ -416,7 +416,6 @@ jobs:
   bootstrapper-bundles-verify:
     name: Bootstrapper bundles — verify (offline, signature ok)
     runs-on: ubuntu-latest
-    needs: build-test
     steps:
       - name: Checkout
         uses: actions/checkout@v4
