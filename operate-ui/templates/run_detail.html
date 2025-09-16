@@ -27,7 +27,13 @@
 <div class="card">
     <div class="card-header">
         <h2 class="card-title">Run Details</h2>
-        <span class="status-indicator {{ run_status_class }}">{{ run_status }}</span>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <span class="status-indicator {{ run_status_class }}">{{ run_status }}</span>
+            <span id="connection-status" class="connection-indicator" style="display: none;">
+                <span class="connection-icon">●</span>
+                <span class="connection-text">Offline</span>
+            </span>
+        </div>
     </div>
 
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
@@ -43,7 +49,7 @@
             <strong>Started:</strong><br>
             {{ run_started | default(value="-") }}
         </div>
-        <div>
+        <div id="event-count">
             <strong>Events:</strong><br>
             {{ run.events|length }} events
         </div>
@@ -198,16 +204,193 @@
 
 {% endif %}
 
-{% if jetstream_available %}
+{% if jetstream_available and run %}
+<style>
+.connection-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    background-color: var(--bg-secondary, #f5f5f5);
+}
+
+.connection-indicator.connected {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.connection-indicator.connected .connection-icon {
+    color: #28a745;
+}
+
+.connection-indicator.reconnecting {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.connection-indicator.reconnecting .connection-icon {
+    color: #ffc107;
+    animation: pulse 1.5s infinite;
+}
+
+.connection-indicator.offline {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.connection-indicator.offline .connection-icon {
+    color: #dc3545;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+</style>
+
 <script>
-// Sprint 6: SSE connection with capped backoff + jitter; heartbeats are logged at debug noise level.
+// Real-time event streaming with connection status and live DOM updates
 (function() {
-  const runId = {{ run_id | json }};
+  const runId = {{ run_id | json | safe }};
   const base = window.location.origin;
   const BASE_MS = parseInt((window.SSE_RETRY_BASE_MS || '250'), 10) || 250;
   const MAX_MS  = parseInt((window.SSE_RETRY_MAX_MS  || '5000'), 10) || 5000;
   let attempt = 0;
   let es = null;
+  let eventCount = {{ run.events|length }};
+  let seenTimestamps = new Set();
+
+  // Initialize seen timestamps from existing events
+  {% for event in run.events %}
+  seenTimestamps.add({{ event.ts | json | safe }});
+  {% endfor %}
+
+  function updateConnectionStatus(status, text) {
+    const indicator = document.getElementById('connection-status');
+    if (indicator) {
+      indicator.style.display = 'flex';
+      indicator.className = `connection-indicator ${status}`;
+      indicator.querySelector('.connection-text').textContent = text;
+    }
+  }
+
+  function updateRunStatus(status) {
+    const statusElements = document.querySelectorAll('.status-indicator');
+    statusElements.forEach(el => {
+      if (el.textContent.includes('Running') || el.textContent.includes('Completed') || el.textContent.includes('Failed')) {
+        el.textContent = status;
+        el.className = `status-indicator status-${status.toLowerCase()}`;
+      }
+    });
+  }
+
+  function formatEventName(eventName) {
+    if (eventName === 'ritual.started:v1') return 'Ritual Started';
+    if (eventName === 'ritual.completed:v1') return 'Ritual Completed';
+    if (eventName === 'ritual.failed:v1') return 'Ritual Failed';
+    if (eventName === 'ritual.transitioned:v1') return 'State Transition';
+    if (eventName === 'timer.scheduled:v1') return 'Timer Scheduled';
+    return eventName;
+  }
+
+  function addEventToTimeline(event) {
+    // Check if we've already seen this event
+    if (seenTimestamps.has(event.ts)) {
+      return;
+    }
+    seenTimestamps.add(event.ts);
+
+    const tbody = document.querySelector('.table tbody');
+    if (!tbody) return;
+
+    const row = document.createElement('tr');
+
+    // Timestamp
+    const tsCell = document.createElement('td');
+    tsCell.innerHTML = `<code>${event.ts}</code>`;
+    row.appendChild(tsCell);
+
+    // Event
+    const eventCell = document.createElement('td');
+    eventCell.innerHTML = `
+      <strong>${formatEventName(event.event)}</strong>
+      <div style="font-size: 0.875rem; color: var(--text-secondary);">
+        <code>${event.event}</code>
+      </div>
+    `;
+    row.appendChild(eventCell);
+
+    // State Transition
+    const transitionCell = document.createElement('td');
+    if (event.stateFrom || event.stateTo) {
+      transitionCell.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          ${event.stateFrom ? `<code>${event.stateFrom}</code>` : '<span style="color: var(--text-secondary);">-</span>'}
+          <span>→</span>
+          ${event.stateTo ? `<code>${event.stateTo}</code>` : '<span style="color: var(--text-secondary);">-</span>'}
+        </div>
+      `;
+    } else {
+      transitionCell.innerHTML = '<span style="color: var(--text-secondary);">-</span>';
+    }
+    row.appendChild(transitionCell);
+
+    // Details
+    const detailsCell = document.createElement('td');
+    if (event.extra && Object.keys(event.extra).length > 0) {
+      detailsCell.innerHTML = `
+        <details>
+          <summary style="cursor: pointer; color: var(--primary-color);">
+            ${Object.keys(event.extra).length} field(s)
+          </summary>
+          <pre style="margin-top: 0.5rem; font-size: 0.8rem; background: #f5f5f5; padding: 0.5rem; border-radius: 4px; overflow-x: auto;">${JSON.stringify(event.extra, null, 2)}</pre>
+        </details>
+      `;
+    } else {
+      detailsCell.innerHTML = '<span style="color: var(--text-secondary);">-</span>';
+    }
+    row.appendChild(detailsCell);
+
+    // Insert in chronological order
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    let inserted = false;
+
+    for (let i = 0; i < rows.length; i++) {
+      const existingTs = rows[i].querySelector('td code')?.textContent;
+      if (existingTs && existingTs > event.ts) {
+        tbody.insertBefore(row, rows[i]);
+        inserted = true;
+        break;
+      }
+    }
+
+    if (!inserted) {
+      tbody.appendChild(row);
+    }
+
+    // Update event count
+    eventCount++;
+    const countElement = document.getElementById('event-count');
+    if (countElement) {
+      countElement.innerHTML = '<strong>Events:</strong><br>' + eventCount + ' events';
+    }
+
+    // Update run status if needed
+    if (event.event === 'ritual.completed:v1') {
+      updateRunStatus('Completed');
+    } else if (event.event === 'ritual.failed:v1') {
+      updateRunStatus('Failed');
+    }
+
+    // Highlight new row briefly
+    row.style.backgroundColor = '#ffffcc';
+    setTimeout(() => {
+      row.style.transition = 'background-color 1s';
+      row.style.backgroundColor = '';
+    }, 100);
+  }
 
   function jitter(ms) {
     const delta = Math.floor(ms * 0.2);
@@ -215,22 +398,52 @@
   }
 
   function connect() {
+    updateConnectionStatus('reconnecting', 'Connecting...');
     const url = `${base}/api/runs/${runId}/events/stream`;
     es = new EventSource(url);
 
     es.addEventListener('open', () => {
       console.info('[SSE] connected');
-      attempt = 0; // Reset backoff counter on successful connection
+      attempt = 0;
+      updateConnectionStatus('connected', 'Connected');
     });
+
     es.addEventListener('error', () => {
+      console.warn('[SSE] connection error');
+      updateConnectionStatus('reconnecting', 'Reconnecting...');
       es.close();
       scheduleReconnect();
     });
-    es.addEventListener('heartbeat', (e) => {
-      if (attempt === 0) {
-        // Debug-level only to avoid noisy logs
-        // console.debug('[SSE] heartbeat', e.data);
+
+    es.addEventListener('init', (e) => {
+      console.info('[SSE] initialized:', e.data);
+      updateConnectionStatus('connected', 'Connected');
+    });
+
+    es.addEventListener('append', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.type === 'event' && data.event) {
+          console.debug('[SSE] new event:', data.event.event);
+          addEventToTimeline(data.event);
+        }
+      } catch (err) {
+        console.error('[SSE] failed to parse event:', err);
       }
+    });
+
+    es.addEventListener('warning', (e) => {
+      console.warn('[SSE] warning:', e.data);
+      updateConnectionStatus('connected', 'Connected (degraded)');
+    });
+
+    es.addEventListener('stream-error', (e) => {
+      console.error('[SSE] stream error event:', e.data);
+    });
+
+    es.addEventListener('heartbeat', (e) => {
+      // Heartbeats keep connection alive, logged at debug level only
+      // console.debug('[SSE] heartbeat');
     });
   }
 
@@ -238,22 +451,21 @@
     attempt += 1;
     const backoff = Math.min(MAX_MS, BASE_MS * Math.pow(2, attempt - 1));
     const delay = jitter(backoff);
-    if (attempt === 1) {
-      console.info(`[SSE] reconnecting in ${delay}ms`);
-    } else {
-      // Debug-level only to reduce noise
-      // console.debug(`[SSE] reconnecting in ${delay}ms (attempt ${attempt})`);
-    }
+    console.info(`[SSE] reconnecting in ${delay}ms (attempt ${attempt})`);
+    updateConnectionStatus('offline', `Reconnecting in ${Math.round(delay/1000)}s...`);
     setTimeout(connect, delay);
   }
 
+  // Start connection
   connect();
-})();
 
-// Keep existing auto-refresh for running rituals as a safety net
-{% if run and run.is_running %}
-setTimeout(function() { window.location.reload(); }, 10000);
-{% endif %}
+  // Clean up on page unload
+  window.addEventListener('beforeunload', () => {
+    if (es) {
+      es.close();
+    }
+  });
+})();
 </script>
 {% endif %}
 {% endblock %}

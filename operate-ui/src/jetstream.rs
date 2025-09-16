@@ -565,6 +565,101 @@ impl JetStreamClient {
     fn extract_ritual_id_from_subject(&self, subject: &str) -> Option<String> {
         extract_ritual_id_from_subject(subject)
     }
+
+    /// Stream run events for a specific run ID
+    pub async fn stream_run_events(
+        &self,
+        run_id: &str,
+    ) -> Result<impl futures_util::Stream<Item = Result<RitualEvent>>> {
+        debug!("Starting event stream for run: {}", run_id);
+
+        // Get initial snapshot
+        let initial_events = match self.get_run_detail(run_id).await? {
+            Some(detail) => detail.events,
+            None => Vec::new(),
+        };
+
+        let subject_filter = format!("demon.ritual.v1.*.{}.events", run_id);
+
+        // Clone self for use in the async stream
+        let js_client = self.clone();
+        let run_id_owned = run_id.to_string();
+
+        Ok(async_stream::try_stream! {
+            // First, emit all initial events
+            for event in initial_events.clone() {
+                yield event;
+            }
+
+            // Resolve stream name with precedence
+            let desired = std::env::var("RITUAL_STREAM_NAME").ok();
+            let stream = if let Some(name) = desired {
+                js_client.jetstream
+                    .get_stream(&name)
+                    .await
+                    .with_context(|| format!("JetStream stream '{}' not found", name))?
+            } else {
+                match js_client.jetstream.get_stream("RITUAL_EVENTS").await {
+                    Ok(s) => s,
+                    Err(_) => {
+                        let s = js_client
+                            .jetstream
+                            .get_stream("DEMON_RITUAL_EVENTS")
+                            .await
+                            .with_context(|| "JetStream stream 'RITUAL_EVENTS' not found")?;
+                        warn!("Using deprecated stream name 'DEMON_RITUAL_EVENTS'");
+                        s
+                    }
+                }
+            };
+
+            // Create ephemeral consumer for tailing new events
+            let consumer_config = jetstream::consumer::pull::Config {
+                filter_subject: subject_filter.clone(),
+                durable_name: None,
+                deliver_policy: DeliverPolicy::New, // Only get new messages
+                ack_policy: async_nats::jetstream::consumer::AckPolicy::None,
+                inactive_threshold: std::time::Duration::from_secs(300), // 5 minute timeout
+                ..Default::default()
+            };
+
+            let consumer = stream.create_consumer(consumer_config).await?;
+            debug!("Created ephemeral consumer for streaming run {}", run_id_owned);
+
+            // Keep track of seen events to avoid duplicates
+            let mut seen_timestamps = std::collections::HashSet::new();
+            for event in &initial_events {
+                seen_timestamps.insert(event.ts);
+            }
+
+            // Continuously poll for new messages
+            loop {
+                let mut messages = consumer
+                    .batch()
+                    .max_messages(100)
+                    .expires(std::time::Duration::from_secs(30)) // Long poll for 30 seconds
+                    .messages()
+                    .await?;
+
+                while let Some(msg_result) = messages.next().await {
+                    match msg_result {
+                        Ok(msg) => {
+                            if let Ok(Some(event)) = js_client.parse_message_for_event(&msg) {
+                                // Only emit if we haven't seen this timestamp before
+                                if !seen_timestamps.contains(&event.ts) {
+                                    seen_timestamps.insert(event.ts);
+                                    yield event;
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            warn!("Error receiving streaming message: {}", e);
+                        }
+                    }
+                }
+            }
+        })
+    }
 }
 
 /// Extract ritual ID from subject string (standalone function for testing)
