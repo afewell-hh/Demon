@@ -18,18 +18,24 @@ jobs:
     steps:
       - name: Check for required admin token
         run: |
-          if [ -z "${{ secrets.ADMINTOKEN_DEMON_AFEWELLHH }}" ]; then
-            echo "::error::ADMINTOKEN_DEMON_AFEWELLHH secret is not configured. This workflow requires admin privileges to manage project items."
+          if [ -n "${{ secrets.PROJECT_ADMIN_TOKEN }}" ]; then
+            echo "Using PROJECT_ADMIN_TOKEN for project operations"
+            echo "token_source=PROJECT_ADMIN_TOKEN" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ secrets.ADMINTOKEN_DEMON_AFEWELLHH }}" ]; then
+            echo "Falling back to ADMINTOKEN_DEMON_AFEWELLHH for project operations"
+            echo "token_source=ADMINTOKEN_DEMON_AFEWELLHH" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::No admin token configured. This workflow requires PROJECT_ADMIN_TOKEN or ADMINTOKEN_DEMON_AFEWELLHH secret for project management."
             exit 1
           fi
-          echo "Admin token is configured, proceeding with backfill"
+        id: token-check
 
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Backfill issues to project
         env:
-          GH_TOKEN: ${{ secrets.ADMINTOKEN_DEMON_AFEWELLHH }}
+          GH_TOKEN: ${{ steps.token-check.outputs.token_source == 'PROJECT_ADMIN_TOKEN' && secrets.PROJECT_ADMIN_TOKEN || secrets.ADMINTOKEN_DEMON_AFEWELLHH }}
         run: |
           set -euo pipefail
 
