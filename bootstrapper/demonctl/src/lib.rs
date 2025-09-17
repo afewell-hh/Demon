@@ -239,8 +239,23 @@ async fn grant_via_rest(ui_url: &str, run_id: &str, gate_id: &str) -> Result<()>
         .json(&body)
         .send()
         .await?;
-    if !resp.status().is_success() {
-        return Err(anyhow!("grant REST failed: {}", resp.status()));
+
+    let status = resp.status();
+
+    // Handle idempotent grants: 409 Conflict is OK if the gate is already resolved
+    if status == reqwest::StatusCode::CONFLICT {
+        // Parse response to check if it's an expected conflict (already granted)
+        if let Ok(json) = resp.json::<serde_json::Value>().await {
+            if json.get("error").and_then(|e| e.as_str()) == Some("approval write conflict") {
+                // This is expected for idempotent operations - treat as success
+                return Ok(());
+            }
+        }
+        return Err(anyhow!("grant REST failed: 409 Conflict (unexpected)"));
+    }
+
+    if !status.is_success() {
+        return Err(anyhow!("grant REST failed: {}", status));
     }
     Ok(())
 }
