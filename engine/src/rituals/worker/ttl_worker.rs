@@ -123,6 +123,7 @@ async fn handle_message(msg: Message) -> Result<bool> {
         }
     };
 
+    // Try to parse as legacy approval timer first
     if let Some((run_id, gate_id)) =
         crate::rituals::approvals::parse_approval_expiry_timer_id(timer_id)
     {
@@ -150,6 +151,43 @@ async fn handle_message(msg: Message) -> Result<bool> {
             }
             Err(e) => {
                 error!(error=%e, %run_id, %gate_id, %ritual_id, "ttl_worker: expiry failed; nack with backoff");
+                // Bounded small backoff then NAK with server-side redelivery delay.
+                tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                let _ = msg
+                    .ack_with(AckKind::Nak(Some(std::time::Duration::from_millis(500))))
+                    .await;
+                Ok(true)
+            }
+        }
+    }
+    // Try to parse as escalation timer
+    else if let Some((run_id, gate_id, level)) =
+        crate::rituals::approvals::parse_escalation_timer_id(timer_id)
+    {
+        if run_id != run_id_from_subject {
+            warn!(%subject, run_id=%run_id, sub_run=%run_id_from_subject, level=%level, "ttl_worker: escalation runId mismatch; ack");
+            let _ = msg.ack().await;
+            return Ok(true);
+        }
+        incr(&HANDLED);
+        match crate::rituals::approvals::process_expiry_if_pending(
+            &tenant, &run_id, &ritual_id, &gate_id,
+        )
+        .await
+        {
+            Ok(did_expire) => {
+                if did_expire {
+                    incr(&EXPIRED);
+                    info!(%run_id, %gate_id, %ritual_id, level=%level, "ttl_worker: escalation level expired");
+                } else {
+                    incr(&NOOP);
+                    info!(%run_id, %gate_id, %ritual_id, level=%level, "ttl_worker: escalation noop_terminal");
+                }
+                let _ = msg.ack().await;
+                Ok(true)
+            }
+            Err(e) => {
+                error!(error=%e, %run_id, %gate_id, %ritual_id, level=%level, "ttl_worker: escalation expiry failed; nack with backoff");
                 // Bounded small backoff then NAK with server-side redelivery delay.
                 tokio::time::sleep(std::time::Duration::from_millis(250)).await;
                 let _ = msg
@@ -272,6 +310,18 @@ mod tests {
         let tid = "run-1:approval:gate-1:expiry";
         let out = crate::rituals::approvals::parse_approval_expiry_timer_id(tid);
         assert_eq!(out, Some(("run-1".into(), "gate-1".into())));
+    }
+
+    #[test]
+    fn parse_escalation_timer_id() {
+        let tid = "run-1:approval:gate-1:expiry:level:2";
+        let out = crate::rituals::approvals::parse_escalation_timer_id(tid);
+        assert_eq!(out, Some(("run-1".into(), "gate-1".into(), 2)));
+
+        // Test invalid formats
+        let bad_tid = "run-1:approval:gate-1:expiry";
+        let out = crate::rituals::approvals::parse_escalation_timer_id(bad_tid);
+        assert_eq!(out, None);
     }
     #[test]
     fn parse_subject_malformed() {

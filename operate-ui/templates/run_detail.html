@@ -97,6 +97,60 @@
         {% endif %}
     </div>
 
+    <!-- Escalation Information -->
+    {% if approvals.escalationInfo %}
+    <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color, #e0e0e0);">
+        <h4 style="margin-bottom: 1rem;">Escalation Chain</h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+            <div>
+                <strong>Current Level</strong><br>
+                <span class="status-indicator status-running">L{{ approvals.escalationInfo.currentLevel }} of {{ approvals.escalationInfo.totalLevels }}</span>
+            </div>
+            {% if approvals.escalationInfo.nextEscalationAt %}
+            <div>
+                <strong>Next Escalation</strong><br>
+                <span style="font-family: monospace; font-size: 0.9em;">{{ approvals.escalationInfo.nextEscalationAt }}</span>
+            </div>
+            {% endif %}
+            {% if approvals.escalationInfo.emergencyOverride %}
+            <div>
+                <strong>Override</strong><br>
+                <span class="status-indicator status-warning">Emergency Override</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Escalation History -->
+        {% if approvals.escalationInfo.escalationHistory %}
+        <details style="margin-top: 1rem;">
+            <summary style="cursor: pointer; font-weight: 500; color: var(--primary-color, #007bff);">
+                Escalation History ({{ approvals.escalationInfo.escalationHistory|length }} events)
+            </summary>
+            <div style="margin-top: 0.5rem; max-height: 200px; overflow-y: auto;">
+                <table style="width: 100%; font-size: 0.9em; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background-color: var(--bg-secondary, #f8f9fa);">
+                            <th style="padding: 0.5rem; text-align: left; border: 1px solid var(--border-color, #e0e0e0);">Time</th>
+                            <th style="padding: 0.5rem; text-align: left; border: 1px solid var(--border-color, #e0e0e0);">Escalation</th>
+                            <th style="padding: 0.5rem; text-align: left; border: 1px solid var(--border-color, #e0e0e0);">Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for hist in approvals.escalationInfo.escalationHistory %}
+                        <tr>
+                            <td style="padding: 0.5rem; border: 1px solid var(--border-color, #e0e0e0); font-family: monospace; font-size: 0.8em;">{{ hist.escalatedAt }}</td>
+                            <td style="padding: 0.5rem; border: 1px solid var(--border-color, #e0e0e0);">L{{ hist.fromLevel }} → L{{ hist.toLevel }}</td>
+                            <td style="padding: 0.5rem; border: 1px solid var(--border-color, #e0e0e0);">{{ hist.reason }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </details>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <!-- Approval Actions (only shown for pending approvals) -->
     {% if approvals.status == "Pending" %}
     <div id="approval-actions" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color, #e0e0e0);">
@@ -133,6 +187,11 @@
                 <button type="button" id="deny-approval-btn" class="btn btn-danger"
                         style="background-color: #dc3545; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-weight: 500;">
                     Deny Approval
+                </button>
+                <button type="button" id="override-approval-btn" class="btn btn-warning"
+                        style="background-color: #ffc107; color: #212529; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-weight: 500; margin-top: 0.5rem;"
+                        title="Emergency override - bypasses escalation chain">
+                    🚨 Emergency Override
                 </button>
             </div>
         </div>
@@ -578,12 +637,14 @@
   function setButtonsEnabled(enabled) {
     const grantBtn = document.getElementById('grant-approval-btn');
     const denyBtn = document.getElementById('deny-approval-btn');
+    const overrideBtn = document.getElementById('override-approval-btn');
     const emailInput = document.getElementById('approver-email');
     const noteInput = document.getElementById('approval-note');
     const loading = document.getElementById('approval-loading');
 
     if (grantBtn) grantBtn.disabled = !enabled;
     if (denyBtn) denyBtn.disabled = !enabled;
+    if (overrideBtn) overrideBtn.disabled = !enabled;
     if (emailInput) emailInput.disabled = !enabled;
     if (noteInput) noteInput.disabled = !enabled;
     if (loading) loading.style.display = enabled ? 'none' : 'block';
@@ -701,9 +762,86 @@
     }
   }
 
+  async function submitOverride() {
+    const emailInput = document.getElementById('approver-email');
+    const noteInput = document.getElementById('approval-note');
+
+    if (!emailInput || !emailInput.value.trim()) {
+      showToast('Please enter your email address for emergency override', 'error');
+      if (emailInput) emailInput.focus();
+      return;
+    }
+
+    const email = emailInput.value.trim();
+    const note = noteInput ? noteInput.value.trim() : '';
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      showToast('Please enter a valid email address', 'error');
+      emailInput.focus();
+      return;
+    }
+
+    // Confirm emergency override
+    if (!confirm('Are you sure you want to perform an emergency override? This will bypass the escalation chain and immediately grant approval.')) {
+      return;
+    }
+
+    setButtonsEnabled(false);
+    showToast('Processing emergency override...', 'info');
+
+    try {
+      const endpoint = tenant && tenant !== 'default'
+        ? `/api/tenants/${tenant}/approvals/${runId}/${gateId}/override`
+        : `/api/approvals/${runId}/${gateId}/override`;
+      const body = { approver: email, note: note || null };
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(body)
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        showToast('Emergency override successful!', 'success');
+        updateApprovalStatus('Override', 'status-override');
+      } else {
+        let errorMsg = data.error || 'Failed to perform emergency override';
+
+        if (response.status === 403) {
+          errorMsg = 'You are not authorized to perform emergency overrides. Check the APPROVER_ALLOWLIST configuration.';
+        } else if (response.status === 409) {
+          errorMsg = data.error || 'This approval gate has already been resolved';
+          updateApprovalStatus(
+            data.state === 'granted' ? 'Granted' : data.state === 'denied' ? 'Denied' : 'Override',
+            data.state === 'granted' ? 'status-completed' : data.state === 'denied' ? 'status-failed' : 'status-override'
+          );
+        } else if (response.status === 404) {
+          errorMsg = 'Run not found';
+        } else if (response.status >= 500) {
+          errorMsg = 'Server error occurred. Please try again later.';
+        }
+
+        showToast(errorMsg, 'error');
+        setButtonsEnabled(true);
+      }
+    } catch (error) {
+      console.error('Emergency override failed:', error);
+      showToast('Network error occurred. Please check your connection and try again.', 'error');
+      setButtonsEnabled(true);
+    }
+  }
+
   // Event listeners
   const grantBtn = document.getElementById('grant-approval-btn');
   const denyBtn = document.getElementById('deny-approval-btn');
+  const overrideBtn = document.getElementById('override-approval-btn');
 
   if (grantBtn) {
     grantBtn.addEventListener('click', () => submitApproval('grant'));
@@ -711,6 +849,10 @@
 
   if (denyBtn) {
     denyBtn.addEventListener('click', () => submitApproval('deny'));
+  }
+
+  if (overrideBtn) {
+    overrideBtn.addEventListener('click', submitOverride);
   }
 
   // Enter key support in email field
@@ -737,6 +879,15 @@
       } else if (eventData.event === 'approval.denied:v1') {
         updateApprovalStatus('Denied', 'status-failed');
         showToast('Approval denied (live update)', 'info');
+      } else if (eventData.event === 'approval.override:v1') {
+        updateApprovalStatus('Override', 'status-override');
+        showToast('Emergency override performed (live update)', 'success');
+      } else if (eventData.event === 'approval.escalated:v1') {
+        showToast('Approval escalated to next level (live update)', 'info');
+        // Optionally refresh the page to show updated escalation info
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
       }
     }
   });
