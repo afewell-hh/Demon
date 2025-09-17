@@ -27,7 +27,8 @@ pub struct AppState {
 
 impl AppState {
     pub async fn new() -> Self {
-        let jetstream_client = match jetstream::JetStreamClient::new().await {
+        // Initialize JetStream client and ensure stream exists
+        let jetstream_client = match Self::init_jetstream().await {
             Ok(client) => {
                 info!("Successfully connected to NATS JetStream");
                 Some(client)
@@ -38,13 +39,28 @@ impl AppState {
             }
         };
 
-        // Load templates using crate-absolute path for deterministic resolution
+        // Load templates with fallback handling
         let tpl_glob = format!("{}/templates/**/*.html", env!("CARGO_MANIFEST_DIR"));
         let mut tera = match Tera::new(&tpl_glob) {
-            Ok(t) => t,
+            Ok(t) => {
+                // Check if any templates were actually loaded
+                let template_names: Vec<&str> = t.get_template_names().collect();
+                if template_names.is_empty() {
+                    warn!("No templates found at {}, creating fallback", tpl_glob);
+                    Self::create_fallback_tera()
+                } else {
+                    info!(
+                        "Successfully loaded {} Tera templates from: {}",
+                        template_names.len(),
+                        tpl_glob
+                    );
+                    t
+                }
+            }
             Err(e) => {
-                error!("Parsing error for Tera templates ({}): {}", tpl_glob, e);
-                std::process::exit(1);
+                error!("Failed to load Tera templates from {}: {}", tpl_glob, e);
+                warn!("Creating fallback Tera instance with minimal templates");
+                Self::create_fallback_tera()
             }
         };
 
@@ -70,6 +86,113 @@ impl AppState {
             tera,
             admin_token,
         }
+    }
+
+    /// Initialize JetStream client and ensure required stream exists
+    async fn init_jetstream() -> Result<jetstream::JetStreamClient> {
+        let client = jetstream::JetStreamClient::new().await?;
+
+        // Ensure the stream exists for ritual events
+        Self::ensure_stream_exists().await?;
+
+        Ok(client)
+    }
+
+    /// Ensure the required JetStream stream exists
+    async fn ensure_stream_exists() -> Result<()> {
+        let url = std::env::var("NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".to_string());
+        let nats_client = async_nats::connect(&url).await?;
+        let jetstream = async_nats::jetstream::new(nats_client);
+
+        // Resolve stream name with precedence: RITUAL_STREAM_NAME -> RITUAL_EVENTS (default)
+        let stream_name =
+            std::env::var("RITUAL_STREAM_NAME").unwrap_or_else(|_| "RITUAL_EVENTS".to_string());
+
+        match jetstream.get_stream(&stream_name).await {
+            Ok(_) => {
+                info!("JetStream stream '{}' already exists", stream_name);
+                Ok(())
+            }
+            Err(_) => {
+                info!("Creating JetStream stream '{}'", stream_name);
+                let stream_config = async_nats::jetstream::stream::Config {
+                    name: stream_name.clone(),
+                    subjects: vec!["demon.ritual.v1.>".to_string()],
+                    ..Default::default()
+                };
+                jetstream.get_or_create_stream(stream_config).await?;
+                info!("Successfully created JetStream stream '{}'", stream_name);
+                Ok(())
+            }
+        }
+    }
+
+    /// Create a minimal fallback Tera instance with basic error templates
+    fn create_fallback_tera() -> Tera {
+        let mut tera = Tera::default();
+
+        // Add a basic error template
+        let error_template = r#"
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Error - Demon Operate UI</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .error { color: #d32f2f; }
+        .container { max-width: 600px; margin: 0 auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="error">Service Temporarily Unavailable</h1>
+        <p>The Operate UI is experiencing template loading issues. Please contact the system administrator.</p>
+        <p><a href="/health">Check System Health</a></p>
+    </div>
+</body>
+</html>
+        "#;
+
+        // Add basic runs list fallback template
+        let runs_fallback_template = r#"
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Runs - Demon Operate UI</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .error { color: #d32f2f; }
+        .warning { color: #ff9800; }
+        .container { max-width: 800px; margin: 0 auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Demon Operate UI - Runs</h1>
+        {% if error %}
+            <div class="error">
+                <strong>Error:</strong> {{ error }}
+            </div>
+        {% endif %}
+        {% if not jetstream_available %}
+            <div class="warning">
+                <strong>Warning:</strong> JetStream is not available. Unable to retrieve runs.
+            </div>
+        {% endif %}
+        <p><a href="/health">System Health</a></p>
+    </div>
+</body>
+</html>
+        "#;
+
+        if let Err(e) = tera.add_raw_template("error.html", error_template) {
+            error!("Failed to add fallback error template: {}", e);
+        }
+        if let Err(e) = tera.add_raw_template("runs_list.html", runs_fallback_template) {
+            error!("Failed to add fallback runs template: {}", e);
+        }
+
+        tera
     }
 }
 
