@@ -81,7 +81,7 @@ async fn publish_granted(
     run: &str,
     gate: &str,
 ) -> Result<()> {
-    let subject = format!("demon.ritual.v1.{}.{}.events", ritual, run);
+    let subject = format!("demon.ritual.v1.default.{}.{}.events", ritual, run);
     let now = chrono::Utc::now().to_rfc3339();
     let payload = serde_json::json!({
         "event": "approval.granted:v1",
@@ -134,7 +134,9 @@ async fn expires_after_ttl_if_no_terminal() -> Result<()> {
 
     // Simulate timer wheel firing after TTL by invoking the engine expiry helper
     tokio::time::sleep(Duration::from_millis(2300)).await;
-    let emitted = engine::rituals::approvals::process_expiry_if_pending(&run, ritual, gate).await?;
+    let emitted =
+        engine::rituals::approvals::process_expiry_if_pending("default", &run, ritual, gate)
+            .await?;
     assert!(emitted, "auto-deny should be emitted when pending");
 
     // Read back and verify exactly one denied with reason: expired
@@ -169,7 +171,9 @@ async fn grant_preempts_expiry_integration() -> Result<()> {
 
     // Sleep past TTL and attempt auto-expiry; should be a no-op
     tokio::time::sleep(Duration::from_millis(2300)).await;
-    let emitted = engine::rituals::approvals::process_expiry_if_pending(&run, ritual, gate).await?;
+    let emitted =
+        engine::rituals::approvals::process_expiry_if_pending("default", &run, ritual, gate)
+            .await?;
     assert!(!emitted, "expiry should be a no-op when already granted");
 
     // Verify there is no auto-deny

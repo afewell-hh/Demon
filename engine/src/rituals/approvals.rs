@@ -162,9 +162,10 @@ pub async fn await_gate_with_ttl(
     Ok(())
 }
 
-/// Process an expiry for a (run, ritual, gate): if no terminal exists, emit approval.denied:v1.
+/// Process an expiry for a (tenant, run, ritual, gate): if no terminal exists, emit approval.denied:v1.
 /// Idempotency key: "{runId}:approval:{gateId}:denied".
 pub async fn process_expiry_if_pending(
+    tenant: &str,
     run_id: &str,
     ritual_id: &str,
     gate_id: &str,
@@ -182,15 +183,33 @@ pub async fn process_expiry_if_pending(
         js.get_stream("DEMON_RITUAL_EVENTS").await?
     };
 
-    // Read all events for this run as generic JSON values
-    let subject = format!("demon.ritual.v1.default.{}.{}.events", ritual_id, run_id);
-    let consumer = stream
+    // Try tenant-aware subject first, then fallback to legacy
+    let tenant_subject = format!("demon.ritual.v1.{}.{}.{}.events", tenant, ritual_id, run_id);
+    let legacy_subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
+
+    let mut events: Vec<serde_json::Value> = Vec::new();
+
+    // Try tenant-aware format first
+    let consumer_result = stream
         .create_consumer(jetstream::consumer::pull::Config {
-            filter_subject: subject,
+            filter_subject: tenant_subject.clone(),
             ..Default::default()
         })
-        .await?;
-    let mut events: Vec<serde_json::Value> = Vec::new();
+        .await;
+
+    let consumer = match consumer_result {
+        Ok(c) => c,
+        Err(_) => {
+            // Fallback to legacy format
+            stream
+                .create_consumer(jetstream::consumer::pull::Config {
+                    filter_subject: legacy_subject.clone(),
+                    ..Default::default()
+                })
+                .await?
+        }
+    };
+
     let mut batch = consumer
         .batch()
         .max_messages(10_000)
@@ -215,14 +234,14 @@ pub async fn process_expiry_if_pending(
     let payload = serde_json::json!({
         "event": "approval.denied:v1",
         "ts": now,
-        "tenantId": "default",
+        "tenantId": tenant,
         "runId": run_id,
         "ritualId": ritual_id,
         "gateId": gate_id,
         "approver": "system",
         "reason": "expired",
     });
-    let subject = format!("demon.ritual.v1.default.{}.{}.events", ritual_id, run_id);
+    let subject = format!("demon.ritual.v1.{}.{}.{}.events", tenant, ritual_id, run_id);
     let mut headers = async_nats::HeaderMap::new();
     let msg_id = format!("{}:approval:{}:denied", run_id, gate_id);
     headers.insert("Nats-Msg-Id", msg_id.as_str());
