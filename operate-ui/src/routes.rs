@@ -983,7 +983,9 @@ pub async fn grant_approval_api(
                     .to_string();
                 // Enforce: if a terminal approval already exists for this gate, prevent conflicting writes
                 if let Some(last) = rd.events.iter().rev().find(|e| {
-                    (e.event == "approval.granted:v1" || e.event == "approval.denied:v1")
+                    (e.event == "approval.granted:v1"
+                        || e.event == "approval.denied:v1"
+                        || e.event == "approval.override:v1")
                         && e.extra
                             .get("gateId")
                             .and_then(|v| v.as_str())
@@ -1007,7 +1009,12 @@ pub async fn grant_approval_api(
                         StatusCode::CONFLICT,
                         Json(serde_json::json!({
                             "error": "gate already resolved",
-                            "state": if last.event == "approval.granted:v1" { "granted" } else { "denied" }
+                            "state": match last.event.as_str() {
+                                "approval.granted:v1" => "granted",
+                                "approval.denied:v1" => "denied",
+                                "approval.override:v1" => "override",
+                                _ => "unknown"
+                            }
                         })),
                     )
                         .into_response();
@@ -1179,7 +1186,9 @@ pub async fn deny_approval_api(
                     .unwrap_or("default")
                     .to_string();
                 if let Some(last) = rd.events.iter().rev().find(|e| {
-                    (e.event == "approval.granted:v1" || e.event == "approval.denied:v1")
+                    (e.event == "approval.granted:v1"
+                        || e.event == "approval.denied:v1"
+                        || e.event == "approval.override:v1")
                         && e.extra
                             .get("gateId")
                             .and_then(|v| v.as_str())
@@ -1202,7 +1211,12 @@ pub async fn deny_approval_api(
                         StatusCode::CONFLICT,
                         Json(serde_json::json!({
                             "error": "gate already resolved",
-                            "state": if last.event == "approval.granted:v1" { "granted" } else { "denied" }
+                            "state": match last.event.as_str() {
+                                "approval.granted:v1" => "granted",
+                                "approval.denied:v1" => "denied",
+                                "approval.override:v1" => "override",
+                                _ => "unknown"
+                            }
                         })),
                     )
                         .into_response();
@@ -1716,7 +1730,9 @@ pub async fn grant_approval_api_tenant(
             Ok(Some(rd)) => {
                 // Enforce: if a terminal approval already exists for this gate, prevent conflicting writes
                 if let Some(last) = rd.events.iter().rev().find(|e| {
-                    (e.event == "approval.granted:v1" || e.event == "approval.denied:v1")
+                    (e.event == "approval.granted:v1"
+                        || e.event == "approval.denied:v1"
+                        || e.event == "approval.override:v1")
                         && e.extra
                             .get("gateId")
                             .and_then(|v| v.as_str())
@@ -1740,7 +1756,12 @@ pub async fn grant_approval_api_tenant(
                         StatusCode::CONFLICT,
                         Json(serde_json::json!({
                             "error": "gate already resolved",
-                            "state": if last.event == "approval.granted:v1" { "granted" } else { "denied" }
+                            "state": match last.event.as_str() {
+                                "approval.granted:v1" => "granted",
+                                "approval.denied:v1" => "denied",
+                                "approval.override:v1" => "override",
+                                _ => "unknown"
+                            }
                         })),
                     )
                         .into_response();
@@ -1818,7 +1839,9 @@ pub async fn grant_approval_api_tenant(
                         .iter()
                         .rev()
                         .find(|e| {
-                            (e.event == "approval.granted:v1" || e.event == "approval.denied:v1")
+                            (e.event == "approval.granted:v1"
+                                || e.event == "approval.denied:v1"
+                                || e.event == "approval.override:v1")
                                 && e.extra
                                     .get("gateId")
                                     .and_then(|v| v.as_str())
@@ -1913,7 +1936,9 @@ pub async fn deny_approval_api_tenant(
             Ok(Some(rd)) => {
                 // Enforce: if a terminal approval already exists for this gate, prevent conflicting writes
                 if let Some(last) = rd.events.iter().rev().find(|e| {
-                    (e.event == "approval.granted:v1" || e.event == "approval.denied:v1")
+                    (e.event == "approval.granted:v1"
+                        || e.event == "approval.denied:v1"
+                        || e.event == "approval.override:v1")
                         && e.extra
                             .get("gateId")
                             .and_then(|v| v.as_str())
@@ -1937,7 +1962,12 @@ pub async fn deny_approval_api_tenant(
                         StatusCode::CONFLICT,
                         Json(serde_json::json!({
                             "error": "gate already resolved",
-                            "state": if last.event == "approval.granted:v1" { "granted" } else { "denied" }
+                            "state": match last.event.as_str() {
+                                "approval.granted:v1" => "granted",
+                                "approval.denied:v1" => "denied",
+                                "approval.override:v1" => "override",
+                                _ => "unknown"
+                            }
                         })),
                     )
                         .into_response();
@@ -2015,7 +2045,9 @@ pub async fn deny_approval_api_tenant(
                         .iter()
                         .rev()
                         .find(|e| {
-                            (e.event == "approval.granted:v1" || e.event == "approval.denied:v1")
+                            (e.event == "approval.granted:v1"
+                                || e.event == "approval.denied:v1"
+                                || e.event == "approval.override:v1")
                                 && e.extra
                                     .get("gateId")
                                     .and_then(|v| v.as_str())
