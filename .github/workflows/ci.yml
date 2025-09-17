@@ -468,8 +468,9 @@ jobs:
 
       - name: Run local-dev bundle (twice) with idempotency asserts
         run: |
-          cargo run -q -p demonctl -- bootstrap --profile local-dev --ensure-stream --seed --verify | tee /tmp/local1.log
-          cargo run -q -p demonctl -- bootstrap --profile local-dev --ensure-stream --seed --verify | tee /tmp/local2.log
+          # Capture stderr to prevent error messages from being lost
+          cargo run -q -p demonctl -- bootstrap --profile local-dev --ensure-stream --seed --verify 2>&1 | tee /tmp/local1.log
+          cargo run -q -p demonctl -- bootstrap --profile local-dev --ensure-stream --seed --verify 2>&1 | tee /tmp/local2.log
           # second run should complete cleanly
           grep -q 'seed: ok' /tmp/local2.log
           grep -q 'verify: ok' /tmp/local2.log
@@ -478,8 +479,9 @@ jobs:
         env:
           NATS_URL: nats://127.0.0.1:4223
         run: |
-          cargo run -q -p demonctl -- bootstrap --profile remote-nats --ensure-stream --seed --verify | tee /tmp/remote1.log
-          cargo run -q -p demonctl -- bootstrap --profile remote-nats --ensure-stream --seed --verify | tee /tmp/remote2.log
+          # Capture stderr to prevent error messages from being lost
+          cargo run -q -p demonctl -- bootstrap --profile remote-nats --ensure-stream --seed --verify 2>&1 | tee /tmp/remote1.log
+          cargo run -q -p demonctl -- bootstrap --profile remote-nats --ensure-stream --seed --verify 2>&1 | tee /tmp/remote2.log
           grep -q 'seed: ok' /tmp/remote2.log
           grep -q 'verify: ok' /tmp/remote2.log
 
