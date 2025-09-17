@@ -160,6 +160,7 @@ async fn handle_static_file_error() -> impl IntoResponse {
 pub fn create_app(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
+        // Legacy routes (redirect to default tenant)
         .route("/runs", get(routes::list_runs_html))
         .route("/runs/:run_id", get(routes::get_run_html))
         .route("/api/runs", get(routes::list_runs_api))
@@ -167,6 +168,19 @@ pub fn create_app(state: AppState) -> Router {
         .route(
             "/api/runs/:run_id/events/stream",
             get(routes::stream_run_events_sse),
+        )
+        // Tenant-aware routes
+        .route(
+            "/api/tenants/:tenant/runs",
+            get(routes::list_runs_api_tenant),
+        )
+        .route(
+            "/api/tenants/:tenant/runs/:run_id",
+            get(routes::get_run_api_tenant),
+        )
+        .route(
+            "/api/tenants/:tenant/runs/:run_id/events/stream",
+            get(routes::stream_run_events_sse_tenant),
         )
         .route(
             "/admin/templates/report",
@@ -180,6 +194,14 @@ pub fn create_app(state: AppState) -> Router {
         .route(
             "/api/approvals/:run_id/:gate_id/deny",
             post(routes::deny_approval_api),
+        )
+        .route(
+            "/api/tenants/:tenant/approvals/:run_id/:gate_id/grant",
+            post(routes::grant_approval_api_tenant),
+        )
+        .route(
+            "/api/tenants/:tenant/approvals/:run_id/:gate_id/deny",
+            post(routes::deny_approval_api_tenant),
         )
         .route(
             "/static/*path",

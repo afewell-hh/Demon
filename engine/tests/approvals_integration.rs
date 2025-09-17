@@ -14,7 +14,8 @@ async fn read_events_for_run(
     ritual_id: &str,
     run_id: &str,
 ) -> Result<Vec<Value>> {
-    let subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
+    // Try new tenant-aware pattern first
+    let subject = format!("demon.ritual.v1.default.{}.{}.events", ritual_id, run_id);
 
     // Resolve stream by scanning both likely names
     let stream = if let Ok(s) = js.get_stream("RITUAL_EVENTS").await {
@@ -23,15 +24,31 @@ async fn read_events_for_run(
         js.get_stream("DEMON_RITUAL_EVENTS").await?
     };
 
-    // Ephemeral consumer to fetch all messages for this subject
-    let consumer = stream
+    // Try tenant-aware consumer first
+    let consumer_result = stream
         .create_consumer(jetstream::consumer::pull::Config {
             filter_subject: subject.clone(),
             deliver_policy: DeliverPolicy::All,
             ack_policy: jetstream::consumer::AckPolicy::None,
             ..Default::default()
         })
-        .await?;
+        .await;
+
+    let consumer = match consumer_result {
+        Ok(c) => c,
+        Err(_) => {
+            // Fallback to legacy pattern
+            let legacy_subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
+            stream
+                .create_consumer(jetstream::consumer::pull::Config {
+                    filter_subject: legacy_subject.clone(),
+                    deliver_policy: DeliverPolicy::All,
+                    ack_policy: jetstream::consumer::AckPolicy::None,
+                    ..Default::default()
+                })
+                .await?
+        }
+    };
 
     let mut out = Vec::new();
     let mut batch = consumer

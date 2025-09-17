@@ -1,4 +1,7 @@
 use anyhow::{Context, Result};
+fn default_tenant() -> String {
+    DEFAULT_TENANT.to_string()
+}
 use async_nats::jetstream::{self, consumer::PullConsumer, stream::Stream};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -7,7 +10,8 @@ use tracing::{debug, info};
 
 const DEFAULT_STREAM_NAME: &str = "RITUAL_EVENTS";
 const DEPRECATED_STREAM_NAME: &str = "DEMON_RITUAL_EVENTS"; // kept for compatibility
-const STREAM_SUBJECTS: &str = "demon.ritual.v1.>";
+const STREAM_SUBJECTS: &str = "demon.ritual.v1.*.*.*.events";
+const DEFAULT_TENANT: &str = "default";
 
 #[derive(Debug, Clone)]
 pub struct EventLog {
@@ -28,6 +32,8 @@ pub enum RitualEvent {
         run_id: String,
         ts: String,
         spec: Value,
+        #[serde(rename = "tenantId", default = "default_tenant")]
+        tenant_id: String,
         #[serde(rename = "traceId", skip_serializing_if = "Option::is_none")]
         trace_id: Option<String>,
     },
@@ -42,6 +48,8 @@ pub enum RitualEvent {
         from_state: String,
         #[serde(rename = "toState")]
         to_state: String,
+        #[serde(rename = "tenantId", default = "default_tenant")]
+        tenant_id: String,
         #[serde(rename = "traceId", skip_serializing_if = "Option::is_none")]
         trace_id: Option<String>,
     },
@@ -54,6 +62,8 @@ pub enum RitualEvent {
         ts: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         outputs: Option<Value>,
+        #[serde(rename = "tenantId", default = "default_tenant")]
+        tenant_id: String,
         #[serde(rename = "traceId", skip_serializing_if = "Option::is_none")]
         trace_id: Option<String>,
     },
@@ -134,22 +144,37 @@ impl EventLog {
     }
 
     pub async fn append(&self, event: &RitualEvent, sequence: u64) -> Result<()> {
-        let (ritual_id, run_id) = match event {
+        let (ritual_id, run_id, tenant_id) = match event {
             RitualEvent::Started {
-                ritual_id, run_id, ..
+                ritual_id,
+                run_id,
+                tenant_id,
+                ..
             }
             | RitualEvent::StateTransitioned {
-                ritual_id, run_id, ..
+                ritual_id,
+                run_id,
+                tenant_id,
+                ..
             }
             | RitualEvent::Completed {
-                ritual_id, run_id, ..
-            }
-            | RitualEvent::PolicyDecision {
-                ritual_id, run_id, ..
-            } => (ritual_id, run_id),
+                ritual_id,
+                run_id,
+                tenant_id,
+                ..
+            } => (ritual_id, run_id, tenant_id),
+            RitualEvent::PolicyDecision {
+                ritual_id,
+                run_id,
+                tenant_id,
+                ..
+            } => (ritual_id, run_id, tenant_id),
         };
 
-        let subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
+        let subject = format!(
+            "demon.ritual.v1.{}.{}.{}.events",
+            tenant_id, ritual_id, run_id
+        );
         let msg_id = format!("{}:{}", run_id, sequence);
 
         let payload = serde_json::to_vec(event).context("Failed to serialize event")?;
@@ -174,15 +199,42 @@ impl EventLog {
     }
 
     pub async fn read_run(&self, ritual_id: &str, run_id: &str) -> Result<Vec<RitualEvent>> {
-        let filter_subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
+        self.read_run_with_tenant(ritual_id, run_id, None).await
+    }
 
+    pub async fn read_run_with_tenant(
+        &self,
+        ritual_id: &str,
+        run_id: &str,
+        tenant_id: Option<&str>,
+    ) -> Result<Vec<RitualEvent>> {
+        let tenant = tenant_id.unwrap_or(DEFAULT_TENANT);
+
+        // Try new tenant-scoped subject first
+        let filter_subject = format!("demon.ritual.v1.{}.{}.{}.events", tenant, ritual_id, run_id);
+        let events = self.read_run_internal(&filter_subject, run_id).await?;
+
+        // If empty and no specific tenant was requested, fall back to legacy format
+        if events.is_empty() && tenant_id.is_none() {
+            let legacy_subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
+            return self.read_run_internal(&legacy_subject, run_id).await;
+        }
+
+        Ok(events)
+    }
+
+    async fn read_run_internal(
+        &self,
+        filter_subject: &str,
+        run_id: &str,
+    ) -> Result<Vec<RitualEvent>> {
         // Create truly ephemeral pull consumer (no name = auto-generated)
         // This allows concurrent reads and prevents consumer conflicts
         let mut consumer: PullConsumer = self
             .stream
             .create_consumer(jetstream::consumer::pull::Config {
                 name: None, // Let JetStream auto-generate ephemeral consumer name
-                filter_subject: filter_subject.clone(),
+                filter_subject: filter_subject.to_string(),
                 ack_policy: jetstream::consumer::AckPolicy::Explicit,
                 ..Default::default()
             })
@@ -314,6 +366,7 @@ mod tests {
                     }
                 }
             }),
+            tenant_id: DEFAULT_TENANT.to_string(),
             trace_id: Some("test-trace".to_string()),
         }
     }
@@ -324,6 +377,7 @@ mod tests {
             run_id: run_id.to_string(),
             ts: Utc::now().to_rfc3339(),
             outputs: Some(serde_json::json!({ "result": "success" })),
+            tenant_id: DEFAULT_TENANT.to_string(),
             trace_id: Some("test-trace".to_string()),
         }
     }

@@ -13,7 +13,7 @@ async fn ensure_stream(js: &jetstream::Context) -> Result<()> {
     let _ = js
         .get_or_create_stream(async_nats::jetstream::stream::Config {
             name: desired,
-            subjects: vec!["demon.ritual.v1.>".to_string()],
+            subjects: vec!["demon.ritual.v1.*.*.*.events".to_string()],
             ..Default::default()
         })
         .await?;
@@ -25,20 +25,39 @@ async fn read_events_for_run(
     ritual_id: &str,
     run_id: &str,
 ) -> Result<Vec<serde_json::Value>> {
-    let subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
+    // Try new tenant-aware pattern first
+    let subject = format!("demon.ritual.v1.default.{}.{}.events", ritual_id, run_id);
     let stream = if let Ok(s) = js.get_stream("RITUAL_EVENTS").await {
         s
     } else {
         js.get_stream("DEMON_RITUAL_EVENTS").await?
     };
-    let consumer = stream
+
+    // Try tenant-aware consumer first
+    let consumer_result = stream
         .create_consumer(async_nats::jetstream::consumer::pull::Config {
-            filter_subject: subject,
+            filter_subject: subject.clone(),
             deliver_policy: DeliverPolicy::All,
             ack_policy: async_nats::jetstream::consumer::AckPolicy::None,
             ..Default::default()
         })
-        .await?;
+        .await;
+
+    let consumer = match consumer_result {
+        Ok(c) => c,
+        Err(_) => {
+            // Fallback to legacy pattern
+            let legacy_subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
+            stream
+                .create_consumer(async_nats::jetstream::consumer::pull::Config {
+                    filter_subject: legacy_subject.clone(),
+                    deliver_policy: DeliverPolicy::All,
+                    ack_policy: async_nats::jetstream::consumer::AckPolicy::None,
+                    ..Default::default()
+                })
+                .await?
+        }
+    };
     let mut out = Vec::new();
     let mut msgs = consumer
         .batch()

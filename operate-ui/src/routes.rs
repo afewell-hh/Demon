@@ -1187,3 +1187,312 @@ mod tests {
         assert_eq!(completed_run.status(), RunStatus::Completed);
     }
 }
+
+// Tenant-aware route handlers
+
+/// List runs for a specific tenant - JSON API response
+#[axum::debug_handler]
+pub async fn list_runs_api_tenant(
+    State(state): State<AppState>,
+    Path(tenant): Path<String>,
+    Query(query): Query<ListRunsQuery>,
+) -> Response {
+    debug!("Handling tenant {} JSON API list runs: {:?}", tenant, query);
+
+    // Validate inputs
+    if let Some(limit) = query.limit {
+        if limit == 0 || limit > 1000 {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({
+                    "error": "invalid 'limit': must be 1..=1000"
+                })),
+            )
+                .into_response();
+        }
+    }
+    if let Some(ref s) = query.status {
+        if parse_status_filter(s).is_none() {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({
+                    "error": "invalid 'status': expected one of Running, Completed, Failed"
+                })),
+            )
+                .into_response();
+        }
+    }
+
+    match &state.jetstream_client {
+        Some(client) => match client.list_runs_for_tenant(&tenant, query.limit).await {
+            Ok(mut runs) => {
+                if let Some(ref r) = query.ritual_filter {
+                    let needle = r.to_ascii_lowercase();
+                    runs.retain(|x| x.ritual_id.to_ascii_lowercase().contains(&needle));
+                }
+                if let Some(ref r) = query.run_id_filter {
+                    let needle = r.to_ascii_lowercase();
+                    runs.retain(|x| x.run_id.to_ascii_lowercase().contains(&needle));
+                }
+                if let Some(ref s) = query.status {
+                    if let Some(want) = parse_status_filter(s) {
+                        runs.retain(|x| x.status == want);
+                    }
+                }
+                info!(
+                    "Successfully retrieved {} runs for tenant {} API",
+                    runs.len(),
+                    tenant
+                );
+                Json(serde_json::json!({ "runs": runs })).into_response()
+            }
+            Err(e) => {
+                error!("Failed to retrieve runs for tenant {}: {}", tenant, e);
+                (
+                    StatusCode::BAD_GATEWAY,
+                    Json(serde_json::json!({
+                        "error": format!("Failed to retrieve runs: {}", e)
+                    })),
+                )
+                    .into_response()
+            }
+        },
+        None => {
+            error!("JetStream client not available");
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({
+                    "error": "JetStream is not available"
+                })),
+            )
+                .into_response()
+        }
+    }
+}
+
+/// Get run detail for a specific tenant - JSON API response
+#[axum::debug_handler]
+pub async fn get_run_api_tenant(
+    State(state): State<AppState>,
+    Path((tenant, run_id)): Path<(String, String)>,
+) -> Response {
+    debug!(
+        "Handling tenant {} JSON API request for run detail: {}",
+        tenant, run_id
+    );
+
+    match &state.jetstream_client {
+        Some(client) => match client.get_run_detail_for_tenant(&tenant, &run_id).await {
+            Ok(Some(run)) => {
+                info!(
+                    "Successfully retrieved run detail for tenant {} API: {}",
+                    tenant, run_id
+                );
+                Json(run).into_response()
+            }
+            Ok(None) => {
+                info!("Run not found for tenant {}: {}", tenant, run_id);
+                (
+                    StatusCode::NOT_FOUND,
+                    Json(serde_json::json!({
+                        "error": "Run not found",
+                        "tenantId": tenant,
+                        "runId": run_id
+                    })),
+                )
+                    .into_response()
+            }
+            Err(e) => {
+                error!("Failed to retrieve run detail for tenant {}: {}", tenant, e);
+                (
+                    StatusCode::BAD_GATEWAY,
+                    Json(serde_json::json!({
+                        "error": format!("Failed to retrieve run detail: {}", e)
+                    })),
+                )
+                    .into_response()
+            }
+        },
+        None => {
+            error!("JetStream client not available");
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({
+                    "error": "JetStream is not available"
+                })),
+            )
+                .into_response()
+        }
+    }
+}
+
+/// Stream run events for a specific tenant - SSE response
+#[axum::debug_handler]
+pub async fn stream_run_events_sse_tenant(
+    State(state): State<AppState>,
+    Path((tenant, run_id)): Path<(String, String)>,
+) -> Response {
+    let hb_secs: u64 = std::env::var("SSE_HEARTBEAT_SECONDS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(15);
+
+    // Try to get JetStream client
+    let jetstream_client = if state.jetstream_client.is_some() {
+        state.jetstream_client.clone()
+    } else {
+        // Try to create a new client if not available
+        match crate::jetstream::JetStreamClient::new().await {
+            Ok(client) => Some(client),
+            Err(e) => {
+                error!("Failed to connect to JetStream for SSE: {}", e);
+                None
+            }
+        }
+    };
+
+    let tenant_owned = tenant.clone();
+    let run_id_owned = run_id.clone();
+    let body_stream = async_stream::stream! {
+        if let Some(js_client) = jetstream_client {
+            // Stream with real events from JetStream
+            match js_client.stream_run_events_for_tenant(&tenant_owned, &run_id_owned).await {
+                Ok(event_stream) => {
+                    // Send initial snapshot event
+                    let init_payload = serde_json::json!({
+                        "type": "init",
+                        "message": "Connected to event stream"
+                    });
+                    yield Ok::<_, std::convert::Infallible>(
+                        axum::response::sse::Event::default()
+                            .event("init")
+                            .json_data(init_payload)
+                            .expect("Valid JSON")
+                    );
+
+                    // Forward events from stream
+                    futures_util::pin_mut!(event_stream);
+                    let mut heartbeat_interval = tokio::time::interval(tokio::time::Duration::from_secs(hb_secs));
+                    heartbeat_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+                    loop {
+                        tokio::select! {
+                            event_result = event_stream.next() => {
+                                match event_result {
+                                    Some(Ok(event)) => {
+                                        yield Ok(
+                                            axum::response::sse::Event::default()
+                                                .event("append")
+                                                .json_data(event)
+                                                .expect("Valid JSON")
+                                        );
+                                    }
+                                    Some(Err(e)) => {
+                                        error!("Stream error for tenant {} run {}: {}", tenant_owned, run_id_owned, e);
+                                        let error_payload = serde_json::json!({
+                                            "type": "error",
+                                            "message": format!("Stream error: {}", e)
+                                        });
+                                        yield Ok(
+                                            axum::response::sse::Event::default()
+                                                .event("error")
+                                                .json_data(error_payload)
+                                                .expect("Valid JSON")
+                                        );
+                                        break;
+                                    }
+                                    None => {
+                                        debug!("Event stream ended for tenant {} run {}", tenant_owned, run_id_owned);
+                                        break;
+                                    }
+                                }
+                            }
+                            _ = heartbeat_interval.tick() => {
+                                yield Ok(
+                                    axum::response::sse::Event::default()
+                                        .event("heartbeat")
+                                        .comment("keep-alive")
+                                );
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to create event stream for tenant {} run {}: {}", tenant_owned, run_id_owned, e);
+                    let error_payload = serde_json::json!({
+                        "type": "error",
+                        "message": format!("Failed to create event stream: {}", e)
+                    });
+                    yield Ok::<_, std::convert::Infallible>(
+                        axum::response::sse::Event::default()
+                            .event("error")
+                            .json_data(error_payload)
+                            .expect("Valid JSON")
+                    );
+                }
+            }
+        } else {
+            // JetStream not available - send warning and heartbeats
+            let warning_payload = serde_json::json!({
+                "type": "warning",
+                "message": "JetStream unavailable; operating in degraded mode"
+            });
+            yield Ok::<_, std::convert::Infallible>(
+                axum::response::sse::Event::default()
+                    .event("warning")
+                    .json_data(warning_payload)
+                    .expect("Valid JSON")
+            );
+
+            // Send heartbeats only
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(hb_secs));
+            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            loop {
+                interval.tick().await;
+                yield Ok(
+                    axum::response::sse::Event::default()
+                        .event("heartbeat")
+                        .comment("keep-alive")
+                );
+            }
+        }
+    };
+
+    axum::response::Sse::new(body_stream).into_response()
+}
+
+/// Grant approval for a specific tenant
+#[axum::debug_handler]
+pub async fn grant_approval_api_tenant(
+    State(state): State<AppState>,
+    Path((tenant, run_id, gate_id)): Path<(String, String, String)>,
+    headers: HeaderMap,
+    Json(body): Json<ApproveBody>,
+) -> Response {
+    debug!(
+        "Handling grant approval for tenant {} run {} gate {}",
+        tenant, run_id, gate_id
+    );
+
+    // Delegate to existing grant_approval_api logic
+    // For now, we'll just use the existing implementation
+    grant_approval_api(State(state), Path((run_id, gate_id)), headers, Json(body)).await
+}
+
+/// Deny approval for a specific tenant
+#[axum::debug_handler]
+pub async fn deny_approval_api_tenant(
+    State(state): State<AppState>,
+    Path((tenant, run_id, gate_id)): Path<(String, String, String)>,
+    headers: HeaderMap,
+    Json(body): Json<DenyBody>,
+) -> Response {
+    debug!(
+        "Handling deny approval for tenant {} run {} gate {}",
+        tenant, run_id, gate_id
+    );
+
+    // Delegate to existing deny_approval_api logic
+    // For now, we'll just use the existing implementation
+    deny_approval_api(State(state), Path((run_id, gate_id)), headers, Json(body)).await
+}

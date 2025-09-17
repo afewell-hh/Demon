@@ -92,14 +92,23 @@ impl JetStreamClient {
         Ok(Self { jetstream })
     }
 
-    /// List recent runs with optional limit
+    /// List recent runs with optional limit (legacy - uses default tenant)
     pub async fn list_runs(&self, limit: Option<usize>) -> Result<Vec<RunSummary>> {
+        self.list_runs_for_tenant("default", limit).await
+    }
+
+    /// List recent runs for a specific tenant
+    pub async fn list_runs_for_tenant(
+        &self,
+        tenant: &str,
+        limit: Option<usize>,
+    ) -> Result<Vec<RunSummary>> {
         let limit = limit.unwrap_or(50).min(1000); // Cap at 1000 for safety
-        debug!("Listing runs with limit: {}", limit);
+        debug!("Listing runs for tenant {} with limit: {}", tenant, limit);
 
         // Query JetStream for ritual events
-        // Subject pattern: demon.ritual.v1.<ritualId>.<runId>.events
-        let subject_filter = "demon.ritual.v1.*.*.events";
+        // New subject pattern: demon.ritual.v1.<tenant>.<ritualId>.<runId>.events
+        let subject_filter = format!("demon.ritual.v1.{}.*.*.events", tenant);
 
         let mut runs_map: HashMap<String, RunSummary> = HashMap::new();
         let mut message_count = 0;
@@ -107,7 +116,7 @@ impl JetStreamClient {
         // Get messages from JetStream stream
         // Use DeliverPolicy::All to get all messages, then sort by timestamp to prioritize recent runs
         match self
-            .query_stream_messages(subject_filter, None, DeliverPolicy::All)
+            .query_stream_messages(&subject_filter, None, DeliverPolicy::All)
             .await
         {
             Ok(messages) => {
@@ -181,12 +190,21 @@ impl JetStreamClient {
         Ok(runs)
     }
 
-    /// Get detailed information for a specific run
+    /// Get detailed information for a specific run (legacy - uses default tenant)
     pub async fn get_run_detail(&self, run_id: &str) -> Result<Option<RunDetail>> {
-        debug!("Getting run detail for: {}", run_id);
+        self.get_run_detail_for_tenant("default", run_id).await
+    }
 
-        // Subject pattern for specific run: demon.ritual.v1.*.<runId>.events
-        let subject_filter = &format!("demon.ritual.v1.*.{}.events", run_id);
+    /// Get detailed information for a specific run with tenant
+    pub async fn get_run_detail_for_tenant(
+        &self,
+        tenant: &str,
+        run_id: &str,
+    ) -> Result<Option<RunDetail>> {
+        debug!("Getting run detail for tenant {} run: {}", tenant, run_id);
+
+        // Try new tenant-aware subject first
+        let subject_filter = &format!("demon.ritual.v1.{}.*.{}.events", tenant, run_id);
 
         let mut events = Vec::new();
         let mut ritual_id: Option<String> = None;
@@ -220,6 +238,42 @@ impl JetStreamClient {
             Err(e) => {
                 error!("Failed to query stream messages for run {}: {}", run_id, e);
                 return Err(e); // Propagate error instead of hiding as 404
+            }
+        }
+
+        // If events are empty and tenant is default, try legacy subject pattern
+        if events.is_empty() && tenant == "default" {
+            let legacy_subject = &format!("demon.ritual.v1.*.{}.events", run_id);
+            debug!(
+                "No events found with tenant pattern, trying legacy pattern: {}",
+                legacy_subject
+            );
+
+            match self.query_all_stream_messages(legacy_subject).await {
+                Ok(messages) => {
+                    for message in messages {
+                        match self.parse_message_for_event(&message) {
+                            Ok(Some(event)) => {
+                                events.push(event);
+                            }
+                            Ok(None) => {}
+                            Err(e) => {
+                                debug!("Failed to parse message for event: {}", e);
+                            }
+                        }
+                        // Extract ritual_id from subject if we haven't found it yet
+                        if ritual_id.is_none() {
+                            if let Some(extracted) =
+                                self.extract_ritual_id_from_subject(&message.subject)
+                            {
+                                ritual_id = Some(extracted);
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    debug!("Failed to query legacy stream messages: {}", e);
+                }
             }
         }
 
@@ -576,10 +630,21 @@ impl JetStreamClient {
         &self,
         run_id: &str,
     ) -> Result<impl futures_util::Stream<Item = Result<RitualEvent>>> {
-        debug!("Starting event stream for run: {}", run_id);
+        self.stream_run_events_for_tenant("default", run_id).await
+    }
+
+    pub async fn stream_run_events_for_tenant(
+        &self,
+        tenant: &str,
+        run_id: &str,
+    ) -> Result<impl futures_util::Stream<Item = Result<RitualEvent>>> {
+        debug!(
+            "Starting event stream for tenant {} run: {}",
+            tenant, run_id
+        );
 
         // Get initial snapshot
-        let initial_events = match self.get_run_detail(run_id).await? {
+        let initial_events = match self.get_run_detail_for_tenant(tenant, run_id).await? {
             Some(detail) => detail.events,
             None => Vec::new(),
         };
@@ -591,7 +656,13 @@ impl JetStreamClient {
             .filter_map(|evt| evt.stream_sequence)
             .max();
 
-        let subject_filter = format!("demon.ritual.v1.*.{}.events", run_id);
+        // Try new tenant-aware subject first, fallback to legacy if default tenant
+        let subject_filter = if tenant == "default" && initial_events.is_empty() {
+            // Try legacy pattern if no events found with tenant pattern
+            format!("demon.ritual.v1.*.{}.events", run_id)
+        } else {
+            format!("demon.ritual.v1.{}.*.{}.events", tenant, run_id)
+        };
 
         // Clone self for use in the async stream
         let js_client = self.clone();

@@ -189,6 +189,7 @@ mod tests {
                         "end": { "type": "end" }
                     }
                 }),
+                tenant_id: "default".to_string(),
                 trace_id: Some("trace-123".to_string()),
             },
             RitualEvent::StateTransitioned {
@@ -197,6 +198,7 @@ mod tests {
                 ts: ts.clone(),
                 from_state: "start".to_string(),
                 to_state: "end".to_string(),
+                tenant_id: "default".to_string(),
                 trace_id: Some("trace-123".to_string()),
             },
             RitualEvent::Completed {
@@ -204,6 +206,7 @@ mod tests {
                 run_id: run_id.to_string(),
                 ts,
                 outputs: Some(serde_json::json!({ "result": "success" })),
+                tenant_id: "default".to_string(),
                 trace_id: Some("trace-123".to_string()),
             },
         ]
