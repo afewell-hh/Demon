@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.demon.ai/events/approval.override.v1.json",
+  "title": "Approval Emergency Override Event",
+  "description": "Event emitted when an approval is granted via emergency override",
+  "type": "object",
+  "properties": {
+    "event": {
+      "type": "string",
+      "const": "approval.override:v1"
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of the event"
+    },
+    "tenantId": {
+      "type": "string",
+      "description": "Tenant identifier"
+    },
+    "runId": {
+      "type": "string",
+      "description": "Unique identifier for the ritual run"
+    },
+    "ritualId": {
+      "type": "string",
+      "description": "Identifier of the ritual"
+    },
+    "gateId": {
+      "type": "string",
+      "description": "Identifier of the approval gate"
+    },
+    "approver": {
+      "type": "string",
+      "description": "Email or identifier of the person who performed the override"
+    },
+    "overrideLevel": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Level at which the override was performed"
+    },
+    "note": {
+      "type": ["string", "null"],
+      "description": "Optional note explaining the emergency override"
+    },
+    "escalationState": {
+      "type": "object",
+      "description": "Escalation state at time of override",
+      "properties": {
+        "currentLevel": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "totalLevels": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "emergencyOverride": {
+          "type": "boolean"
+        }
+      },
+      "required": ["currentLevel", "totalLevels", "emergencyOverride"],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "event",
+    "ts",
+    "tenantId",
+    "runId",
+    "ritualId",
+    "gateId",
+    "approver",
+    "overrideLevel",
+    "escalationState"
+  ],
+  "additionalProperties": false
+}

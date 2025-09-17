@@ -1,0 +1,18 @@
+{
+  "event": "approval.escalated:v1",
+  "ts": "2023-10-15T14:30:00Z",
+  "tenantId": "tenant-a",
+  "runId": "run-12345",
+  "ritualId": "deploy-ritual",
+  "gateId": "deploy-gate",
+  "fromLevel": 1,
+  "toLevel": 2,
+  "reason": "timeout",
+  "escalationState": {
+    "currentLevel": 2,
+    "totalLevels": 3,
+    "levelStartedAt": "2023-10-15T14:30:00Z",
+    "nextEscalationAt": "2023-10-16T14:30:00Z",
+    "emergencyOverride": false
+  }
+}

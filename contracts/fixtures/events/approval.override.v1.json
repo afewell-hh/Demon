@@ -1,0 +1,16 @@
+{
+  "event": "approval.override:v1",
+  "ts": "2023-10-15T16:45:00Z",
+  "tenantId": "tenant-a",
+  "runId": "run-12345",
+  "ritualId": "deploy-ritual",
+  "gateId": "deploy-gate",
+  "approver": "director@company.com",
+  "overrideLevel": 3,
+  "note": "Emergency deployment for critical security fix",
+  "escalationState": {
+    "currentLevel": 3,
+    "totalLevels": 3,
+    "emergencyOverride": true
+  }
+}
