@@ -210,6 +210,10 @@ pub fn create_app(state: AppState) -> Router {
             post(routes::deny_approval_api_tenant),
         )
         .route(
+            "/api/tenants/:tenant/approvals/:run_id/:gate_id/override",
+            post(routes::override_approval_api_tenant),
+        )
+        .route(
             "/static/*path",
             get_service(
                 ServeDir::new("static").not_found_service(handle_static_file_error.into_service()),

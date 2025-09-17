@@ -602,15 +602,42 @@ struct ApprovalsSummary {
     approver: Option<String>,
     reason: Option<String>,
     note: Option<String>,
+    // Escalation information
+    #[serde(rename = "escalationInfo")]
+    escalation_info: Option<EscalationInfo>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct EscalationInfo {
+    #[serde(rename = "currentLevel")]
+    current_level: u32,
+    #[serde(rename = "totalLevels")]
+    total_levels: u32,
+    #[serde(rename = "nextEscalationAt")]
+    next_escalation_at: Option<String>, // ISO 8601 timestamp
+    #[serde(rename = "emergencyOverride")]
+    emergency_override: bool,
+    #[serde(rename = "escalationHistory")]
+    escalation_history: Vec<EscalationHistoryUI>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct EscalationHistoryUI {
+    #[serde(rename = "fromLevel")]
+    from_level: u32,
+    #[serde(rename = "toLevel")]
+    to_level: u32,
+    #[serde(rename = "escalatedAt")]
+    escalated_at: String, // ISO 8601 timestamp
+    reason: String,
 }
 
 impl ApprovalsSummary {
     fn from_events(events: &[crate::jetstream::RitualEvent]) -> Option<Self> {
-        // Find the latest approval.* event
-        let evt = events
-            .iter()
-            .rev()
-            .find(|e| e.event.starts_with("approval."))?;
+        // Find the latest approval.* event (excluding escalation events for now)
+        let evt = events.iter().rev().find(|e| {
+            e.event.starts_with("approval.") && !e.event.starts_with("approval.escalated:")
+        })?;
 
         let gate_id = evt
             .extra
@@ -618,6 +645,9 @@ impl ApprovalsSummary {
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
+
+        // Extract escalation information from all events for this gate
+        let escalation_info = Self::extract_escalation_info(events, &gate_id);
 
         match evt.event.as_str() {
             "approval.granted:v1" => Some(Self {
@@ -636,6 +666,7 @@ impl ApprovalsSummary {
                     .get("note")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string()),
+                escalation_info,
             }),
             "approval.denied:v1" => {
                 let reason = evt
@@ -660,25 +691,133 @@ impl ApprovalsSummary {
                         .map(|s| s.to_string()),
                     reason,
                     note: None,
+                    escalation_info,
                 })
             }
-            "approval.requested:v1" => Some(Self {
-                status: "Pending".to_string(),
-                status_class: "status-running".to_string(),
+            "approval.requested:v1" => {
+                // For pending approvals, check if we have any escalation events
+                let latest_escalation = events.iter().rev().find(|e| {
+                    e.event == "approval.escalated:v1"
+                        && e.extra.get("gateId").and_then(|v| v.as_str()) == Some(&gate_id)
+                });
+
+                let (status, status_class) = if latest_escalation.is_some() {
+                    (
+                        "Pending — Escalated".to_string(),
+                        "status-warning".to_string(),
+                    )
+                } else {
+                    ("Pending".to_string(), "status-running".to_string())
+                };
+
+                Some(Self {
+                    status,
+                    status_class,
+                    gate_id,
+                    requester: evt
+                        .extra
+                        .get("requester")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string()),
+                    approver: None,
+                    reason: evt
+                        .extra
+                        .get("reason")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string()),
+                    note: None,
+                    escalation_info,
+                })
+            }
+            "approval.override:v1" => Some(Self {
+                status: "Override".to_string(),
+                status_class: "status-override".to_string(),
                 gate_id,
-                requester: evt
+                requester: None,
+                approver: evt
                     .extra
-                    .get("requester")
+                    .get("approver")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string()),
-                approver: None,
-                reason: evt
+                reason: None,
+                note: evt
                     .extra
-                    .get("reason")
+                    .get("note")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string()),
-                note: None,
+                escalation_info,
             }),
+            _ => None,
+        }
+    }
+
+    fn extract_escalation_info(
+        events: &[crate::jetstream::RitualEvent],
+        gate_id: &str,
+    ) -> Option<EscalationInfo> {
+        // Look for the latest escalation state or original request
+        let latest_escalation = events.iter().rev().find(|e| {
+            (e.event == "approval.escalated:v1" || e.event == "approval.requested:v1")
+                && e.extra.get("gateId").and_then(|v| v.as_str()) == Some(gate_id)
+        })?;
+
+        match latest_escalation.event.as_str() {
+            "approval.escalated:v1" => {
+                // Extract escalation state from the escalated event
+                let escalation_state = latest_escalation.extra.get("escalationState")?;
+
+                let current_level = escalation_state.get("currentLevel")?.as_u64()? as u32;
+                let total_levels = escalation_state.get("totalLevels")?.as_u64()? as u32;
+                let next_escalation_at = escalation_state
+                    .get("nextEscalationAt")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let emergency_override = escalation_state
+                    .get("emergencyOverride")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+
+                // Build escalation history
+                let mut escalation_history = Vec::new();
+                for event in events {
+                    if event.event == "approval.escalated:v1"
+                        && event.extra.get("gateId").and_then(|v| v.as_str()) == Some(gate_id)
+                    {
+                        if let (Some(from_level), Some(to_level), Some(reason)) = (
+                            event.extra.get("fromLevel").and_then(|v| v.as_u64()),
+                            event.extra.get("toLevel").and_then(|v| v.as_u64()),
+                            event.extra.get("reason").and_then(|v| v.as_str()),
+                        ) {
+                            escalation_history.push(EscalationHistoryUI {
+                                from_level: from_level as u32,
+                                to_level: to_level as u32,
+                                escalated_at: event.ts.to_rfc3339(),
+                                reason: reason.to_string(),
+                            });
+                        }
+                    }
+                }
+
+                Some(EscalationInfo {
+                    current_level,
+                    total_levels,
+                    next_escalation_at,
+                    emergency_override,
+                    escalation_history,
+                })
+            }
+            "approval.requested:v1" => {
+                // If we only have the initial request, check if there's escalation config
+                // This would require access to the escalation config, but for the UI,
+                // we'll assume level 1 of unknown total if no escalation events exist
+                Some(EscalationInfo {
+                    current_level: 1,
+                    total_levels: 1, // Will be updated if escalation config is available
+                    next_escalation_at: None,
+                    emergency_override: false,
+                    escalation_history: Vec::new(),
+                })
+            }
             _ => None,
         }
     }
@@ -696,6 +835,13 @@ pub struct ApproveBody {
 pub struct DenyBody {
     approver: String,
     reason: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct OverrideBody {
+    approver: String,
+    #[serde(default)]
+    note: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1897,6 +2043,229 @@ pub async fn deny_approval_api_tenant(
         }
         Err(e) => {
             error!("Failed to publish approval denied: {}", e);
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({ "error": "publish failed" })),
+            )
+                .into_response()
+        }
+    }
+}
+
+/// Emergency override approval for a specific tenant
+#[axum::debug_handler]
+pub async fn override_approval_api_tenant(
+    State(state): State<AppState>,
+    Path((tenant, run_id, gate_id)): Path<(String, String, String)>,
+    headers: HeaderMap,
+    Json(body): Json<OverrideBody>,
+) -> Response {
+    debug!(
+        "Handling emergency override for tenant {} run {} gate {}",
+        tenant, run_id, gate_id
+    );
+
+    // CSRF protection: require X-Requested-With header for API calls
+    if headers.get("X-Requested-With").is_none() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "X-Requested-With header required"
+            })),
+        )
+            .into_response();
+    }
+
+    // Check if approver is allowed (for emergency override, we might have stricter requirements)
+    if !approver_allowed(&body.approver) {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "approver not allowed for emergency override" })),
+        )
+            .into_response();
+    }
+
+    // Ensure stream exists before attempting to read
+    if let Some(_jsctx) = &state.jetstream_client {
+        let desired = std::env::var("RITUAL_STREAM_NAME").ok();
+        if let Some(name) = desired {
+            let client = async_nats::connect(
+                &std::env::var("NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".to_string()),
+            )
+            .await
+            .ok();
+            if let Some(client) = client {
+                let _ = async_nats::jetstream::new(client)
+                    .get_or_create_stream(async_nats::jetstream::stream::Config {
+                        name,
+                        subjects: vec!["demon.ritual.v1.>".to_string()],
+                        ..Default::default()
+                    })
+                    .await;
+            }
+        }
+    }
+
+    // Get run details and check current escalation state
+    let (ritual_id, current_escalation_level, expected_sequence) = match &state.jetstream_client {
+        Some(js) => match js.get_run_detail_for_tenant(&tenant, &run_id).await {
+            Ok(Some(rd)) => {
+                // Check if already terminal
+                if let Some(last) = rd.events.iter().rev().find(|e| {
+                    (e.event == "approval.granted:v1"
+                        || e.event == "approval.denied:v1"
+                        || e.event == "approval.override:v1")
+                        && e.extra
+                            .get("gateId")
+                            .and_then(|v| v.as_str())
+                            .map(|g| g == gate_id)
+                            .unwrap_or(false)
+                }) {
+                    // Already resolved
+                    let state_name = match last.event.as_str() {
+                        "approval.granted:v1" => "granted",
+                        "approval.denied:v1" => "denied",
+                        "approval.override:v1" => "override",
+                        _ => "unknown",
+                    };
+                    return (
+                        StatusCode::CONFLICT,
+                        Json(serde_json::json!({
+                            "error": "gate already resolved",
+                            "state": state_name
+                        })),
+                    )
+                        .into_response();
+                }
+
+                // Extract current escalation level
+                let escalation_level = rd
+                    .events
+                    .iter()
+                    .rev()
+                    .find(|e| {
+                        e.event == "approval.escalated:v1"
+                            && e.extra.get("gateId").and_then(|v| v.as_str()) == Some(&gate_id)
+                    })
+                    .and_then(|e| e.extra.get("escalationState"))
+                    .and_then(|state| state.get("currentLevel"))
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(1) as u32;
+
+                (
+                    rd.ritual_id,
+                    escalation_level,
+                    rd.events.last().and_then(|evt| evt.stream_sequence),
+                )
+            }
+            Ok(None) => {
+                return (
+                    StatusCode::NOT_FOUND,
+                    Json(serde_json::json!({ "error": "run not found" })),
+                )
+                    .into_response()
+            }
+            Err(e) => {
+                error!("get_run_detail_for_tenant failed: {}", e);
+                return (
+                    StatusCode::BAD_GATEWAY,
+                    Json(serde_json::json!({ "error": "JetStream error" })),
+                )
+                    .into_response();
+            }
+        },
+        None => {
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({ "error": "JetStream unavailable" })),
+            )
+                .into_response()
+        }
+    };
+
+    // Create escalation state for the override
+    let escalation_state = serde_json::json!({
+        "current_level": current_escalation_level,
+        "total_levels": current_escalation_level, // We don't know the total, use current
+        "emergency_override": true
+    });
+
+    let now = chrono::Utc::now().to_rfc3339();
+    let payload = serde_json::json!({
+        "event": "approval.override:v1",
+        "ts": now,
+        "tenantId": tenant,
+        "runId": run_id,
+        "ritualId": ritual_id,
+        "gateId": gate_id,
+        "approver": body.approver,
+        "overrideLevel": current_escalation_level,
+        "note": body.note,
+        "escalationState": escalation_state,
+    });
+
+    let msg_id = format!(
+        "{}:approval:{}:override",
+        payload["runId"].as_str().unwrap(),
+        payload["gateId"].as_str().unwrap()
+    );
+
+    match publish_approval_event(
+        &tenant,
+        payload["ritualId"].as_str().unwrap(),
+        payload["runId"].as_str().unwrap(),
+        payload.clone(),
+        msg_id,
+        expected_sequence,
+    )
+    .await
+    {
+        Ok(PublishOutcome::Published) => (StatusCode::OK, Json(payload)).into_response(),
+        Ok(PublishOutcome::Conflict) => {
+            // Attempt to refresh state to report the final gate disposition
+            let state_info = match &state.jetstream_client {
+                Some(js) => js
+                    .get_run_detail_for_tenant(&tenant, &run_id)
+                    .await
+                    .ok()
+                    .flatten(),
+                None => None,
+            };
+            let resolved_state = state_info
+                .and_then(|rd| {
+                    rd.events
+                        .iter()
+                        .rev()
+                        .find(|e| {
+                            (e.event == "approval.granted:v1"
+                                || e.event == "approval.denied:v1"
+                                || e.event == "approval.override:v1")
+                                && e.extra
+                                    .get("gateId")
+                                    .and_then(|v| v.as_str())
+                                    .map(|g| g == gate_id)
+                                    .unwrap_or(false)
+                        })
+                        .map(|e| e.event.clone())
+                })
+                .map(|event| match event.as_str() {
+                    "approval.granted:v1" => "granted",
+                    "approval.denied:v1" => "denied",
+                    "approval.override:v1" => "override",
+                    _ => "unknown",
+                })
+                .unwrap_or("unknown");
+            (
+                StatusCode::CONFLICT,
+                Json(serde_json::json!({
+                    "error": "gate already resolved",
+                    "state": resolved_state
+                })),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            error!("Failed to publish approval override: {}", e);
             (
                 StatusCode::BAD_GATEWAY,
                 Json(serde_json::json!({ "error": "publish failed" })),
