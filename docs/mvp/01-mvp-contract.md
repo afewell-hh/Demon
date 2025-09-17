@@ -15,9 +15,9 @@
 - [x] M0-8: Development Environment — Acceptance: `make dev` command starts NATS and builds workspace, Docker Compose configuration for NATS JetStream, configurable ports (`NATS_PORT=4222`, `NATS_MON_PORT=8222`), seed script for demo data
 
 ## Should-have (M1)
-- [ ] M1-1: Enhanced UI Dashboard — Acceptance: Real-time event streaming, filtering and search capabilities, approval action buttons in UI
-- [ ] M1-2: Multi-tenant Support — Acceptance: Namespace isolation, per-tenant quotas and policies
-- [ ] M1-3: Advanced Policy Engine — Acceptance: Time-based policies, complex approval workflows, escalation chains
+- [x] M1-1: Enhanced UI Dashboard — Acceptance: Real-time event streaming, filtering and search capabilities, approval action buttons in UI (PR #105)
+- [x] M1-2: Multi-tenant Support — Acceptance: Namespace isolation, per-tenant quotas and policies (PR #107)
+- [x] M1-3: Advanced Policy Engine — Acceptance: Time-based policies, complex approval workflows, escalation chains (PR #108, #109)
 
 ## Non-goals
 - Full workflow orchestration (use existing tools like GitHub Actions/GitLab CI)
@@ -30,6 +30,11 @@
 - [x] "replies-guard" required + passing
 - [x] Docs: README quickstart + HOWTOs updated
 - [x] Smoke demo script passes (Playwright)
+
+### M1 Completion Reference
+- M1-1 (UI Dashboard): PR #105 → SHA 3c6fa76
+- M1-2 (Multi-tenant): PR #107 → SHA 02c5a37
+- M1-3 (Policy Engine): PR #108 → SHA c77e208, PR #109 → SHA 810d7e7
 
 ## Risks & Open Questions
 - NATS JetStream operational complexity in production environments
