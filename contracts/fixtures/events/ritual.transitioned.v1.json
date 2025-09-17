@@ -3,6 +3,7 @@
   "ritualId": "echo-basic",
   "runId": "550e8400-e29b-41d4-a716-446655440000",
   "ts": "2025-01-06T10:30:01Z",
+  "tenantId": "default",
   "fromState": "start",
   "toState": "end",
   "traceId": "trace-123"

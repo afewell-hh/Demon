@@ -13,7 +13,7 @@ async fn ensure_stream(js: &jetstream::Context) -> Result<()> {
     let _ = js
         .get_or_create_stream(async_nats::jetstream::stream::Config {
             name: desired,
-            subjects: vec!["demon.ritual.v1.>".to_string()],
+            subjects: vec!["demon.ritual.v1.*.*.*.events".to_string()],
             ..Default::default()
         })
         .await?;
@@ -25,20 +25,39 @@ async fn read_events_for_run(
     ritual_id: &str,
     run_id: &str,
 ) -> Result<Vec<serde_json::Value>> {
-    let subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
+    // Try new tenant-aware pattern first
+    let subject = format!("demon.ritual.v1.default.{}.{}.events", ritual_id, run_id);
     let stream = if let Ok(s) = js.get_stream("RITUAL_EVENTS").await {
         s
     } else {
         js.get_stream("DEMON_RITUAL_EVENTS").await?
     };
-    let consumer = stream
+
+    // Try tenant-aware consumer first
+    let consumer_result = stream
         .create_consumer(async_nats::jetstream::consumer::pull::Config {
-            filter_subject: subject,
+            filter_subject: subject.clone(),
             deliver_policy: DeliverPolicy::All,
             ack_policy: async_nats::jetstream::consumer::AckPolicy::None,
             ..Default::default()
         })
-        .await?;
+        .await;
+
+    let consumer = match consumer_result {
+        Ok(c) => c,
+        Err(_) => {
+            // Fallback to legacy pattern
+            let legacy_subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
+            stream
+                .create_consumer(async_nats::jetstream::consumer::pull::Config {
+                    filter_subject: legacy_subject.clone(),
+                    deliver_policy: DeliverPolicy::All,
+                    ack_policy: async_nats::jetstream::consumer::AckPolicy::None,
+                    ..Default::default()
+                })
+                .await?
+        }
+    };
     let mut out = Vec::new();
     let mut msgs = consumer
         .batch()
@@ -62,7 +81,7 @@ async fn publish_granted(
     run: &str,
     gate: &str,
 ) -> Result<()> {
-    let subject = format!("demon.ritual.v1.{}.{}.events", ritual, run);
+    let subject = format!("demon.ritual.v1.default.{}.{}.events", ritual, run);
     let now = chrono::Utc::now().to_rfc3339();
     let payload = serde_json::json!({
         "event": "approval.granted:v1",
@@ -115,7 +134,9 @@ async fn expires_after_ttl_if_no_terminal() -> Result<()> {
 
     // Simulate timer wheel firing after TTL by invoking the engine expiry helper
     tokio::time::sleep(Duration::from_millis(2300)).await;
-    let emitted = engine::rituals::approvals::process_expiry_if_pending(&run, ritual, gate).await?;
+    let emitted =
+        engine::rituals::approvals::process_expiry_if_pending("default", &run, ritual, gate)
+            .await?;
     assert!(emitted, "auto-deny should be emitted when pending");
 
     // Read back and verify exactly one denied with reason: expired
@@ -150,7 +171,9 @@ async fn grant_preempts_expiry_integration() -> Result<()> {
 
     // Sleep past TTL and attempt auto-expiry; should be a no-op
     tokio::time::sleep(Duration::from_millis(2300)).await;
-    let emitted = engine::rituals::approvals::process_expiry_if_pending(&run, ritual, gate).await?;
+    let emitted =
+        engine::rituals::approvals::process_expiry_if_pending("default", &run, ritual, gate)
+            .await?;
     assert!(!emitted, "expiry should be a no-op when already granted");
 
     // Verify there is no auto-deny

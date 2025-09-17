@@ -13,7 +13,7 @@ UI_URL=${UI_URL:-http://127.0.0.1:3000}
 export NATS_URL RITUAL_STREAM_NAME
 
 ritual=preview
-tenant=default
+tenant=${TENANT:-default}
 now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 
 RUN_A=${RUN_A:-run-preview-a}
@@ -22,7 +22,7 @@ RUN_C=${RUN_C:-run-preview-c}
 GATE_B=${GATE_B:-gate-b}
 GATE_C=${GATE_C:-gate-c}
 
-subject() { echo "demon.ritual.v1.$1.$2.events"; }
+subject() { echo "demon.ritual.v1.$tenant.$1.$2.events"; }
 expiry_key() { echo "$1:approval:$2:expiry"; }
 
 # Ensure UI is reachable (retry for ~20s)

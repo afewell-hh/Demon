@@ -27,7 +27,7 @@ impl Default for TtlWorkerConfig {
             stream_name: std::env::var("RITUAL_STREAM_NAME").ok(),
             consumer_name: std::env::var("TTL_CONSUMER_NAME")
                 .unwrap_or_else(|_| "ttl-worker".to_string()),
-            subject_filter: "demon.ritual.v1.*.*.events".to_string(),
+            subject_filter: "demon.ritual.v1.*.*.*.events".to_string(),
             batch: std::env::var("TTL_BATCH")
                 .ok()
                 .and_then(|s| s.parse().ok())
@@ -58,11 +58,30 @@ pub fn reset_counters() {
     NOOP.store(0, Ordering::Relaxed);
 }
 
-/// Parse ritualId and runId from a subject like "demon.ritual.v1.<ritual>.<run>.events".
-fn parse_subject(subject: &str) -> Option<(String, String)> {
+/// Parse tenant, ritualId and runId from a subject.
+/// Supports both tenant-aware "demon.ritual.v1.<tenant>.<ritual>.<run>.events"
+/// and legacy "demon.ritual.v1.<ritual>.<run>.events" formats.
+/// Returns (tenant, ritual_id, run_id).
+fn parse_subject(subject: &str) -> Option<(String, String, String)> {
     let parts: Vec<&str> = subject.split('.').collect();
     if parts.len() >= 6 && parts[0] == "demon" && parts[1] == "ritual" && parts[2] == "v1" {
-        Some((parts[3].to_string(), parts[4].to_string()))
+        if parts.len() == 7 {
+            // Tenant-aware format: demon.ritual.v1.<tenant>.<ritual>.<run>.events
+            Some((
+                parts[3].to_string(),
+                parts[4].to_string(),
+                parts[5].to_string(),
+            ))
+        } else if parts.len() == 6 {
+            // Legacy format: demon.ritual.v1.<ritual>.<run>.events
+            Some((
+                "default".to_string(),
+                parts[3].to_string(),
+                parts[4].to_string(),
+            ))
+        } else {
+            None
+        }
     } else {
         None
     }
@@ -71,7 +90,7 @@ fn parse_subject(subject: &str) -> Option<(String, String)> {
 /// Handle a single JetStream message; returns true if acked.
 async fn handle_message(msg: Message) -> Result<bool> {
     let subject = msg.message.subject.clone();
-    let (ritual_id, run_id_from_subject) = match parse_subject(&subject) {
+    let (tenant, ritual_id, run_id_from_subject) = match parse_subject(&subject) {
         Some(x) => x,
         None => {
             warn!(%subject, "ttl_worker: unexpected subject; ack and skip");
@@ -113,8 +132,10 @@ async fn handle_message(msg: Message) -> Result<bool> {
             return Ok(true);
         }
         incr(&HANDLED);
-        match crate::rituals::approvals::process_expiry_if_pending(&run_id, &ritual_id, &gate_id)
-            .await
+        match crate::rituals::approvals::process_expiry_if_pending(
+            &tenant, &run_id, &ritual_id, &gate_id,
+        )
+        .await
         {
             Ok(did_expire) => {
                 if did_expire {
@@ -232,8 +253,19 @@ mod tests {
     use super::*;
     #[test]
     fn parse_subject_happy() {
+        // Legacy format
         let s = "demon.ritual.v1.rit.run.events";
-        assert_eq!(parse_subject(s), Some(("rit".into(), "run".into())));
+        assert_eq!(
+            parse_subject(s),
+            Some(("default".into(), "rit".into(), "run".into()))
+        );
+
+        // Tenant-aware format
+        let s_tenant = "demon.ritual.v1.tenant1.rit.run.events";
+        assert_eq!(
+            parse_subject(s_tenant),
+            Some(("tenant1".into(), "rit".into(), "run".into()))
+        );
     }
     #[test]
     fn parse_timer_id() {

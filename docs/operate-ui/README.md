@@ -14,9 +14,25 @@ cargo run -p operate-ui          # starts the UI server
 ```
 
 Then visit:
-- `/runs` — recent runs, stable ordering
-- `/runs/:runId` — ordered timeline per run
-- `/api/runs`, `/api/runs/:runId` — JSON APIs (502 when NATS unavailable)
+- `/runs` — recent runs, stable ordering (legacy - defaults to tenant "default")
+- `/runs/:runId` — ordered timeline per run (legacy - defaults to tenant "default")
+- `/api/runs`, `/api/runs/:runId` — JSON APIs (502 when NATS unavailable) (legacy - defaults to tenant "default")
+
+## Multi-tenant Support
+
+The UI now supports tenant namespace isolation for multi-tenant deployments:
+
+### Tenant-aware API Endpoints
+- `/api/tenants/:tenant/runs` — list runs for a specific tenant
+- `/api/tenants/:tenant/runs/:runId` — get run detail for a specific tenant
+- `/api/tenants/:tenant/runs/:runId/events/stream` — SSE stream for a specific tenant's run
+- `/api/tenants/:tenant/approvals/:runId/:gateId/grant` — grant approval for a specific tenant
+- `/api/tenants/:tenant/approvals/:runId/:gateId/deny` — deny approval for a specific tenant
+
+### JetStream Subject Pattern
+Events are now published to tenant-scoped subjects:
+- New pattern: `demon.ritual.v1.<tenant>.<ritualId>.<runId>.events`
+- Legacy pattern: `demon.ritual.v1.<ritualId>.<runId>.events` (backward compatible with tenant "default")
 
 ## Notes
 - Read-only semantics: ephemeral consumers; no durable state created by the UI.
@@ -82,6 +98,7 @@ The UI now supports real-time event streaming via Server-Sent Events (SSE):
 
 - See docs/preview/alpha/runbook.md for a 10‑minute, one‑command demo.
  - After starting the UI and TTL worker, run `./examples/seed/seed_preview.sh` and open `/runs`.
+- To seed for a specific tenant: `TENANT=acme ./examples/seed/seed_preview.sh`
 - Preview Mode links:
    - Runbook (One‑Pager): `docs/preview/alpha/runbook.md`
    - Client Deck (5 slides): `docs/preview/alpha/deck.md`

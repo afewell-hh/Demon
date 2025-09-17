@@ -20,6 +20,7 @@ async fn templates_compile_and_render_minimal() {
     ctx.insert("error", &Option::<String>::None);
     ctx.insert("jetstream_available", &false);
     ctx.insert("current_page", &"runs");
+    ctx.insert("tenant", &"default");
 
     let html = tera
         .render("runs_list.html", &ctx)
@@ -33,6 +34,7 @@ async fn templates_compile_and_render_minimal() {
     ctx2.insert("jetstream_available", &false);
     ctx2.insert("run_id", &"test-run-123");
     ctx2.insert("current_page", &"runs");
+    ctx2.insert("tenant", &"default");
 
     let html2 = tera
         .render("run_detail.html", &ctx2)
@@ -52,6 +54,7 @@ async fn templates_compile_and_render_minimal() {
     ctx3.insert("jetstream_available", &true);
     ctx3.insert("run_id", &"run-x");
     ctx3.insert("current_page", &"runs");
+    ctx3.insert("tenant", &"default");
     // Fields normally provided by handler
     ctx3.insert("run_status", &"Running");
     ctx3.insert("run_status_class", &"status-running");

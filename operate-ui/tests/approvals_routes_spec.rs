@@ -40,7 +40,7 @@ async fn fetch_events_for_run(
         .await
         .or(js.get_stream("DEMON_RITUAL_EVENTS").await)
         .expect("stream exists");
-    let subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
+    let subject = format!("demon.ritual.v1.default.{}.{}.events", ritual_id, run_id);
     let consumer = stream
         .create_consumer(jetstream::consumer::pull::Config {
             filter_subject: subject,
@@ -70,11 +70,11 @@ async fn publish_requested(
     run: &str,
     gate: &str,
 ) -> Result<()> {
-    let subject = format!("demon.ritual.v1.{}.{}.events", ritual, run);
+    let subject = format!("demon.ritual.v1.default.{}.{}.events", ritual, run);
     let payload = serde_json::json!({
         "event": "approval.requested:v1",
         "ts": Utc::now().to_rfc3339(),
-        "tenantId": "tenant-a",
+        "tenantId": "default",
         "runId": run,
         "ritualId": ritual,
         "gateId": gate,

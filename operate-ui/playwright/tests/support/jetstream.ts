@@ -29,7 +29,7 @@ async function ensureStream(jsm: JetStreamManager, stream: string, subjectPrefix
 
   await jsm.streams.add({
     name: stream,
-    subjects: [`${subjectPrefix}.>`],
+    subjects: [`${subjectPrefix}.*.*.*.events`],
     retention: 'limits',
     discard: 'old',
     storage: 'file',
@@ -73,7 +73,7 @@ async function publishEvents(
     const jsm = await nc.jetstreamManager();
     await ensureStream(jsm, DEFAULT_STREAM_NAME, DEFAULT_SUBJECT_PREFIX);
 
-    const subject = `${DEFAULT_SUBJECT_PREFIX}.${ritualId}.${runId}.events`;
+    const subject = `${DEFAULT_SUBJECT_PREFIX}.${tenantId}.${ritualId}.${runId}.events`;
 
     if (opts.purge) {
       // Purge prior subject data for determinism (ignore errors when subject missing)

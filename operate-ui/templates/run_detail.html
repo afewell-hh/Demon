@@ -4,7 +4,11 @@
 
 {% block content %}
 <div style="margin-bottom: 1rem;">
+    {% if tenant and tenant != "default" %}
+    <a href="/tenants/{{ tenant }}/runs" class="btn btn-secondary">← Back to Runs</a>
+    {% else %}
     <a href="/runs" class="btn btn-secondary">← Back to Runs</a>
+    {% endif %}
 </div>
 
 {% if error %}
@@ -225,9 +229,15 @@
     </div>
     <p>Get this run's data programmatically:</p>
     <div style="margin-top: 1rem;">
+        {% if tenant and tenant != "default" %}
+        <a href="/api/tenants/{{ tenant }}/runs/{{ run_id }}" target="_blank" class="btn btn-primary">
+            <code>GET /api/tenants/{{ tenant }}/runs/{{ run_id }}</code>
+        </a>
+        {% else %}
         <a href="/api/runs/{{ run_id }}" target="_blank" class="btn btn-primary">
             <code>GET /api/runs/{{ run_id }}</code>
         </a>
+        {% endif %}
     </div>
 </div>
 
@@ -301,6 +311,7 @@
 // Real-time event streaming with connection status and live DOM updates
 (function() {
   const runId = {{ run_id | json | safe }};
+  const tenant = {{ tenant | json | safe }};
   const base = window.location.origin;
   const BASE_MS = parseInt((window.SSE_RETRY_BASE_MS || '250'), 10) || 250;
   const MAX_MS  = parseInt((window.SSE_RETRY_MAX_MS  || '5000'), 10) || 5000;
@@ -446,7 +457,9 @@
 
   function connect() {
     updateConnectionStatus('reconnecting', 'Connecting...');
-    const url = `${base}/api/runs/${runId}/events/stream`;
+    const url = tenant && tenant !== 'default'
+      ? `${base}/api/tenants/${tenant}/runs/${runId}/events/stream`
+      : `${base}/api/runs/${runId}/events/stream`;
     es = new EventSource(url);
 
     es.addEventListener('open', () => {
@@ -531,6 +544,7 @@
 // Approval Actions JavaScript
 (function() {
   const runId = {{ run_id | json | safe }};
+  const tenant = {{ tenant | json | safe }};
   const gateId = {% if approvals %}{{ approvals.gateId | json | safe }}{% else %}null{% endif %};
 
   if (!gateId) return; // No approvals on this run
@@ -627,7 +641,9 @@
     showToast(`${action === 'grant' ? 'Granting' : 'Denying'} approval...`, 'info');
 
     try {
-      const endpoint = `/api/approvals/${runId}/${gateId}/${action}`;
+      const endpoint = tenant && tenant !== 'default'
+        ? `/api/tenants/${tenant}/approvals/${runId}/${gateId}/${action}`
+        : `/api/approvals/${runId}/${gateId}/${action}`;
       const body = action === 'grant'
         ? { approver: email, note: note || null }
         : { approver: email, reason: note };
