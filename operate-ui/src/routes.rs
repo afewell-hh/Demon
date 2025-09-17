@@ -1668,15 +1668,18 @@ pub async fn grant_approval_api_tenant(
             };
             let resolved_state = state_info
                 .and_then(|rd| {
-                    rd.events.iter().rev().find(|e| {
-                        (e.event == "approval.granted:v1" || e.event == "approval.denied:v1")
-                            && e.extra
-                                .get("gateId")
-                                .and_then(|v| v.as_str())
-                                .map(|g| g == gate_id)
-                                .unwrap_or(false)
-                    })
-                    .map(|e| e.event.clone())
+                    rd.events
+                        .iter()
+                        .rev()
+                        .find(|e| {
+                            (e.event == "approval.granted:v1" || e.event == "approval.denied:v1")
+                                && e.extra
+                                    .get("gateId")
+                                    .and_then(|v| v.as_str())
+                                    .map(|g| g == gate_id)
+                                    .unwrap_or(false)
+                        })
+                        .map(|e| e.event.clone())
                 })
                 .map(|event| {
                     if event == "approval.granted:v1" {
@@ -1862,15 +1865,18 @@ pub async fn deny_approval_api_tenant(
             };
             let resolved_state = state_info
                 .and_then(|rd| {
-                    rd.events.iter().rev().find(|e| {
-                        (e.event == "approval.granted:v1" || e.event == "approval.denied:v1")
-                            && e.extra
-                                .get("gateId")
-                                .and_then(|v| v.as_str())
-                                .map(|g| g == gate_id)
-                                .unwrap_or(false)
-                    })
-                    .map(|e| e.event.clone())
+                    rd.events
+                        .iter()
+                        .rev()
+                        .find(|e| {
+                            (e.event == "approval.granted:v1" || e.event == "approval.denied:v1")
+                                && e.extra
+                                    .get("gateId")
+                                    .and_then(|v| v.as_str())
+                                    .map(|g| g == gate_id)
+                                    .unwrap_or(false)
+                        })
+                        .map(|e| e.event.clone())
                 })
                 .map(|event| {
                     if event == "approval.granted:v1" {
