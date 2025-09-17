@@ -44,6 +44,7 @@ pub struct EscalationLevel {
 
 /// Current state of an approval request in the escalation chain
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EscalationState {
     /// Current level (1-based)
     pub current_level: u32,
@@ -61,6 +62,7 @@ pub struct EscalationState {
 
 /// Entry in the escalation history
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EscalationHistoryEntry {
     /// Level that was escalated from
     pub from_level: u32,
