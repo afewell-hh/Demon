@@ -4,9 +4,28 @@
 - [Preview Kit](docs/preview/alpha/README.md)
 - [Bundle Library & Signatures](docs/bootstrapper/bundles.md) (offline, reproducible, CI-enforced)
 
-<sub>Local verify:</sub>  
+<sub>Local verify:</sub>
 <code>target/debug/demonctl bootstrap --verify-only --bundle lib://local/preview-local-dev@0.0.1 \
 | jq -e 'select(.phase=="verify" and .signature=="ok")' >/dev/null && echo "signature ok"</code>
+
+## Self-Host Bootstrap
+
+Use the `demonctl bootstrap` command for zero-config self-hosting setup:
+
+```bash
+# Complete bootstrap (ensure stream + seed events + verify UI)
+cargo run -p demonctl -- bootstrap --ensure-stream --seed --verify
+
+# Individual steps
+cargo run -p demonctl -- bootstrap --ensure-stream    # Create NATS stream
+cargo run -p demonctl -- bootstrap --seed            # Seed sample events
+cargo run -p demonctl -- bootstrap --verify          # Verify Operate UI health
+
+# With environment overrides
+RITUAL_STREAM_NAME=CUSTOM_STREAM cargo run -p demonctl -- bootstrap --ensure-stream --seed --verify
+```
+
+See [docs/bootstrapper/README.md](docs/bootstrapper/README.md) for more details.
 
 
 # Demon — Meta-PaaS (Milestone 0)

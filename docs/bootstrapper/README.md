@@ -1,8 +1,31 @@
 # Bootstrapper (Self-Host v0)
 
-`bootstrapper-demonctl` provides an idempotent one-command setup to ensure NATS JetStream stream/subjects, seed minimal events, and verify Operate UI readiness.
+The bootstrapper provides an idempotent one-command setup to ensure NATS JetStream stream/subjects, seed minimal events, and verify Operate UI readiness.
 
-## Usage
+## Main CLI Usage (Recommended)
+
+Use the main `demonctl bootstrap` subcommand:
+
+```bash
+# Complete bootstrap (all phases: ensure + seed + verify)
+cargo run -p demonctl -- bootstrap --ensure-stream --seed --verify
+
+# Individual steps
+cargo run -p demonctl -- bootstrap --ensure-stream    # Create NATS stream only
+cargo run -p demonctl -- bootstrap --seed            # Seed sample events only
+cargo run -p demonctl -- bootstrap --verify          # Verify Operate UI health only
+
+# With overrides
+cargo run -p demonctl -- bootstrap \
+  --ensure-stream --seed --verify \
+  --nats-url nats://127.0.0.1:4222 \
+  --stream-name CUSTOM_STREAM \
+  --ui-base-url http://127.0.0.1:3000
+```
+
+## Direct bootstrapper-demonctl Usage
+
+For advanced use cases, you can use the standalone tool:
 
 ```bash
 # defaults: profile local-dev, run all phases (ensure + seed + verify)
