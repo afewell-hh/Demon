@@ -44,6 +44,7 @@ req_b=$(jq -n --arg ts "$(now)" --arg t "$tenant" --arg run "$RUN_B" --arg rit "
 cargo run -q -p engine --bin demon-seed -- "$(subject $ritual $RUN_B)" "$req_b" "$RUN_B:approval:$GATE_B"
 curl -sS -X POST "$UI_URL/api/approvals/$RUN_B/$GATE_B/grant" \
   -H 'content-type: application/json' \
+  -H 'X-Requested-With: XMLHttpRequest' \
   -d '{"approver":"ops@example.com","note":"ok"}' >/dev/null
 
 echo "Seeding Run C (approval requested -> TTL scheduled; worker will auto-deny)"

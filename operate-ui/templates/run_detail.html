@@ -60,7 +60,7 @@
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">Approvals</h3>
-        <span class="status-indicator {{ approvals.statusClass }}">{{ approvals.status }}</span>
+        <span id="approval-status" class="status-indicator {{ approvals.statusClass }}">{{ approvals.status }}</span>
     </div>
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
         <div>
@@ -92,6 +92,53 @@
         </div>
         {% endif %}
     </div>
+
+    <!-- Approval Actions (only shown for pending approvals) -->
+    {% if approvals.status == "Pending" %}
+    <div id="approval-actions" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color, #e0e0e0);">
+        <h4 style="margin-bottom: 1rem;">Approval Actions</h4>
+
+        <!-- Toast notification area -->
+        <div id="approval-toast" style="display: none; margin-bottom: 1rem; padding: 0.75rem; border-radius: 4px; font-weight: 500;"></div>
+
+        <!-- Approver identity input -->
+        <div style="margin-bottom: 1rem;">
+            <label for="approver-email" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">
+                Approver Email:
+            </label>
+            <input type="email" id="approver-email" name="approver"
+                   style="width: 100%; max-width: 300px; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px;"
+                   placeholder="your.email@company.com" required>
+        </div>
+
+        <!-- Action buttons and note input -->
+        <div style="display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 250px;">
+                <label for="approval-note" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">
+                    Note/Reason (optional):
+                </label>
+                <textarea id="approval-note" name="note" rows="3"
+                          style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; resize: vertical;"
+                          placeholder="Optional note or reason for this decision..."></textarea>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; min-width: 150px;">
+                <button type="button" id="grant-approval-btn" class="btn btn-success"
+                        style="background-color: #28a745; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-weight: 500;">
+                    Grant Approval
+                </button>
+                <button type="button" id="deny-approval-btn" class="btn btn-danger"
+                        style="background-color: #dc3545; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-weight: 500;">
+                    Deny Approval
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading state -->
+        <div id="approval-loading" style="display: none; margin-top: 1rem; text-align: center; color: #666;">
+            <span>Processing approval action...</span>
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endif %}
 
@@ -426,6 +473,20 @@
         if (data.type === 'event' && data.event) {
           console.debug('[SSE] new event:', data.event.event);
           addEventToTimeline(data.event);
+
+          // Dispatch approval events for real-time UI updates
+          if (data.event.event && data.event.event.startsWith('approval.')) {
+            const approvalEvent = new CustomEvent('approval-event', {
+              detail: {
+                event: data.event.event,
+                gateId: data.event.extra?.gateId,
+                approver: data.event.extra?.approver,
+                reason: data.event.extra?.reason,
+                note: data.event.extra?.note
+              }
+            });
+            document.dispatchEvent(approvalEvent);
+          }
         }
       } catch (err) {
         console.error('[SSE] failed to parse event:', err);
@@ -463,6 +524,204 @@
   window.addEventListener('beforeunload', () => {
     if (es) {
       es.close();
+    }
+  });
+})();
+
+// Approval Actions JavaScript
+(function() {
+  const runId = {{ run_id | json | safe }};
+  const gateId = {% if approvals %}{{ approvals.gateId | json | safe }}{% else %}null{% endif %};
+
+  if (!gateId) return; // No approvals on this run
+
+  function showToast(message, type = 'info') {
+    const toast = document.getElementById('approval-toast');
+    if (!toast) return;
+
+    toast.style.display = 'block';
+    toast.textContent = message;
+
+    // Set color based on type
+    const colors = {
+      success: { bg: '#d4edda', text: '#155724', border: '#c3e6cb' },
+      error: { bg: '#f8d7da', text: '#721c24', border: '#f5c6cb' },
+      info: { bg: '#d1ecf1', text: '#0c5460', border: '#bee5eb' }
+    };
+    const color = colors[type] || colors.info;
+    toast.style.backgroundColor = color.bg;
+    toast.style.color = color.text;
+    toast.style.border = `1px solid ${color.border}`;
+
+    // Auto-hide after 5 seconds for success/info messages
+    if (type !== 'error') {
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 5000);
+    }
+  }
+
+  function setButtonsEnabled(enabled) {
+    const grantBtn = document.getElementById('grant-approval-btn');
+    const denyBtn = document.getElementById('deny-approval-btn');
+    const emailInput = document.getElementById('approver-email');
+    const noteInput = document.getElementById('approval-note');
+    const loading = document.getElementById('approval-loading');
+
+    if (grantBtn) grantBtn.disabled = !enabled;
+    if (denyBtn) denyBtn.disabled = !enabled;
+    if (emailInput) emailInput.disabled = !enabled;
+    if (noteInput) noteInput.disabled = !enabled;
+    if (loading) loading.style.display = enabled ? 'none' : 'block';
+  }
+
+  function hideApprovalActions() {
+    const actions = document.getElementById('approval-actions');
+    if (actions) {
+      actions.style.display = 'none';
+    }
+  }
+
+  function updateApprovalStatus(status, statusClass) {
+    const statusEl = document.getElementById('approval-status');
+    if (statusEl) {
+      statusEl.textContent = status;
+      statusEl.className = `status-indicator ${statusClass}`;
+    }
+
+    // Hide approval actions if no longer pending
+    if (status !== 'Pending') {
+      hideApprovalActions();
+    }
+  }
+
+  async function submitApproval(action) {
+    const emailInput = document.getElementById('approver-email');
+    const noteInput = document.getElementById('approval-note');
+
+    if (!emailInput || !emailInput.value.trim()) {
+      showToast('Please enter your email address', 'error');
+      if (emailInput) emailInput.focus();
+      return;
+    }
+
+    const email = emailInput.value.trim();
+    const note = noteInput ? noteInput.value.trim() : '';
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      showToast('Please enter a valid email address', 'error');
+      emailInput.focus();
+      return;
+    }
+
+    // For deny action, require a reason/note
+    if (action === 'deny' && !note) {
+      showToast('Please provide a reason for denying this approval', 'error');
+      if (noteInput) noteInput.focus();
+      return;
+    }
+
+    setButtonsEnabled(false);
+    showToast(`${action === 'grant' ? 'Granting' : 'Denying'} approval...`, 'info');
+
+    try {
+      const endpoint = `/api/approvals/${runId}/${gateId}/${action}`;
+      const body = action === 'grant'
+        ? { approver: email, note: note || null }
+        : { approver: email, reason: note };
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(body)
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        if (data.status === 'noop') {
+          showToast(`This approval was already ${action === 'grant' ? 'granted' : 'denied'}`, 'info');
+          updateApprovalStatus(
+            action === 'grant' ? 'Granted' : 'Denied',
+            action === 'grant' ? 'status-completed' : 'status-failed'
+          );
+        } else {
+          showToast(`Approval ${action === 'grant' ? 'granted' : 'denied'} successfully!`, 'success');
+          updateApprovalStatus(
+            action === 'grant' ? 'Granted' : 'Denied',
+            action === 'grant' ? 'status-completed' : 'status-failed'
+          );
+        }
+      } else {
+        let errorMsg = data.error || `Failed to ${action} approval`;
+
+        if (response.status === 403) {
+          errorMsg = 'You are not authorized to approve this request. Check the APPROVER_ALLOWLIST configuration.';
+        } else if (response.status === 409) {
+          errorMsg = data.error || 'This approval gate has already been resolved';
+          // Update UI to show current state
+          updateApprovalStatus(
+            data.state === 'granted' ? 'Granted' : 'Denied',
+            data.state === 'granted' ? 'status-completed' : 'status-failed'
+          );
+        } else if (response.status === 404) {
+          errorMsg = 'Run not found';
+        } else if (response.status >= 500) {
+          errorMsg = 'Server error occurred. Please try again later.';
+        }
+
+        showToast(errorMsg, 'error');
+        setButtonsEnabled(true);
+      }
+    } catch (error) {
+      console.error('Approval action failed:', error);
+      showToast('Network error occurred. Please check your connection and try again.', 'error');
+      setButtonsEnabled(true);
+    }
+  }
+
+  // Event listeners
+  const grantBtn = document.getElementById('grant-approval-btn');
+  const denyBtn = document.getElementById('deny-approval-btn');
+
+  if (grantBtn) {
+    grantBtn.addEventListener('click', () => submitApproval('grant'));
+  }
+
+  if (denyBtn) {
+    denyBtn.addEventListener('click', () => submitApproval('deny'));
+  }
+
+  // Enter key support in email field
+  const emailInput = document.getElementById('approver-email');
+  if (emailInput) {
+    emailInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const noteInput = document.getElementById('approval-note');
+        if (noteInput) {
+          noteInput.focus();
+        }
+      }
+    });
+  }
+
+  // Listen for approval events from SSE to update UI in real-time
+  document.addEventListener('approval-event', (e) => {
+    const eventData = e.detail;
+    if (eventData.gateId === gateId) {
+      if (eventData.event === 'approval.granted:v1') {
+        updateApprovalStatus('Granted', 'status-completed');
+        showToast('Approval granted (live update)', 'success');
+      } else if (eventData.event === 'approval.denied:v1') {
+        updateApprovalStatus('Denied', 'status-failed');
+        showToast('Approval denied (live update)', 'info');
+      }
     }
   });
 })();

@@ -233,7 +233,12 @@ async fn grant_via_rest(ui_url: &str, run_id: &str, gate_id: &str) -> Result<()>
     let c = reqwest::Client::builder().build()?;
     let url = format!("{}/api/approvals/{}/{}/grant", ui_url, run_id, gate_id);
     let body = serde_json::json!({"approver":"ops@example.com","note":"bootstrap grant"});
-    let resp = c.post(url).json(&body).send().await?;
+    let resp = c
+        .post(url)
+        .header("X-Requested-With", "XMLHttpRequest")
+        .json(&body)
+        .send()
+        .await?;
     if !resp.status().is_success() {
         return Err(anyhow!("grant REST failed: {}", resp.status()));
     }

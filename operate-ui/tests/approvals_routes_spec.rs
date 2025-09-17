@@ -112,6 +112,7 @@ async fn grant_then_grant_is_noop_and_deny_conflicts() -> Result<()> {
     // First grant
     let r1 = http
         .post(format!("{}/api/approvals/{}/{}/grant", base, run, gate))
+        .header("X-Requested-With", "XMLHttpRequest")
         .json(&serde_json::json!({"approver":"ops@example.com","note":"ok"}))
         .send()
         .await?;
@@ -120,6 +121,7 @@ async fn grant_then_grant_is_noop_and_deny_conflicts() -> Result<()> {
     // Duplicate grant -> 200 noop
     let r2 = http
         .post(format!("{}/api/approvals/{}/{}/grant", base, run, gate))
+        .header("X-Requested-With", "XMLHttpRequest")
         .json(&serde_json::json!({"approver":"ops@example.com"}))
         .send()
         .await?;
@@ -130,6 +132,7 @@ async fn grant_then_grant_is_noop_and_deny_conflicts() -> Result<()> {
     // Conflicting deny -> 409
     let r3 = http
         .post(format!("{}/api/approvals/{}/{}/deny", base, run, gate))
+        .header("X-Requested-With", "XMLHttpRequest")
         .json(&serde_json::json!({"approver":"ops@example.com","reason":"oops"}))
         .send()
         .await?;

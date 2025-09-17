@@ -62,6 +62,8 @@ pub struct RitualEvent {
     pub state_from: Option<String>,
     #[serde(rename = "stateTo", skip_serializing_if = "Option::is_none")]
     pub state_to: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub stream_sequence: Option<u64>,
     #[serde(flatten)]
     pub extra: HashMap<String, serde_json::Value>,
 }
@@ -517,6 +519,8 @@ impl JetStreamClient {
         let payload: serde_json::Value = serde_json::from_slice(&message.message.payload)
             .context("Failed to parse message payload as JSON")?;
 
+        let stream_sequence = message.info().ok().map(|info| info.stream_sequence);
+
         let ts = if let Some(ts_str) = payload.get("ts").and_then(|v| v.as_str()) {
             ts_str
                 .parse::<DateTime<Utc>>()
@@ -557,6 +561,7 @@ impl JetStreamClient {
             event,
             state_from,
             state_to,
+            stream_sequence,
             extra,
         }))
     }
@@ -578,6 +583,13 @@ impl JetStreamClient {
             Some(detail) => detail.events,
             None => Vec::new(),
         };
+
+        // Track the last published stream sequence that we emitted from the snapshot so we can
+        // resume streaming without dropping mid-flight events (PR review feedback).
+        let resume_sequence = initial_events
+            .iter()
+            .filter_map(|evt| evt.stream_sequence)
+            .max();
 
         let subject_filter = format!("demon.ritual.v1.*.{}.events", run_id);
 
@@ -614,10 +626,15 @@ impl JetStreamClient {
             };
 
             // Create ephemeral consumer for tailing new events
+            let deliver_policy = resume_sequence
+                .and_then(|seq| seq.checked_add(1))
+                .map(|next| DeliverPolicy::ByStartSequence { start_sequence: next })
+                .unwrap_or(DeliverPolicy::New);
+
             let consumer_config = jetstream::consumer::pull::Config {
                 filter_subject: subject_filter.clone(),
                 durable_name: None,
-                deliver_policy: DeliverPolicy::New, // Only get new messages
+                deliver_policy,
                 ack_policy: async_nats::jetstream::consumer::AckPolicy::None,
                 inactive_threshold: std::time::Duration::from_secs(300), // 5 minute timeout
                 ..Default::default()
@@ -626,9 +643,8 @@ impl JetStreamClient {
             let consumer = stream.create_consumer(consumer_config).await?;
             debug!("Created ephemeral consumer for streaming run {}", run_id_owned);
 
-            // Continuously poll for new messages
-            // DeliverPolicy::New already prevents replaying the initial snapshot,
-            // so we can safely emit every message the consumer yields
+            // Continuously poll for new messages. The deliver policy resumes at the first
+            // sequence after the snapshot so we can safely emit each message without gaps.
             loop {
                 let mut messages = consumer
                     .batch()

@@ -100,9 +100,19 @@ async fn requested_once_then_grant_resumes_once() -> Result<()> {
     .replace(" ", "");
     let body = serde_json::json!({"approver":"ops@example.com","note":"ok"});
     let http = reqwest::Client::new();
-    let r1 = http.post(&url).json(&body).send().await?;
+    let r1 = http
+        .post(&url)
+        .header("X-Requested-With", "XMLHttpRequest")
+        .json(&body)
+        .send()
+        .await?;
     assert!(r1.status().is_success());
-    let r2 = http.post(&url).json(&body).send().await?;
+    let r2 = http
+        .post(&url)
+        .header("X-Requested-With", "XMLHttpRequest")
+        .json(&body)
+        .send()
+        .await?;
     assert!(r2.status().is_success());
 
     // Validate exactly one approval.granted and zero denied
@@ -146,9 +156,19 @@ async fn requested_once_then_deny_halts() -> Result<()> {
     );
     let body = serde_json::json!({"approver":"ops@example.com","reason":"hold"});
     let http = reqwest::Client::new();
-    let r1 = http.post(&url).json(&body).send().await?;
+    let r1 = http
+        .post(&url)
+        .header("X-Requested-With", "XMLHttpRequest")
+        .json(&body)
+        .send()
+        .await?;
     assert!(r1.status().is_success());
-    let r2 = http.post(&url).json(&body).send().await?;
+    let r2 = http
+        .post(&url)
+        .header("X-Requested-With", "XMLHttpRequest")
+        .json(&body)
+        .send()
+        .await?;
     assert!(r2.status().is_success());
 
     let events = read_events_for_run(&js, ritual_id, &run_id).await?;

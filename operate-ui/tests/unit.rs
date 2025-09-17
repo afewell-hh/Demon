@@ -43,6 +43,7 @@ fn test_ritual_event_creation() {
         event: "ritual.started:v1".to_string(),
         state_from: Some("idle".to_string()),
         state_to: Some("running".to_string()),
+        stream_sequence: None,
         extra,
     };
 
@@ -60,6 +61,7 @@ fn test_run_detail_creation() {
             event: "ritual.started:v1".to_string(),
             state_from: None,
             state_to: Some("running".to_string()),
+            stream_sequence: None,
             extra: HashMap::new(),
         },
         RitualEvent {
@@ -67,6 +69,7 @@ fn test_run_detail_creation() {
             event: "ritual.completed:v1".to_string(),
             state_from: Some("running".to_string()),
             state_to: Some("completed".to_string()),
+            stream_sequence: None,
             extra: HashMap::new(),
         },
     ];
@@ -112,6 +115,7 @@ fn test_run_detail_serde() {
         event: "ritual.started:v1".to_string(),
         state_from: None,
         state_to: Some("running".to_string()),
+        stream_sequence: None,
         extra: HashMap::new(),
     }];
 
@@ -142,6 +146,7 @@ fn test_ritual_event_serde_with_optional_fields() {
         event: "ritual.transitioned:v1".to_string(),
         state_from: Some("idle".to_string()),
         state_to: Some("running".to_string()),
+        stream_sequence: None,
         extra: HashMap::new(),
     };
 
@@ -155,6 +160,7 @@ fn test_ritual_event_serde_with_optional_fields() {
         event: "ritual.started:v1".to_string(),
         state_from: None,
         state_to: None,
+        stream_sequence: None,
         extra: HashMap::new(),
     };
 
@@ -199,6 +205,7 @@ fn test_json_flattening_in_ritual_event() {
         event: "custom.event:v1".to_string(),
         state_from: None,
         state_to: None,
+        stream_sequence: None,
         extra,
     };
 
