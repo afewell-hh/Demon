@@ -50,6 +50,33 @@ impl Default for BootstrapConfig {
     }
 }
 
+/// Returns the default bundle path for a given profile.
+/// Returns None if no default bundle is configured for the profile.
+/// Tries to find the bundle file in the project directory structure.
+pub fn get_default_bundle_for_profile(profile: &Profile) -> Option<String> {
+    let bundle_name = match profile {
+        Profile::LocalDev => "local-dev.yaml",
+        Profile::RemoteNats => "remote-nats.yaml",
+    };
+
+    // Try different relative paths to find the bundle
+    let possible_paths = [
+        format!("examples/bundles/{}", bundle_name),
+        format!("../examples/bundles/{}", bundle_name),
+        format!("../../examples/bundles/{}", bundle_name),
+        format!("../../../examples/bundles/{}", bundle_name),
+    ];
+
+    for path in &possible_paths {
+        if std::path::Path::new(path).exists() {
+            return Some(path.to_string());
+        }
+    }
+
+    // Fallback to relative path for consistency with original behavior
+    Some(format!("examples/bundles/{}", bundle_name))
+}
+
 pub async fn ensure_stream(cfg: &BootstrapConfig) -> Result<jetstream::stream::Stream> {
     let client = async_nats::connect(&cfg.nats_url).await?;
     let js = jetstream::new(client);
