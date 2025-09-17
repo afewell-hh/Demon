@@ -92,7 +92,10 @@ async fn test_stream_auto_creation() -> anyhow::Result<()> {
     sleep(Duration::from_millis(100)).await;
 
     // Verify the stream was created
-    assert!(js.get_stream(&test_stream_name).await.is_ok(), "Stream should exist after auto-creation");
+    assert!(
+        js.get_stream(&test_stream_name).await.is_ok(),
+        "Stream should exist after auto-creation"
+    );
 
     // Test that API endpoints work now
     let client = reqwest::Client::new();
@@ -194,7 +197,10 @@ async fn test_clean_machine_full_startup_sequence() -> anyhow::Result<()> {
     let base = format!("http://{}", addr);
 
     // 1. Verify stream was created
-    assert!(js.get_stream(&test_stream_name).await.is_ok(), "Stream should exist after auto-creation");
+    assert!(
+        js.get_stream(&test_stream_name).await.is_ok(),
+        "Stream should exist after auto-creation"
+    );
 
     // 2. Verify API endpoints work
     let api_response = client.get(format!("{}/api/runs", base)).send().await?;
