@@ -40,10 +40,21 @@ pub async fn list_runs_html(
     State(state): State<AppState>,
     Query(query): Query<ListRunsQuery>,
 ) -> Html<String> {
-    debug!("Handling HTML list runs: {:?}", query);
+    // Delegate to tenant-aware version with default tenant
+    list_runs_html_tenant(State(state), Path("default".to_string()), Query(query)).await
+}
+
+/// List runs for specific tenant - HTML response
+#[axum::debug_handler]
+pub async fn list_runs_html_tenant(
+    State(state): State<AppState>,
+    Path(tenant): Path<String>,
+    Query(query): Query<ListRunsQuery>,
+) -> Html<String> {
+    debug!("Handling HTML list runs for tenant {}: {:?}", tenant, query);
 
     let (runs, error) = match &state.jetstream_client {
-        Some(client) => match client.list_runs(query.limit).await {
+        Some(client) => match client.list_runs_for_tenant(&tenant, query.limit).await {
             Ok(mut runs) => {
                 // Apply in-memory filters (fast, bounded by limit)
                 if let Some(ref r) = query.ritual_filter {
@@ -59,11 +70,15 @@ pub async fn list_runs_html(
                         runs.retain(|x| x.status == want);
                     }
                 }
-                info!("Successfully retrieved {} runs for HTML", runs.len());
+                info!(
+                    "Successfully retrieved {} runs for tenant {} HTML",
+                    runs.len(),
+                    tenant
+                );
                 (runs, None)
             }
             Err(e) => {
-                error!("Failed to retrieve runs: {}", e);
+                error!("Failed to retrieve runs for tenant {}: {}", tenant, e);
                 (vec![], Some(format!("Failed to retrieve runs: {}", e)))
             }
         },
@@ -75,6 +90,7 @@ pub async fn list_runs_html(
     context.insert("error", &error);
     context.insert("jetstream_available", &state.jetstream_client.is_some());
     context.insert("current_page", &"runs");
+    context.insert("tenant", &tenant);
     // Reflect current filters in the template for persistence helpers
     context.insert("ritual_filter", &query.ritual_filter);
     context.insert("run_id_filter", &query.run_id_filter);
@@ -183,20 +199,36 @@ pub async fn get_run_html(
     State(state): State<AppState>,
     Path(run_id): Path<String>,
 ) -> Html<String> {
-    debug!("Handling HTML request for run detail: {}", run_id);
+    // Delegate to tenant-aware version with default tenant
+    get_run_html_tenant(State(state), Path(("default".to_string(), run_id))).await
+}
+
+/// Get run detail for specific tenant - HTML response
+#[axum::debug_handler]
+pub async fn get_run_html_tenant(
+    State(state): State<AppState>,
+    Path((tenant, run_id)): Path<(String, String)>,
+) -> Html<String> {
+    debug!(
+        "Handling HTML request for tenant {} run detail: {}",
+        tenant, run_id
+    );
 
     let (run, error) = match &state.jetstream_client {
-        Some(client) => match client.get_run_detail(&run_id).await {
+        Some(client) => match client.get_run_detail_for_tenant(&tenant, &run_id).await {
             Ok(run) => {
                 if run.is_some() {
-                    info!("Successfully retrieved run detail for HTML: {}", run_id);
+                    info!(
+                        "Successfully retrieved run detail for tenant {} HTML: {}",
+                        tenant, run_id
+                    );
                 } else {
-                    info!("Run not found: {}", run_id);
+                    info!("Run not found for tenant {}: {}", tenant, run_id);
                 }
                 (run, None)
             }
             Err(e) => {
-                error!("Failed to retrieve run detail: {}", e);
+                error!("Failed to retrieve run detail for tenant {}: {}", tenant, e);
                 (None, Some(format!("Failed to retrieve run: {}", e)))
             }
         },
@@ -208,6 +240,7 @@ pub async fn get_run_html(
     context.insert("error", &error);
     context.insert("jetstream_available", &state.jetstream_client.is_some());
     context.insert("run_id", &run_id);
+    context.insert("tenant", &tenant);
     context.insert("current_page", &"runs");
 
     // View helpers to avoid template method calls

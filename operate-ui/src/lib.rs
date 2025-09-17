@@ -163,6 +163,12 @@ pub fn create_app(state: AppState) -> Router {
         // Legacy routes (redirect to default tenant)
         .route("/runs", get(routes::list_runs_html))
         .route("/runs/:run_id", get(routes::get_run_html))
+        // Tenant-aware HTML routes
+        .route("/tenants/:tenant/runs", get(routes::list_runs_html_tenant))
+        .route(
+            "/tenants/:tenant/runs/:run_id",
+            get(routes::get_run_html_tenant),
+        )
         .route("/api/runs", get(routes::list_runs_api))
         .route("/api/runs/:run_id", get(routes::get_run_api))
         .route(

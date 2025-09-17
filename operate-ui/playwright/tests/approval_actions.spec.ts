@@ -51,7 +51,7 @@ test.beforeAll(async () => {
 });
 
 async function loadRun(page: Page, runId: string) {
-  await page.goto(`${baseUrl}/runs/${runId}`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${baseUrl}/tenants/${tenantId}/runs/${runId}`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('main')).toBeVisible();
 }
 
@@ -197,7 +197,7 @@ test.describe('Approval Actions', () => {
 
   test('handles conflict error (409)', async ({ page }) => {
     const runId = buildRunId('409');
-    const sseEndpoint = `${baseUrl}/api/runs/${runId}/events/stream`;
+    const sseEndpoint = `${baseUrl}/api/tenants/${tenantId}/runs/${runId}/events/stream`;
     await page.route(sseEndpoint, route => route.abort());
     try {
       await seedRun({
@@ -248,7 +248,7 @@ test.describe('Approval Actions', () => {
 
     await loadRun(page, runId);
 
-    await page.route(`${baseUrl}/api/approvals/${runId}/gate-network/grant`, route => {
+    await page.route(`${baseUrl}/api/tenants/${tenantId}/approvals/${runId}/gate-network/grant`, route => {
       route.abort('failed');
     });
 
@@ -258,7 +258,7 @@ test.describe('Approval Actions', () => {
     await expect(page.locator('#approval-toast')).toContainText('Network error occurred');
     await expect(page.locator('#grant-approval-btn')).toBeEnabled();
 
-    await page.unroute(`${baseUrl}/api/approvals/${runId}/gate-network/grant`);
+    await page.unroute(`${baseUrl}/api/tenants/${tenantId}/approvals/${runId}/gate-network/grant`);
   });
 
   test('supports enter key navigation', async ({ page }) => {
@@ -294,7 +294,7 @@ test.describe('Approval Actions', () => {
 
     await loadRun(page, runId);
 
-    const endpoint = `${baseUrl}/api/approvals/${runId}/gate-csrf/grant`;
+    const endpoint = `${baseUrl}/api/tenants/${tenantId}/approvals/${runId}/gate-csrf/grant`;
     await page.route(endpoint, async route => {
       const headers = { ...route.request().headers() };
       delete headers['x-requested-with'];

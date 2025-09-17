@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 
 // Ensure BASE_URL is set for CI
 const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:3000';
+const tenantId = process.env.TENANT || 'default';
 
 test.describe('Run Streaming', () => {
   test.beforeEach(async ({ page }) => {
@@ -51,7 +52,10 @@ test.describe('Run Streaming', () => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2000);
 
-    const response = await fetch(`${baseUrl}/api/runs/test-run/events/stream`, {
+    const sseEndpoint = tenantId !== 'default'
+      ? `${baseUrl}/api/tenants/${tenantId}/runs/test-run/events/stream`
+      : `${baseUrl}/api/runs/test-run/events/stream`;
+    const response = await fetch(sseEndpoint, {
       method: 'GET',
       signal: controller.signal,
       headers: {
