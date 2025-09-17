@@ -518,14 +518,19 @@ impl JetStreamClient {
             .context("Failed to parse message payload as JSON")?;
 
         // Extract ritual and run IDs from subject
-        // Subject format: demon.ritual.v1.<ritualId>.<runId>.events
+        // Support both formats:
+        // New: demon.ritual.v1.<tenant>.<ritualId>.<runId>.events (7 parts)
+        // Legacy: demon.ritual.v1.<ritualId>.<runId>.events (6 parts)
         let parts: Vec<&str> = message.subject.split('.').collect();
-        if parts.len() < 6 {
+        let (ritual_id, run_id) = if parts.len() == 7 {
+            // New tenant-aware format
+            (parts[4].to_string(), parts[5].to_string())
+        } else if parts.len() == 6 {
+            // Legacy format
+            (parts[3].to_string(), parts[4].to_string())
+        } else {
             return Ok(None);
-        }
-
-        let ritual_id = parts[3].to_string();
-        let run_id = parts[4].to_string();
+        };
 
         // Try to extract timestamp and determine status
         let ts = if let Some(ts_str) = payload.get("ts").and_then(|v| v.as_str()) {
@@ -745,7 +750,11 @@ impl JetStreamClient {
 /// Extract ritual ID from subject string (standalone function for testing)
 fn extract_ritual_id_from_subject(subject: &str) -> Option<String> {
     let parts: Vec<&str> = subject.split('.').collect();
-    if parts.len() >= 4 {
+    if parts.len() == 7 {
+        // New tenant-aware format: demon.ritual.v1.<tenant>.<ritualId>.<runId>.events
+        Some(parts[4].to_string())
+    } else if parts.len() >= 6 {
+        // Legacy format: demon.ritual.v1.<ritualId>.<runId>.events
         Some(parts[3].to_string())
     } else {
         None
@@ -758,8 +767,14 @@ mod tests {
 
     #[test]
     fn test_extract_ritual_id_from_subject() {
-        let subject = "demon.ritual.v1.my-ritual.run-123.events";
+        // Test new tenant-aware format
+        let subject = "demon.ritual.v1.default.my-ritual.run-123.events";
         let ritual_id = extract_ritual_id_from_subject(subject);
+        assert_eq!(ritual_id, Some("my-ritual".to_string()));
+
+        // Test legacy format
+        let legacy_subject = "demon.ritual.v1.my-ritual.run-123.events";
+        let ritual_id = extract_ritual_id_from_subject(legacy_subject);
         assert_eq!(ritual_id, Some("my-ritual".to_string()));
 
         let invalid_subject = "demon.ritual";

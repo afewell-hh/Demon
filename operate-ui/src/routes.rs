@@ -672,6 +672,7 @@ enum PublishOutcome {
 }
 
 async fn publish_approval_event(
+    tenant: &str,
     ritual_id: &str,
     run_id: &str,
     payload: serde_json::Value,
@@ -709,7 +710,7 @@ async fn publish_approval_event(
         }
     }
 
-    let subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
+    let subject = format!("demon.ritual.v1.{}.{}.{}.events", tenant, ritual_id, run_id);
     let mut headers = async_nats::HeaderMap::new();
     headers.insert("Nats-Msg-Id", msg_id.as_str());
     if let Some(seq) = expected_stream_sequence {
@@ -790,9 +791,17 @@ pub async fn grant_approval_api(
     }
 
     // Discover ritualId by looking up run and enforce first-writer-wins on approvals
-    let (ritual_id, expected_sequence) = match &state.jetstream_client {
+    let (ritual_id, tenant, expected_sequence) = match &state.jetstream_client {
         Some(js) => match js.get_run_detail(&run_id).await {
             Ok(Some(rd)) => {
+                // Determine tenant from the first event or default to "default"
+                let tenant = rd
+                    .events
+                    .first()
+                    .and_then(|e| e.extra.get("tenantId"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("default")
+                    .to_string();
                 // Enforce: if a terminal approval already exists for this gate, prevent conflicting writes
                 if let Some(last) = rd.events.iter().rev().find(|e| {
                     (e.event == "approval.granted:v1" || e.event == "approval.denied:v1")
@@ -826,6 +835,7 @@ pub async fn grant_approval_api(
                 }
                 (
                     rd.ritual_id,
+                    tenant,
                     rd.events.last().and_then(|evt| evt.stream_sequence),
                 )
             }
@@ -858,7 +868,7 @@ pub async fn grant_approval_api(
     let payload = serde_json::json!({
         "event": "approval.granted:v1",
         "ts": now,
-        "tenantId": "default",
+        "tenantId": tenant,
         "runId": run_id,
         "ritualId": ritual_id,
         "gateId": gate_id,
@@ -871,6 +881,7 @@ pub async fn grant_approval_api(
         payload["gateId"].as_str().unwrap()
     );
     match publish_approval_event(
+        &tenant,
         payload["ritualId"].as_str().unwrap(),
         payload["runId"].as_str().unwrap(),
         payload.clone(),
@@ -977,9 +988,17 @@ pub async fn deny_approval_api(
         }
     }
 
-    let (ritual_id, expected_sequence) = match &state.jetstream_client {
+    let (ritual_id, tenant, expected_sequence) = match &state.jetstream_client {
         Some(js) => match js.get_run_detail(&run_id).await {
             Ok(Some(rd)) => {
+                // Determine tenant from the first event or default to "default"
+                let tenant = rd
+                    .events
+                    .first()
+                    .and_then(|e| e.extra.get("tenantId"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("default")
+                    .to_string();
                 if let Some(last) = rd.events.iter().rev().find(|e| {
                     (e.event == "approval.granted:v1" || e.event == "approval.denied:v1")
                         && e.extra
@@ -1011,6 +1030,7 @@ pub async fn deny_approval_api(
                 }
                 (
                     rd.ritual_id,
+                    tenant,
                     rd.events.last().and_then(|evt| evt.stream_sequence),
                 )
             }
@@ -1043,7 +1063,7 @@ pub async fn deny_approval_api(
     let payload = serde_json::json!({
         "event": "approval.denied:v1",
         "ts": now,
-        "tenantId": "default",
+        "tenantId": tenant,
         "runId": run_id,
         "ritualId": ritual_id,
         "gateId": gate_id,
@@ -1056,6 +1076,7 @@ pub async fn deny_approval_api(
         payload["gateId"].as_str().unwrap()
     );
     match publish_approval_event(
+        &tenant,
         payload["ritualId"].as_str().unwrap(),
         payload["runId"].as_str().unwrap(),
         payload.clone(),

@@ -128,7 +128,7 @@ pub async fn await_gate_with_ttl(
         "requester": requester,
         "reason": reason,
     });
-    let subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
+    let subject = format!("demon.ritual.v1.default.{}.{}.events", ritual_id, run_id);
     let mut headers = async_nats::HeaderMap::new();
     let msg_id = format!("{}:approval:{}", run_id, gate_id);
     headers.insert("Nats-Msg-Id", msg_id.as_str());
@@ -141,7 +141,7 @@ pub async fn await_gate_with_ttl(
     if ttl > 0 {
         let timer_id = expiry_key(run_id, gate_id);
         let scheduled_for = (now + Duration::seconds(ttl as i64)).to_rfc3339();
-        let subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
+        let subject = format!("demon.ritual.v1.default.{}.{}.events", ritual_id, run_id);
         let timer_evt = serde_json::json!({
             "event": "timer.scheduled:v1",
             "ts": now.to_rfc3339(),
@@ -183,7 +183,7 @@ pub async fn process_expiry_if_pending(
     };
 
     // Read all events for this run as generic JSON values
-    let subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
+    let subject = format!("demon.ritual.v1.default.{}.{}.events", ritual_id, run_id);
     let consumer = stream
         .create_consumer(jetstream::consumer::pull::Config {
             filter_subject: subject,
@@ -222,7 +222,7 @@ pub async fn process_expiry_if_pending(
         "approver": "system",
         "reason": "expired",
     });
-    let subject = format!("demon.ritual.v1.{}.{}.events", ritual_id, run_id);
+    let subject = format!("demon.ritual.v1.default.{}.{}.events", ritual_id, run_id);
     let mut headers = async_nats::HeaderMap::new();
     let msg_id = format!("{}:approval:{}:denied", run_id, gate_id);
     headers.insert("Nats-Msg-Id", msg_id.as_str());
