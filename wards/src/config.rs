@@ -1,3 +1,4 @@
+use crate::schedule::ScheduleConfig;
 use std::collections::HashMap;
 use std::fmt::Write as _;
 
@@ -18,6 +19,7 @@ pub struct WardsConfig {
     pub cap_quotas: HashMap<String, HashMap<String, QuotaCfg>>, // tenant -> capability -> quota
     pub global_cap_quotas: HashMap<String, QuotaCfg>, // capability -> quota (applies to all tenants)
     pub global_quota: Option<QuotaCfg>,
+    pub schedules: ScheduleConfig, // time-based policy rules
 }
 
 pub fn load_from_env() -> WardsConfig {
@@ -33,12 +35,14 @@ pub fn load_from_env() -> WardsConfig {
     let global_quota = std::env::var("WARDS_GLOBAL_QUOTA")
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok());
+    let schedules = crate::schedule::load_schedules_from_env();
     WardsConfig {
         caps,
         quotas,
         cap_quotas,
         global_cap_quotas,
         global_quota,
+        schedules,
     }
 }
 

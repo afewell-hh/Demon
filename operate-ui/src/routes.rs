@@ -1853,6 +1853,8 @@ pub async fn grant_approval_api_tenant(
                 .map(|event| {
                     if event == "approval.granted:v1" {
                         "granted"
+                    } else if event == "approval.override:v1" {
+                        "override"
                     } else {
                         "denied"
                     }
@@ -2059,6 +2061,8 @@ pub async fn deny_approval_api_tenant(
                 .map(|event| {
                     if event == "approval.granted:v1" {
                         "granted"
+                    } else if event == "approval.override:v1" {
+                        "override"
                     } else {
                         "denied"
                     }
