@@ -69,7 +69,7 @@ pub async fn seed_preview_min(js: &jetstream::Context, ritual: &str, ui_url: &st
     let run_c = "bootstrap-run-c";
     let gate_b = "gate-b";
     let gate_c = "gate-c";
-    let subject = |run: &str| format!("demon.ritual.v1.{}.{}.events", ritual, run);
+    let subject = |run: &str| format!("demon.ritual.v1.default.{}.{}.events", ritual, run);
     let now = || Utc::now().to_rfc3339();
 
     // approval.requested (B)
@@ -213,25 +213,43 @@ pub async fn verify_ui(ui_url: &str) -> Result<()> {
     if tr.get("has_filter_tojson").and_then(|v| v.as_bool()) != Some(true) {
         return Err(anyhow!("verify: admin probe has_filter_tojson!=true"));
     }
-    // Runs array
+    // Try tenant-aware endpoint first
     let runs: serde_json::Value = c
-        .get(format!("{}/api/runs", ui_url))
+        .get(format!("{}/api/tenants/default/runs", ui_url))
         .send()
         .await
-        .context("failed GET /api/runs")?
+        .context("failed GET /api/tenants/default/runs")?
         .error_for_status()?
         .json()
         .await?;
     let len = runs.as_array().map(|a| a.len()).unwrap_or(0);
     if len < 1 {
-        return Err(anyhow!("verify: /api/runs returned empty array"));
+        // Fallback to legacy endpoint for compatibility
+        let legacy_runs: serde_json::Value = c
+            .get(format!("{}/api/runs", ui_url))
+            .send()
+            .await
+            .context("failed GET /api/runs")?
+            .error_for_status()?
+            .json()
+            .await?;
+        let legacy_len = legacy_runs.as_array().map(|a| a.len()).unwrap_or(0);
+        if legacy_len < 1 {
+            return Err(anyhow!(
+                "verify: both /api/tenants/default/runs and /api/runs returned empty arrays"
+            ));
+        }
     }
     Ok(())
 }
 
 async fn grant_via_rest(ui_url: &str, run_id: &str, gate_id: &str) -> Result<()> {
     let c = reqwest::Client::builder().build()?;
-    let url = format!("{}/api/approvals/{}/{}/grant", ui_url, run_id, gate_id);
+    // Use tenant-aware endpoint
+    let url = format!(
+        "{}/api/tenants/default/approvals/{}/{}/grant",
+        ui_url, run_id, gate_id
+    );
     let body = serde_json::json!({"approver":"ops@example.com","note":"bootstrap grant"});
     let resp = c
         .post(url)
