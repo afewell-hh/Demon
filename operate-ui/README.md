@@ -17,6 +17,7 @@ The Operate UI provides:
 - 🚀 **Real-time Updates**: Auto-refresh for running rituals
 - 📱 **Responsive Design**: Works on desktop and mobile
 - 🛡️ **Error Handling**: Graceful fallbacks when services are unavailable
+- 🔧 **Auto-Bootstrap**: Automatically creates required JetStream streams on startup
 - 🔗 **API Access**: Full JSON API for integrations
 
 ## API Endpoints
@@ -93,8 +94,7 @@ The Operate UI provides:
 | `BIND_ADDR` | `0.0.0.0` | Bind address |
 | `NATS_URL` | `nats://localhost:4222` | NATS server URL |
 | `NATS_CREDS_PATH` | (none) | Path to NATS credentials file |
-| `RITUAL_STREAM_NAME` | `RITUAL_EVENTS` | JetStream stream for ritual events. If unset, UI looks for `RITUAL_EVENTS` first, then falls back to `DEMON_RITUAL_EVENTS` (deprecated) and logs a warning. |
-| `RITUAL_STREAM_NAME` | `RITUAL_EVENTS` | JetStream stream for ritual events. If unset, UI looks for `RITUAL_EVENTS` first, then falls back to `DEMON_RITUAL_EVENTS` (deprecated) and logs a warning. |
+| `RITUAL_STREAM_NAME` | `RITUAL_EVENTS` | JetStream stream for ritual events. If unset, UI looks for `RITUAL_EVENTS` first, then falls back to `DEMON_RITUAL_EVENTS` (deprecated) and logs a warning. Stream will be auto-created if missing. |
 
 ### Development with NATS
 
@@ -186,9 +186,11 @@ open tarpaulin-report.html
 ### Error Handling
 
 - **Service Unavailable**: When NATS/JetStream is down, the UI shows helpful error messages
-- **Missing Data**: When runs don't exist, appropriate 404s are returned  
+- **Missing Data**: When runs don't exist, appropriate 404s are returned
 - **Timeouts**: All operations have defensive timeouts to prevent hanging
 - **Graceful Degradation**: Core functionality works even with partial failures
+- **Template Fallbacks**: If templates fail to load, minimal fallback templates prevent crashes
+- **Stream Auto-Creation**: Missing JetStream streams are automatically created on startup
 
 ## Deployment
 
@@ -213,7 +215,6 @@ export NATS_URL=nats://nats-cluster:4222
 export NATS_CREDS_PATH=/etc/nats/creds/operate-ui.creds
 export RUST_LOG=operate_ui=info
 export RITUAL_STREAM_NAME=RITUAL_EVENTS
-export RITUAL_STREAM_NAME=RITUAL_EVENTS
 ```
 
 ## Contributing
@@ -229,4 +230,3 @@ export RITUAL_STREAM_NAME=RITUAL_EVENTS
 - **No Authentication**: Currently no auth - add reverse proxy if needed
 - **Input Validation**: All user inputs are validated and sanitized
 - **DoS Protection**: Limits on query sizes and timeouts prevent abuse
- - **DoS Protection**: Limits on query sizes and timeouts prevent abuse
