@@ -46,6 +46,7 @@ pub struct Decision {
     pub limit: u32,
     pub window_seconds: u64,
     pub remaining: u32,
+    pub deny_reason: Option<String>,
 }
 
 #[derive(Default)]
@@ -67,6 +68,38 @@ impl PolicyKernel {
     }
 
     pub fn allow_and_count(&mut self, tenant: &str, capability: &str) -> Decision {
+        let current_time = chrono::Utc::now();
+
+        // First, check time-based policies
+        match self
+            .cfg
+            .schedules
+            .evaluate_at(tenant, capability, current_time)
+        {
+            Ok(Some(false)) => {
+                // Explicitly denied by schedule
+                let quota = self.cfg.effective_quota(tenant, capability);
+                return Decision {
+                    allowed: false,
+                    limit: quota.limit,
+                    window_seconds: quota.window_seconds,
+                    remaining: 0,
+                    deny_reason: Some("time_policy_denied".to_string()),
+                };
+            }
+            Ok(Some(true)) => {
+                // Explicitly allowed by schedule, proceed to quota check
+            }
+            Ok(None) => {
+                // No schedule rules apply, proceed to quota check
+            }
+            Err(schedule_error) => {
+                // Schedule evaluation error, log and proceed to quota check
+                eprintln!("Schedule evaluation error: {}", schedule_error);
+            }
+        }
+
+        // Proceed with quota checking
         let quota = self.cfg.effective_quota(tenant, capability);
         let key = quota_key(Some(tenant), capability);
         let state = self
@@ -85,6 +118,7 @@ impl PolicyKernel {
                 limit: quota.limit,
                 window_seconds: quota.window_seconds,
                 remaining,
+                deny_reason: None,
             }
         } else {
             Decision {
@@ -92,6 +126,7 @@ impl PolicyKernel {
                 limit: quota.limit,
                 window_seconds: quota.window_seconds,
                 remaining: 0,
+                deny_reason: Some("quota_exceeded".to_string()),
             }
         }
     }
@@ -149,9 +184,9 @@ mod tests {
         let mut kernel = PolicyKernel::new(cfg);
 
         let d1 = kernel.allow_and_count("tenant-a", "capsule.http");
-        assert!(d1.allowed && d1.remaining == 0);
+        assert!(d1.allowed && d1.remaining == 0 && d1.deny_reason.is_none());
         let d2 = kernel.allow_and_count("tenant-a", "capsule.http");
-        assert!(!d2.allowed && d2.remaining == 0);
+        assert!(!d2.allowed && d2.remaining == 0 && d2.deny_reason.is_some());
 
         let mut ok = 0;
         for _ in 0..4 {

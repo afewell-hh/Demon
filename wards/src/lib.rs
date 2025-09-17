@@ -3,6 +3,7 @@
 pub mod approvals;
 pub mod config;
 pub mod policy;
+pub mod schedule;
 
 #[derive(Default)]
 pub struct Wards;

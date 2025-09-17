@@ -8,6 +8,7 @@ fn quota_serializes_with_camel_case_window_seconds() {
         limit: 7,
         window_seconds: 42,
         remaining: 6,
+        deny_reason: None,
     };
     let q = quota_json(&d);
     assert_eq!(q.get("limit").and_then(|v| v.as_u64()), Some(7));
