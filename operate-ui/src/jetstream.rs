@@ -177,6 +177,80 @@ impl JetStreamClient {
             }
         }
 
+        // If no runs found and tenant is default, try legacy subject pattern
+        // This fallback ensures backwards compatibility with pre-upgrade runs
+        if runs_map.is_empty() && tenant == "default" {
+            let legacy_subject = "demon.ritual.v1.*.*.events";
+            debug!(
+                "No runs found with tenant pattern, trying legacy pattern: {}",
+                legacy_subject
+            );
+
+            match self
+                .query_stream_messages(legacy_subject, None, DeliverPolicy::All)
+                .await
+            {
+                Ok(messages) => {
+                    for message in messages {
+                        message_count += 1;
+
+                        match self.parse_message_for_run_summary(&message) {
+                            Ok(Some(summary)) => {
+                                // Merge summaries: keep earliest start time, latest status
+                                let key = format!("{}:{}", summary.ritual_id, summary.run_id);
+                                if let Some(mut existing) = runs_map.remove(&key) {
+                                    // Keep the earliest start time (unless it's the placeholder)
+                                    if summary.start_ts
+                                        != DateTime::from_timestamp(0, 0).unwrap_or_else(Utc::now)
+                                        && (existing.start_ts
+                                            == DateTime::from_timestamp(0, 0)
+                                                .unwrap_or_else(Utc::now)
+                                            || summary.start_ts < existing.start_ts)
+                                    {
+                                        existing.start_ts = summary.start_ts;
+                                    }
+                                    // Always update to the most definitive status
+                                    match (existing.status, summary.status) {
+                                        (_, RunStatus::Completed) | (_, RunStatus::Failed) => {
+                                            existing.status = summary.status
+                                        }
+                                        (RunStatus::Running, _) => existing.status = summary.status,
+                                        _ => {} // Keep existing status
+                                    }
+                                    runs_map.insert(key, existing);
+                                } else {
+                                    runs_map.insert(key, summary);
+                                }
+                            }
+                            Ok(None) => {
+                                // Message didn't contain useful run info
+                            }
+                            Err(e) => {
+                                debug!("Failed to parse message for run summary: {}", e);
+                            }
+                        }
+
+                        // Stop when we have enough unique runs (with some buffer for completeness)
+                        if runs_map.len() >= limit && message_count >= limit * 2 {
+                            debug!(
+                                "Collected {} runs from {} messages, stopping",
+                                runs_map.len(),
+                                message_count
+                            );
+                            break;
+                        }
+                    }
+
+                    if !runs_map.is_empty() {
+                        warn!("Found legacy runs using fallback pattern - consider migrating data to tenant-scoped subjects");
+                    }
+                }
+                Err(e) => {
+                    debug!("Failed to query legacy stream messages: {}", e);
+                }
+            }
+        }
+
         // Sort by start time (most recent first) and limit
         let mut runs: Vec<RunSummary> = runs_map.into_values().collect();
         runs.sort_by(|a, b| b.start_ts.cmp(&a.start_ts));
@@ -787,5 +861,24 @@ mod tests {
         assert_eq!(RunStatus::Running.to_string(), "Running");
         assert_eq!(RunStatus::Completed.to_string(), "Completed");
         assert_eq!(RunStatus::Failed.to_string(), "Failed");
+    }
+
+    #[test]
+    fn test_parse_message_for_run_summary_legacy_and_tenant_formats() {
+        // Test legacy format parsing
+        let legacy_subject = "demon.ritual.v1.my-ritual.run-123.events";
+
+        // Test tenant-aware format parsing
+        let tenant_subject = "demon.ritual.v1.default.my-ritual.run-123.events";
+
+        // Verify that both subject formats are handled correctly by the extract function
+        let legacy_ritual_id = extract_ritual_id_from_subject(legacy_subject);
+        assert_eq!(legacy_ritual_id, Some("my-ritual".to_string()));
+
+        let tenant_ritual_id = extract_ritual_id_from_subject(tenant_subject);
+        assert_eq!(tenant_ritual_id, Some("my-ritual".to_string()));
+
+        // Both should extract the same ritual ID despite different subject formats
+        assert_eq!(legacy_ritual_id, tenant_ritual_id);
     }
 }
