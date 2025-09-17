@@ -12,7 +12,7 @@ pub struct Bundle {
     pub nats: Nats,
     #[serde(default)]
     pub stream: Stream,
-    #[serde(default)]
+    #[serde(default, rename = "operateUi")]
     pub operate_ui: OperateUi,
     #[serde(default)]
     pub seed: Seed,

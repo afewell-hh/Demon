@@ -160,8 +160,15 @@ async fn run_bootstrap(
         tracing::warn!("[deprecation] using DEMON_RITUAL_EVENTS; set RITUAL_STREAM_NAME instead");
     }
 
+    // Resolve bundle: explicit bundle arg > profile default > none
+    let effective_bundle = bundle
+        .clone()
+        .or_else(|| bootstrapper_demonctl::get_default_bundle_for_profile(&profile.into()));
+
     // Don't pass lib:// URIs to compute_effective_config - they need resolution first
-    let bundle_for_config = bundle.as_deref().filter(|uri| !uri.starts_with("lib://"));
+    let bundle_for_config = effective_bundle
+        .as_deref()
+        .filter(|uri| !uri.starts_with("lib://"));
     let (cfg, provenance) = bootstrapper_demonctl::compute_effective_config(
         bundle_for_config.map(std::path::Path::new),
         nats_url.as_deref(),
@@ -186,7 +193,7 @@ async fn run_bootstrap(
     );
 
     if verify_only {
-        if let Some(uri) = bundle.as_deref() {
+        if let Some(uri) = effective_bundle.as_deref() {
             if uri.starts_with("lib://local/") {
                 let mut idx_path = std::path::PathBuf::from("bootstrapper/library/index.json");
                 if !idx_path.exists() {
@@ -250,7 +257,7 @@ async fn run_bootstrap(
 
     if !(ensure_stream || seed || verify) {
         // default: run all
-        run_all(&cfg, &ritual_id, bundle.as_deref()).await
+        run_all(&cfg, &ritual_id, effective_bundle.as_deref()).await
     } else {
         run_some(&cfg, ensure_stream, seed, verify, &ritual_id).await
     }

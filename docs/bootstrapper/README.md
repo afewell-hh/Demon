@@ -7,16 +7,23 @@ The bootstrapper provides an idempotent one-command setup to ensure NATS JetStre
 Use the main `demonctl bootstrap` subcommand:
 
 ```bash
-# Complete bootstrap (all phases: ensure + seed + verify)
-cargo run -p demonctl -- bootstrap --ensure-stream --seed --verify
+# Complete bootstrap using profile defaults (all phases: ensure + seed + verify)
+cargo run -p demonctl -- bootstrap --profile local-dev --ensure-stream --seed --verify
+cargo run -p demonctl -- bootstrap --profile remote-nats --ensure-stream --seed --verify
 
 # Individual steps
 cargo run -p demonctl -- bootstrap --ensure-stream    # Create NATS stream only
 cargo run -p demonctl -- bootstrap --seed            # Seed sample events only
 cargo run -p demonctl -- bootstrap --verify          # Verify Operate UI health only
 
-# With overrides
+# With explicit bundle (overrides profile defaults)
 cargo run -p demonctl -- bootstrap \
+  --bundle examples/bundles/local-dev.yaml \
+  --ensure-stream --seed --verify
+
+# With command line overrides (precedence: flags > bundle > env)
+cargo run -p demonctl -- bootstrap \
+  --profile local-dev \
   --ensure-stream --seed --verify \
   --nats-url nats://127.0.0.1:4222 \
   --stream-name CUSTOM_STREAM \
@@ -37,7 +44,20 @@ cargo run -p bootstrapper-demonctl -- \
   --ensure-stream --seed --verify
 ```
 
-## Env & Profiles
+## Profiles & Bundle Resolution
+
+demonctl supports profile-based configuration with automatic bundle resolution:
+
+**Profiles:**
+- `local-dev` (default) → `examples/bundles/local-dev.yaml`
+- `remote-nats` → `examples/bundles/remote-nats.yaml`
+
+**Configuration Precedence:**
+1. Command line flags (highest priority)
+2. Bundle configuration (if specified via `--bundle` or profile default)
+3. Environment variables (lowest priority)
+
+**Environment Variables:**
 - `NATS_URL` or `NATS_HOST`/`NATS_PORT` (default `nats://127.0.0.1:4222`)
 - `RITUAL_STREAM_NAME` precedence: env override → `RITUAL_EVENTS` → `DEMON_RITUAL_EVENTS`
 - `RITUAL_SUBJECTS` (CSV, default `demon.ritual.v1.>`) | dedupe window: 120s
@@ -58,4 +78,4 @@ Bootstrapper resolves the stream name with precedence:
 3. `RITUAL_EVENTS` (default)
 
 ## CI
-A smoke step should start NATS + Operate UI + TTL worker with `APPROVER_ALLOWLIST=ops@example.com`, then run `bootstrapper-demonctl --ensure-stream --seed --verify` twice and assert exit 0.
+A smoke step should start NATS + Operate UI + TTL worker with `APPROVER_ALLOWLIST=ops@example.com`, then run `demonctl bootstrap --profile local-dev --ensure-stream --seed --verify` twice and assert exit 0.
