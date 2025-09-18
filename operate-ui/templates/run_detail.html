@@ -205,6 +205,316 @@
 </div>
 {% endif %}
 
+{% if run_envelope %}
+<!-- Result Envelope Sections -->
+{% if run_envelope.diagnostics %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Diagnostics</h3>
+        <span style="font-size: 0.875rem; color: var(--text-secondary);">{{ run_envelope.diagnostics|length }} diagnostic(s)</span>
+    </div>
+
+    <div style="overflow-x: auto;">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Level</th>
+                    <th>Message</th>
+                    <th>Source</th>
+                    <th>Timestamp</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for diagnostic in run_envelope.diagnostics %}
+                <tr>
+                    <td>
+                        <span class="diagnostic-badge diagnostic-{{ diagnostic.level }}">{{ diagnostic.level|upper }}</span>
+                    </td>
+                    <td>{{ diagnostic.message }}</td>
+                    <td>
+                        {% if diagnostic.source %}
+                            <code>{{ diagnostic.source }}</code>
+                        {% else %}
+                            <span style="color: var(--text-secondary);">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if diagnostic.timestamp %}
+                            <code style="font-size: 0.8rem;">{{ diagnostic.timestamp }}</code>
+                        {% else %}
+                            <span style="color: var(--text-secondary);">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if run_envelope.suggestions %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Suggestions</h3>
+        <span style="font-size: 0.875rem; color: var(--text-secondary);">{{ run_envelope.suggestions|length }} suggestion(s)</span>
+    </div>
+
+    {% for suggestion in run_envelope.suggestions %}
+    <div style="border-bottom: 1px solid var(--border-color, #e0e0e0); padding: 1rem; {% if not loop.last %}margin-bottom: 1rem;{% endif %}">
+        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem;">
+            <span class="suggestion-badge suggestion-{{ suggestion.priority }}">{{ suggestion.priority|upper }}</span>
+            <span class="suggestion-type">{{ suggestion.type|title }}</span>
+        </div>
+
+        <h4 style="margin: 0.5rem 0; font-size: 1rem;">{{ suggestion.description }}</h4>
+
+        {% if suggestion.rationale %}
+        <p style="margin: 0.5rem 0; color: var(--text-secondary);">{{ suggestion.rationale }}</p>
+        {% endif %}
+
+        {% if suggestion.patch %}
+        <details style="margin-top: 1rem;">
+            <summary style="cursor: pointer; font-weight: 500; color: var(--primary-color, #007bff);">
+                JSON Patch Operations ({{ suggestion.patch|length }})
+            </summary>
+            <div style="margin-top: 0.5rem;">
+                <table style="width: 100%; font-size: 0.9em; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background-color: var(--bg-secondary, #f8f9fa);">
+                            <th style="padding: 0.5rem; text-align: left; border: 1px solid var(--border-color, #e0e0e0);">Operation</th>
+                            <th style="padding: 0.5rem; text-align: left; border: 1px solid var(--border-color, #e0e0e0);">Path</th>
+                            <th style="padding: 0.5rem; text-align: left; border: 1px solid var(--border-color, #e0e0e0);">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for patch in suggestion.patch %}
+                        <tr>
+                            <td style="padding: 0.5rem; border: 1px solid var(--border-color, #e0e0e0);">
+                                <code class="patch-op patch-op-{{ patch.op }}">{{ patch.op }}</code>
+                            </td>
+                            <td style="padding: 0.5rem; border: 1px solid var(--border-color, #e0e0e0);">
+                                <code>{{ patch.path }}</code>
+                            </td>
+                            <td style="padding: 0.5rem; border: 1px solid var(--border-color, #e0e0e0);">
+                                {% if patch.value %}
+                                    <pre style="margin: 0; font-size: 0.8rem; background: transparent; padding: 0;">{{ patch.value | json }}</pre>
+                                {% else %}
+                                    <span style="color: var(--text-secondary);">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </details>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if run_envelope.metrics %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Metrics</h3>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+        {% if run_envelope.metrics.duration %}
+        <div>
+            <h4 style="margin: 0 0 1rem 0; font-size: 1rem; color: var(--text-secondary);">Duration</h4>
+            {% if run_envelope.metrics.duration.total_ms %}
+            <div style="margin-bottom: 0.5rem;">
+                <strong>Total:</strong> {{ run_envelope.metrics.duration.total_ms | round(precision=2) }} ms
+            </div>
+            {% endif %}
+            {% if run_envelope.metrics.duration.phases %}
+            <details style="margin-top: 0.5rem;">
+                <summary style="cursor: pointer; font-weight: 500; color: var(--primary-color, #007bff);">
+                    Phase Breakdown
+                </summary>
+                <div style="margin-top: 0.5rem;">
+                    {% for phase in run_envelope.metrics.duration.phases | keys %}
+                    <div style="display: flex; justify-content: space-between; padding: 0.25rem 0;">
+                        <span>{{ phase | replace(from="_", to=" ") | title }}:</span>
+                        <code>{{ run_envelope.metrics.duration.phases[phase] | round(precision=2) }} ms</code>
+                    </div>
+                    {% endfor %}
+                </div>
+            </details>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if run_envelope.metrics.resources %}
+        <div>
+            <h4 style="margin: 0 0 1rem 0; font-size: 1rem; color: var(--text-secondary);">Resources</h4>
+            {% for key in run_envelope.metrics.resources | keys %}
+            <div style="display: flex; justify-content: space-between; padding: 0.25rem 0;">
+                <span>{{ key | replace(from="_", to=" ") | title }}:</span>
+                <code>
+                {% set value = run_envelope.metrics.resources[key] %}
+                {% if key | ending_with(pat="_bytes") %}
+                    {{ (value / 1024 / 1024) | round(precision=2) }} MB
+                {% elif key | ending_with(pat="_percent") %}
+                    {{ value | round(precision=1) }}%
+                {% else %}
+                    {{ value }}
+                {% endif %}
+                </code>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if run_envelope.metrics.counters %}
+        <div>
+            <h4 style="margin: 0 0 1rem 0; font-size: 1rem; color: var(--text-secondary);">Counters</h4>
+            {% for key in run_envelope.metrics.counters | keys %}
+            <div style="display: flex; justify-content: space-between; padding: 0.25rem 0;">
+                <span>{{ key | replace(from="_", to=" ") | title }}:</span>
+                <code>{{ run_envelope.metrics.counters[key] }}</code>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if run_envelope.metrics.custom %}
+        <div>
+            <h4 style="margin: 0 0 1rem 0; font-size: 1rem; color: var(--text-secondary);">Custom Metrics</h4>
+            {% for key in run_envelope.metrics.custom | keys %}
+            <div style="display: flex; justify-content: space-between; padding: 0.25rem 0;">
+                <span>{{ key | replace(from="_", to=" ") | title }}:</span>
+                <code>{{ run_envelope.metrics.custom[key] }}</code>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% if run_envelope.provenance %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Provenance</h3>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
+        {% if run_envelope.provenance.source %}
+        <div>
+            <h4 style="margin: 0 0 1rem 0; font-size: 1rem; color: var(--text-secondary);">Source</h4>
+            {% if run_envelope.provenance.source.system %}
+            <div style="margin-bottom: 0.5rem;">
+                <strong>System:</strong> <code>{{ run_envelope.provenance.source.system }}</code>
+            </div>
+            {% endif %}
+            {% if run_envelope.provenance.source.version %}
+            <div style="margin-bottom: 0.5rem;">
+                <strong>Version:</strong> <code>{{ run_envelope.provenance.source.version }}</code>
+            </div>
+            {% endif %}
+            {% if run_envelope.provenance.source.instance %}
+            <div style="margin-bottom: 0.5rem;">
+                <strong>Instance:</strong> <code>{{ run_envelope.provenance.source.instance }}</code>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <div>
+            <h4 style="margin: 0 0 1rem 0; font-size: 1rem; color: var(--text-secondary);">Tracing</h4>
+            {% if run_envelope.provenance.timestamp %}
+            <div style="margin-bottom: 0.5rem;">
+                <strong>Timestamp:</strong> <code style="font-size: 0.8rem;">{{ run_envelope.provenance.timestamp }}</code>
+            </div>
+            {% endif %}
+            {% if run_envelope.provenance.trace_id %}
+            <div style="margin-bottom: 0.5rem;">
+                <strong>Trace ID:</strong> <code style="font-size: 0.8rem;">{{ run_envelope.provenance.trace_id }}</code>
+            </div>
+            {% endif %}
+            {% if run_envelope.provenance.span_id %}
+            <div style="margin-bottom: 0.5rem;">
+                <strong>Span ID:</strong> <code style="font-size: 0.8rem;">{{ run_envelope.provenance.span_id }}</code>
+            </div>
+            {% endif %}
+            {% if run_envelope.provenance.parent_span_id %}
+            <div style="margin-bottom: 0.5rem;">
+                <strong>Parent Span:</strong> <code style="font-size: 0.8rem;">{{ run_envelope.provenance.parent_span_id }}</code>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if run_envelope.provenance.chain %}
+    <details style="margin-top: 1.5rem;">
+        <summary style="cursor: pointer; font-weight: 500; color: var(--primary-color, #007bff);">
+            Execution Chain ({{ run_envelope.provenance.chain|length }} steps)
+        </summary>
+        <div style="margin-top: 1rem;">
+            <table style="width: 100%; font-size: 0.9em; border-collapse: collapse;">
+                <thead>
+                    <tr style="background-color: var(--bg-secondary, #f8f9fa);">
+                        <th style="padding: 0.5rem; text-align: left; border: 1px solid var(--border-color, #e0e0e0);">Step</th>
+                        <th style="padding: 0.5rem; text-align: left; border: 1px solid var(--border-color, #e0e0e0);">Actor</th>
+                        <th style="padding: 0.5rem; text-align: left; border: 1px solid var(--border-color, #e0e0e0);">Timestamp</th>
+                        <th style="padding: 0.5rem; text-align: left; border: 1px solid var(--border-color, #e0e0e0);">Signature</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for step in run_envelope.provenance.chain %}
+                    <tr>
+                        <td style="padding: 0.5rem; border: 1px solid var(--border-color, #e0e0e0);">
+                            {{ step.step | replace(from="_", to=" ") | title }}
+                        </td>
+                        <td style="padding: 0.5rem; border: 1px solid var(--border-color, #e0e0e0);">
+                            <code>{{ step.actor }}</code>
+                        </td>
+                        <td style="padding: 0.5rem; border: 1px solid var(--border-color, #e0e0e0);">
+                            <code style="font-size: 0.8rem;">{{ step.timestamp }}</code>
+                        </td>
+                        <td style="padding: 0.5rem; border: 1px solid var(--border-color, #e0e0e0);">
+                            {% if step.signature %}
+                                <code style="font-size: 0.75rem;">{{ step.signature }}</code>
+                            {% else %}
+                                <span style="color: var(--text-secondary);">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </details>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Copy JSON Button for Result Envelope -->
+{% if run_envelope %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Result Data</h3>
+    </div>
+    <p>Download the complete result envelope as JSON:</p>
+    <div style="margin-top: 1rem;">
+        <button type="button" id="copy-envelope-btn" class="btn btn-secondary">
+            📋 Copy Result JSON
+        </button>
+        <button type="button" id="download-envelope-btn" class="btn btn-secondary" style="margin-left: 0.5rem;">
+            💾 Download result.json
+        </button>
+    </div>
+
+    <!-- Hidden JSON data for copying -->
+    <script id="envelope-data" type="application/json">{{ run_envelope | json }}</script>
+</div>
+{% endif %}
+{% endif %}
+
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">Event Timeline</h3>
@@ -322,6 +632,109 @@
 
 {% if jetstream_available and run %}
 <style>
+/* Result Envelope Styles */
+.diagnostic-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.diagnostic-debug {
+    background-color: #e9ecef;
+    color: #495057;
+}
+
+.diagnostic-info {
+    background-color: #d1ecf1;
+    color: #0c5460;
+}
+
+.diagnostic-warning {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.diagnostic-error {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.diagnostic-fatal {
+    background-color: #721c24;
+    color: #ffffff;
+}
+
+.suggestion-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.suggestion-critical {
+    background-color: #721c24;
+    color: #ffffff;
+}
+
+.suggestion-high {
+    background-color: #dc3545;
+    color: #ffffff;
+}
+
+.suggestion-medium {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.suggestion-low {
+    background-color: #6c757d;
+    color: #ffffff;
+}
+
+.suggestion-type {
+    padding: 0.25rem 0.5rem;
+    background-color: var(--bg-secondary, #f8f9fa);
+    border-radius: 4px;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.patch-op {
+    padding: 0.25rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.patch-op-add {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.patch-op-remove {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.patch-op-replace {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.patch-op-move, .patch-op-copy {
+    background-color: #d1ecf1;
+    color: #0c5460;
+}
+
+.patch-op-test {
+    background-color: #e9ecef;
+    color: #495057;
+}
+
 .connection-indicator {
     display: flex;
     align-items: center;
@@ -891,6 +1304,83 @@
       }
     }
   });
+})();
+
+// Result Envelope Copy/Download JavaScript
+(function() {
+  const copyBtn = document.getElementById('copy-envelope-btn');
+  const downloadBtn = document.getElementById('download-envelope-btn');
+  const envelopeDataScript = document.getElementById('envelope-data');
+
+  if (copyBtn && envelopeDataScript) {
+    copyBtn.addEventListener('click', async () => {
+      try {
+        const envelopeData = envelopeDataScript.textContent;
+        await navigator.clipboard.writeText(envelopeData);
+
+        // Provide user feedback
+        const originalText = copyBtn.textContent;
+        copyBtn.textContent = '✅ Copied!';
+        copyBtn.style.backgroundColor = '#28a745';
+        copyBtn.style.color = 'white';
+
+        setTimeout(() => {
+          copyBtn.textContent = originalText;
+          copyBtn.style.backgroundColor = '';
+          copyBtn.style.color = '';
+        }, 2000);
+      } catch (err) {
+        console.error('Failed to copy to clipboard:', err);
+
+        // Fallback: show a prompt with the data
+        const envelopeData = envelopeDataScript.textContent;
+        const textarea = document.createElement('textarea');
+        textarea.value = envelopeData;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+
+        copyBtn.textContent = '✅ Copied (fallback)!';
+        setTimeout(() => {
+          copyBtn.textContent = '📋 Copy Result JSON';
+        }, 2000);
+      }
+    });
+  }
+
+  if (downloadBtn && envelopeDataScript) {
+    downloadBtn.addEventListener('click', () => {
+      try {
+        const envelopeData = envelopeDataScript.textContent;
+        const blob = new Blob([envelopeData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `result-{{ run_id }}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        // Provide user feedback
+        const originalText = downloadBtn.textContent;
+        downloadBtn.textContent = '⬇️ Downloaded!';
+        downloadBtn.style.backgroundColor = '#28a745';
+        downloadBtn.style.color = 'white';
+
+        setTimeout(() => {
+          downloadBtn.textContent = originalText;
+          downloadBtn.style.backgroundColor = '';
+          downloadBtn.style.color = '';
+        }, 2000);
+      } catch (err) {
+        console.error('Failed to download file:', err);
+        alert('Failed to download file. Please try copying the JSON instead.');
+      }
+    });
+  }
 })();
 </script>
 {% endif %}

@@ -266,6 +266,11 @@ pub async fn get_run_html_tenant(
         if let Some(summary) = ApprovalsSummary::from_events(&rd.events) {
             context.insert("approvals", &summary);
         }
+
+        // Extract result envelope from completed events (if present)
+        if let Some(envelope) = extract_result_envelope(&rd.events) {
+            context.insert("run_envelope", &envelope);
+        }
     }
 
     let html = state
@@ -1329,6 +1334,25 @@ pub async fn deny_approval_api(
     }
 }
 
+/// Extract result envelope from completed ritual events
+fn extract_result_envelope(events: &[crate::jetstream::RitualEvent]) -> Option<serde_json::Value> {
+    // Look for the most recent ritual.completed:v1 event with outputs
+    events
+        .iter()
+        .rev()
+        .find(|e| e.event == "ritual.completed:v1")
+        .and_then(|event| event.extra.get("outputs"))
+        .and_then(|outputs| {
+            // Check if this outputs field contains result envelope structure
+            // The envelope should have at least a "result" field
+            if outputs.get("result").is_some() {
+                Some(outputs.clone())
+            } else {
+                None
+            }
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1399,6 +1423,89 @@ mod tests {
         };
 
         assert_eq!(completed_run.status(), RunStatus::Completed);
+    }
+
+    #[test]
+    fn test_extract_result_envelope() {
+        let mut extra = HashMap::new();
+        extra.insert(
+            "outputs".to_string(),
+            serde_json::json!({
+                "result": {
+                    "success": true,
+                    "data": "test result"
+                },
+                "diagnostics": [{
+                    "level": "info",
+                    "message": "Test completed"
+                }],
+                "metrics": {
+                    "duration": {
+                        "total_ms": 123.45
+                    }
+                }
+            }),
+        );
+
+        let event = RitualEvent {
+            ts: Utc::now(),
+            event: "ritual.completed:v1".to_string(),
+            state_from: None,
+            state_to: None,
+            stream_sequence: None,
+            extra,
+        };
+
+        let events = vec![event];
+        let envelope = extract_result_envelope(&events);
+
+        assert!(envelope.is_some());
+        let envelope = envelope.unwrap();
+        assert!(envelope.get("result").is_some());
+        assert!(envelope.get("diagnostics").is_some());
+        assert!(envelope.get("metrics").is_some());
+    }
+
+    #[test]
+    fn test_extract_result_envelope_no_result() {
+        let mut extra = HashMap::new();
+        extra.insert(
+            "outputs".to_string(),
+            serde_json::json!({
+                "simple_output": "no envelope structure"
+            }),
+        );
+
+        let event = RitualEvent {
+            ts: Utc::now(),
+            event: "ritual.completed:v1".to_string(),
+            state_from: None,
+            state_to: None,
+            stream_sequence: None,
+            extra,
+        };
+
+        let events = vec![event];
+        let envelope = extract_result_envelope(&events);
+
+        assert!(envelope.is_none());
+    }
+
+    #[test]
+    fn test_extract_result_envelope_no_completed_event() {
+        let event = RitualEvent {
+            ts: Utc::now(),
+            event: "ritual.started:v1".to_string(),
+            state_from: None,
+            state_to: None,
+            stream_sequence: None,
+            extra: HashMap::new(),
+        };
+
+        let events = vec![event];
+        let envelope = extract_result_envelope(&events);
+
+        assert!(envelope.is_none());
     }
 }
 
