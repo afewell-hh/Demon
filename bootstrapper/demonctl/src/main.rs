@@ -1,5 +1,5 @@
 use anyhow::Result;
-use bootstrapper_demonctl::libindex::resolve_local;
+use bootstrapper_demonctl::libindex::resolve;
 use bootstrapper_demonctl::provenance::verify_provenance;
 use bootstrapper_demonctl::{
     bundle::load_bundle, ensure_stream, seed_from_bundle, seed_preview_min, verify_ui_with_token,
@@ -113,7 +113,7 @@ async fn main() -> Result<()> {
 
     if cli.verify_only {
         if let Some(uri) = cli.bundle.as_deref() {
-            if uri.starts_with("lib://local/") {
+            if uri.starts_with("lib://") {
                 let mut idx_path = std::path::PathBuf::from("bootstrapper/library/index.json");
                 if !idx_path.exists() {
                     for prefix in ["..", "../..", "../../.."].iter() {
@@ -125,7 +125,7 @@ async fn main() -> Result<()> {
                         }
                     }
                 }
-                let resolved = resolve_local(uri, &idx_path)?;
+                let resolved = tokio::task::block_in_place(|| resolve(uri, &idx_path))?;
                 println!(
                     "{}",
                     serde_json::json!({
@@ -171,7 +171,7 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
         }
-        anyhow::bail!("--verify-only requires --bundle lib://local/... URI");
+        anyhow::bail!("--verify-only requires --bundle lib://... URI");
     }
 
     if !(cli.ensure_stream || cli.seed || cli.verify) {
@@ -189,7 +189,7 @@ async fn run_all(cfg: &BootstrapConfig, ritual: &str, bundle_uri: Option<&str>) 
     let js = async_nats::jetstream::new(client);
     if let Some(uri) = bundle_uri {
         // Resolve the URI if it's a lib:// URI
-        let bundle_path = if uri.starts_with("lib://local/") {
+        let bundle_path = if uri.starts_with("lib://") {
             let mut idx_path = std::path::PathBuf::from("bootstrapper/library/index.json");
             if !idx_path.exists() {
                 for prefix in ["..", "../..", "../../.."].iter() {
@@ -200,7 +200,7 @@ async fn run_all(cfg: &BootstrapConfig, ritual: &str, bundle_uri: Option<&str>) 
                     }
                 }
             }
-            let resolved = resolve_local(uri, &idx_path)?;
+            let resolved = tokio::task::block_in_place(|| resolve(uri, &idx_path))?;
             resolved.path
         } else {
             std::path::PathBuf::from(uri)

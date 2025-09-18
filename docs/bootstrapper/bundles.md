@@ -1,16 +1,27 @@
-Bundle Library and Offline Verify
+# Bundle Library and Offline Verify
 
-- URI format: `lib://local/{name}@{version}` resolves against `bootstrapper/library/index.json`.
+- URI formats:
+  - `lib://local/{name}@{version}` resolves against `bootstrapper/library/index.json` (local provider)
+  - `lib://https/{name}@{version}` resolves via HTTPS from remote registry (https provider)
 - Index schema: `contracts/schemas/bootstrap.library.index.v0.json`.
+- Provider types:
+  - `local`: Bundles stored in filesystem relative to index
+  - `https`: Bundles fetched from remote HTTPS server using `baseUrl` + `path`
 - Env interpolation: `${VAR}` and `${VAR:-default}` before canonicalization.
 - Canonicalization: YAML → JSON Value → recursively sort all maps (BTreeMap) → `serde_json::to_vec` bytes.
 - Digest: SHA-256 over canonical bytes; lower-case hex.
 - Signature: Ed25519 over canonical bytes; public key base64 at `contracts/keys/{pubKeyId}.ed25519.pub`.
 
-Verify-only example
+Verify-only examples
 
+Local bundle:
 ```
 target/debug/demonctl bootstrap --bundle lib://local/preview-local-dev@0.0.1 --verify-only
+```
+
+Remote bundle (HTTPS):
+```
+target/debug/demonctl bootstrap --bundle lib://https/preview-local-dev@0.0.1 --verify-only
 ```
 
 Expected JSON lines
@@ -23,9 +34,19 @@ Expected JSON lines
 File map
 
 - `bootstrapper/library/index.json` — local provider index.
-- `contracts/schemas/bootstrap.library.index.v0.json` — schema.
+- `contracts/schemas/bootstrap.library.index.v0.json` — schema (supports both local and https providers).
 - `contracts/keys/preview.ed25519.pub` — public key (base64). No private keys committed.
 - `contracts/provenance/*.sha256` and `*.sig` — fixtures.
+
+## Remote Bundle Registry (HTTPS Provider)
+
+When using the HTTPS provider:
+- The index specifies `"provider": "https"` and a `"baseUrl"` field
+- Bundles are fetched from `<baseUrl>/<path>` where path is from the bundle entry
+- Downloads are cached in a temporary directory for the session (not persisted)
+- The canonical digest is computed and verified against the index entry
+- Signature verification uses the same flow as local bundles
+- HTTP errors, connection failures, or digest mismatches fail immediately
 
 ## CI verification: positive & negative
 

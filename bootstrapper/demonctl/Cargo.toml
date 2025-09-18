@@ -21,7 +21,7 @@ jsonschema = "0.27"
 tokio = { workspace = true }
 async-nats = { workspace = true }
 futures-util = { workspace = true }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "blocking"] }
 
 [[bin]]
 name = "bootstrapper-demonctl"
@@ -30,3 +30,5 @@ path = "src/main.rs"
 [dev-dependencies]
 assert_cmd = "2.0"
 tempfile = "3.8"
+httptest = "0.16"
+predicates = "3.1"

@@ -21,6 +21,25 @@ cargo run -p demonctl -- bootstrap \
   --bundle examples/bundles/local-dev.yaml \
   --ensure-stream --seed --verify
 
+# With library bundle (local provider)
+cargo run -p demonctl -- bootstrap \
+  --bundle lib://local/preview-local-dev@0.0.1 \
+  --ensure-stream --seed --verify
+
+# With remote bundle (HTTPS provider - requires index with baseUrl)
+cargo run -p demonctl -- bootstrap \
+  --bundle lib://https/remote-bundle@1.0.0 \
+  --ensure-stream --seed --verify
+
+# Verify-only mode (checks bundle integrity without NATS/UI)
+cargo run -p demonctl -- bootstrap \
+  --bundle lib://local/preview-local-dev@0.0.1 \
+  --verify-only
+
+cargo run -p demonctl -- bootstrap \
+  --bundle lib://https/remote-bundle@1.0.0 \
+  --verify-only
+
 # With command line overrides (precedence: flags > bundle > env)
 cargo run -p demonctl -- bootstrap \
   --profile local-dev \
@@ -42,6 +61,30 @@ cargo run -p bootstrapper-demonctl --
 cargo run -p bootstrapper-demonctl -- \
   --profile local-dev \
   --ensure-stream --seed --verify
+```
+
+## Bundle Library and Remote Registry
+
+The bootstrapper supports fetching bundles from both local and remote sources using URIs:
+
+**URI Formats:**
+- `lib://local/{name}@{version}` - Resolves from local index (`bootstrapper/library/index.json`)
+- `lib://https/{name}@{version}` - Fetches from remote HTTPS registry
+
+**Remote Bundle Features:**
+- Downloads are cached in temp directory for the session
+- Canonical digest verification ensures integrity
+- Signature verification uses the same Ed25519 flow as local bundles
+- HTTP errors and digest mismatches fail immediately
+
+**Index Configuration:**
+For HTTPS provider, the index must specify:
+```json
+{
+  "provider": "https",
+  "baseUrl": "https://registry.example.com",
+  "bundles": [...]
+}
 ```
 
 ## Profiles & Bundle Resolution

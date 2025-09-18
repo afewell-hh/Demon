@@ -6,7 +6,13 @@
   "properties": {
     "provider": {
       "type": "string",
-      "enum": ["local"]
+      "enum": ["local", "https"]
+    },
+    "baseUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1|\\[::1?\\])",
+      "description": "Base URL for HTTPS provider (required when provider is 'https')"
     },
     "bundles": {
       "type": "array",
@@ -40,6 +46,16 @@
       }
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "provider": { "const": "https" } }
+      },
+      "then": {
+        "required": ["baseUrl"]
+      }
+    }
+  ],
   "additionalProperties": false
 }
 
