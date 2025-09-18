@@ -1,7 +1,7 @@
 use assert_cmd::prelude::*;
 use httptest::responders::status_code;
 use httptest::{matchers::request, Expectation, Server};
-use predicates::prelude::*;
+use predicates::str;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -121,9 +121,9 @@ fn bootstrap_https_bundle_verify_only() {
     ])
     .assert()
     .success()
-    .stdout(predicates::str::contains(r#""phase":"resolve"#))
-    .stdout(predicates::str::contains(r#""provider":"https"#))
-    .stdout(predicates::str::contains(r#""name":"preview-local-dev"#));
+    .stdout(str::contains(r#""phase":"resolve"#))
+    .stdout(str::contains(r#""provider":"https"#))
+    .stdout(str::contains(r#""name":"preview-local-dev"#));
 }
 
 #[test]
@@ -173,5 +173,5 @@ fn bootstrap_https_bundle_http_error() {
     ])
     .assert()
     .failure()
-    .stderr(predicates::str::contains("HTTP error 404"));
+    .stderr(str::contains("HTTP error 404"));
 }
