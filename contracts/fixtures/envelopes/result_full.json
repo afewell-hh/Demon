@@ -1,0 +1,155 @@
+{
+  "result": {
+    "success": true,
+    "data": {
+      "message": "Complex operation completed with warnings",
+      "id": "op-67890",
+      "outputs": {
+        "processed_items": 150,
+        "skipped_items": 3,
+        "total_items": 153
+      }
+    }
+  },
+  "diagnostics": [
+    {
+      "level": "info",
+      "message": "Starting operation processing",
+      "timestamp": "2025-01-15T10:00:00Z",
+      "source": "processor.main",
+      "context": {
+        "phase": "initialization"
+      }
+    },
+    {
+      "level": "warning",
+      "message": "Skipped 3 items due to validation errors",
+      "timestamp": "2025-01-15T10:00:45Z",
+      "source": "processor.validator",
+      "context": {
+        "skipped_ids": ["item-101", "item-145", "item-152"],
+        "reason": "schema_validation_failed"
+      }
+    },
+    {
+      "level": "debug",
+      "message": "Memory usage peaked at 512MB",
+      "timestamp": "2025-01-15T10:01:00Z",
+      "source": "processor.monitor"
+    },
+    {
+      "level": "error",
+      "message": "Failed to notify webhook, will retry",
+      "timestamp": "2025-01-15T10:01:15Z",
+      "source": "processor.notifier",
+      "context": {
+        "webhook_url": "https://example.com/webhook",
+        "retry_count": 1
+      }
+    }
+  ],
+  "suggestions": [
+    {
+      "type": "optimization",
+      "description": "Consider increasing batch size to improve throughput",
+      "priority": "medium",
+      "rationale": "Current batch size of 10 is suboptimal for the workload characteristics",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/config/processing/batch_size",
+          "value": 50
+        }
+      ]
+    },
+    {
+      "type": "configuration",
+      "description": "Enable parallel processing for better performance",
+      "priority": "high",
+      "rationale": "System has 8 cores but only using single-threaded processing",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/config/processing/parallel",
+          "value": true
+        },
+        {
+          "op": "add",
+          "path": "/config/processing/worker_threads",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "type": "action",
+      "description": "Review and fix validation errors for skipped items",
+      "priority": "low",
+      "rationale": "3 items failed validation and were skipped from processing"
+    }
+  ],
+  "metrics": {
+    "duration": {
+      "total_ms": 75000,
+      "phases": {
+        "initialization_ms": 500,
+        "validation_ms": 2500,
+        "processing_ms": 70000,
+        "cleanup_ms": 2000
+      }
+    },
+    "resources": {
+      "memory_bytes": 536870912,
+      "cpu_percent": 45.5,
+      "io_operations": 1523,
+      "network_bytes_sent": 2048000,
+      "network_bytes_received": 512000
+    },
+    "counters": {
+      "items_processed": 150,
+      "items_skipped": 3,
+      "retries": 1,
+      "cache_hits": 89,
+      "cache_misses": 61
+    },
+    "custom": {
+      "business_value_generated": 15000.50,
+      "api_calls_made": 25,
+      "database_queries": 178
+    }
+  },
+  "provenance": {
+    "source": {
+      "system": "demon-processor",
+      "version": "1.2.3",
+      "instance": "processor-west-01"
+    },
+    "timestamp": "2025-01-15T10:01:15Z",
+    "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+    "span_id": "00f067aa0ba902b7",
+    "parent_span_id": "5fb397be34f4abd8",
+    "chain": [
+      {
+        "step": "request_received",
+        "timestamp": "2025-01-15T10:00:00Z",
+        "actor": "api-gateway"
+      },
+      {
+        "step": "validation_completed",
+        "timestamp": "2025-01-15T10:00:02.5Z",
+        "actor": "validator-service",
+        "signature": "SHA256:abc123def456..."
+      },
+      {
+        "step": "processing_completed",
+        "timestamp": "2025-01-15T10:01:12Z",
+        "actor": "processor-west-01"
+      },
+      {
+        "step": "result_generated",
+        "timestamp": "2025-01-15T10:01:15Z",
+        "actor": "result-formatter",
+        "signature": "SHA256:789ghi012jkl..."
+      }
+    ]
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "result": {
+    "success": true,
+    "data": {
+      "analysis_complete": true,
+      "issues_found": 3
+    }
+  },
+  "diagnostics": [
+    {
+      "level": "info",
+      "message": "Configuration analysis completed",
+      "timestamp": "2025-01-15T12:00:00Z",
+      "source": "analyzer"
+    }
+  ],
+  "suggestions": [
+    {
+      "type": "modification",
+      "description": "Update deprecated API endpoint",
+      "priority": "high",
+      "rationale": "The v1 API will be deprecated in 30 days",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/api/endpoint",
+          "value": "https://api.example.com/v2/process"
+        }
+      ]
+    },
+    {
+      "type": "modification",
+      "description": "Add missing required field to configuration",
+      "priority": "critical",
+      "rationale": "The 'tenant_id' field is required for multi-tenant operations",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/config/tenant_id",
+          "value": "default-tenant"
+        }
+      ]
+    },
+    {
+      "type": "modification",
+      "description": "Remove unused configuration entries",
+      "priority": "low",
+      "rationale": "These fields are no longer used and can be safely removed",
+      "patch": [
+        {
+          "op": "remove",
+          "path": "/config/legacy_mode"
+        },
+        {
+          "op": "remove",
+          "path": "/config/deprecated_feature"
+        }
+      ]
+    }
+  ],
+  "provenance": {
+    "source": {
+      "system": "config-analyzer",
+      "version": "2.1.0"
+    },
+    "timestamp": "2025-01-15T12:00:00Z"
+  }
+}

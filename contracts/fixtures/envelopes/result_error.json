@@ -1,0 +1,53 @@
+{
+  "result": {
+    "success": false,
+    "error": {
+      "code": "PROCESSING_FAILED",
+      "message": "Failed to process ritual due to resource constraints",
+      "details": {
+        "resource": "memory",
+        "required": 2048,
+        "available": 512,
+        "unit": "MB"
+      }
+    }
+  },
+  "diagnostics": [
+    {
+      "level": "error",
+      "message": "Memory allocation failed",
+      "timestamp": "2025-01-15T10:00:30Z",
+      "source": "runtime.allocator"
+    },
+    {
+      "level": "fatal",
+      "message": "Process terminated due to out of memory error",
+      "timestamp": "2025-01-15T10:00:31Z",
+      "source": "runtime.supervisor"
+    }
+  ],
+  "suggestions": [
+    {
+      "type": "configuration",
+      "description": "Increase memory limit for the processor",
+      "priority": "critical",
+      "rationale": "Current memory limit is insufficient for the workload"
+    }
+  ],
+  "metrics": {
+    "duration": {
+      "total_ms": 31000
+    },
+    "resources": {
+      "memory_bytes": 536870912,
+      "cpu_percent": 95.0
+    }
+  },
+  "provenance": {
+    "source": {
+      "system": "demon-processor"
+    },
+    "timestamp": "2025-01-15T10:00:31Z",
+    "trace_id": "error-trace-12345"
+  }
+}
