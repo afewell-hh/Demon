@@ -819,6 +819,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "envelope"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "envelope-derive",
+ "jsonschema 0.18.3",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
+name = "envelope-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
