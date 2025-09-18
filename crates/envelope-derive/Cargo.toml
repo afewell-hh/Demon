@@ -1,0 +1,15 @@
+[package]
+name = "envelope-derive"
+version = "0.1.0"
+description = "Derive macro for envelope crate"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0"
+syn = { version = "2.0", features = ["full"] }
+quote = "1.0"
