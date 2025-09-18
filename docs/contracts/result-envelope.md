@@ -116,3 +116,71 @@ The Result Envelope can be used by:
 - Approval workflow results
 - Bootstrapper operation results
 - UI component data formatting
+
+## Using the Envelope Helper Crate
+
+The `envelope` crate provides a convenient API for creating and validating result envelopes:
+
+### Basic Usage with Derive Macro
+
+```rust
+use envelope::*;
+use serde::{Serialize, Deserialize};
+
+#[derive(Serialize, Deserialize, AsEnvelope)]
+struct ProcessingResult {
+    items_processed: u32,
+    total_time_ms: u64,
+}
+
+let result = ProcessingResult {
+    items_processed: 150,
+    total_time_ms: 2500,
+};
+
+// Create an envelope automatically
+let envelope = result.into_envelope();
+envelope.validate().expect("Should validate against schema");
+```
+
+### Builder Pattern for Complex Envelopes
+
+```rust
+use envelope::*;
+use serde_json::json;
+
+let envelope = ResultEnvelope::builder()
+    .success("Operation completed successfully")
+    .add_info("Processing started")
+    .add_warning("3 items skipped due to validation errors")
+    .add_suggestion(
+        Suggestion::optimization("Increase batch size")
+            .with_priority(SuggestionPriority::Medium)
+            .with_patch(vec![JsonPatchOperation::replace(
+                "/config/batch_size",
+                json!(50),
+            )])
+            .build()
+    )
+    .with_source_info("demon-processor", Some("1.2.3"), Some("west-01"))
+    .with_trace_info("trace-123", "span-456", Some("parent-789"))
+    .build()
+    .expect("Valid envelope");
+```
+
+### Error Handling
+
+```rust
+use envelope::*;
+
+let envelope = ResultEnvelope::<()>::builder()
+    .error_with_code("Processing failed", "PROCESSING_ERROR")
+    .add_error("Memory allocation failed")
+    .add_diagnostic(
+        Diagnostic::error("Out of memory")
+            .with_source("allocator")
+            .with_context(json!({"requested_bytes": 1048576}))
+    )
+    .build()
+    .expect("Valid error envelope");
+```

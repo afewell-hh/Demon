@@ -21,6 +21,24 @@ fn repo_path(rel: &str) -> PathBuf {
     PathBuf::from(rel)
 }
 
+fn setup_test_environment(tmp_path: &Path) {
+    // Copy the real public key from contracts/keys to the temp directory
+    let keys_dir = tmp_path.join("contracts/keys");
+    fs::create_dir_all(&keys_dir).unwrap();
+    let real_key_path = repo_path("contracts/keys/preview.ed25519.pub");
+    let key_content = fs::read_to_string(&real_key_path).unwrap();
+    let key_path = keys_dir.join("preview.ed25519.pub");
+    fs::write(&key_path, key_content).unwrap();
+
+    // Copy the JSON schema file that the CLI needs for validation
+    let schemas_dir = tmp_path.join("contracts/schemas");
+    fs::create_dir_all(&schemas_dir).unwrap();
+    let real_schema_path = repo_path("contracts/schemas/bootstrap.library.index.v0.json");
+    let schema_content = fs::read_to_string(&real_schema_path).unwrap();
+    let schema_path = schemas_dir.join("bootstrap.library.index.v0.json");
+    fs::write(&schema_path, schema_content).unwrap();
+}
+
 #[test]
 fn arg_parse_help() {
     let mut cmd = Command::cargo_bin("bootstrapper-demonctl").unwrap();
@@ -93,21 +111,8 @@ fn bootstrap_https_bundle_verify_only() {
     );
     fs::write(&idx_path, index_content).unwrap();
 
-    // Copy the real public key from contracts/keys to the temp directory
-    let keys_dir = tmp.path().join("contracts/keys");
-    fs::create_dir_all(&keys_dir).unwrap();
-    let real_key_path = repo_path("contracts/keys/preview.ed25519.pub");
-    let key_content = fs::read_to_string(&real_key_path).unwrap();
-    let key_path = keys_dir.join("preview.ed25519.pub");
-    fs::write(&key_path, key_content).unwrap();
-
-    // Copy the JSON schema file that the CLI needs for validation
-    let schemas_dir = tmp.path().join("contracts/schemas");
-    fs::create_dir_all(&schemas_dir).unwrap();
-    let real_schema_path = repo_path("contracts/schemas/bootstrap.library.index.v0.json");
-    let schema_content = fs::read_to_string(&real_schema_path).unwrap();
-    let schema_path = schemas_dir.join("bootstrap.library.index.v0.json");
-    fs::write(&schema_path, schema_content).unwrap();
+    // Set up test environment with schema and keys
+    setup_test_environment(tmp.path());
 
     // Run the command with --verify-only
     let mut cmd = Command::cargo_bin("bootstrapper-demonctl").unwrap();
@@ -161,6 +166,9 @@ fn bootstrap_https_bundle_http_error() {
         server.url("")
     );
     fs::write(&idx_path, index_content).unwrap();
+
+    // Set up test environment with schema and keys
+    setup_test_environment(tmp.path());
 
     // Run the command with --verify-only
     let mut cmd = Command::cargo_bin("bootstrapper-demonctl").unwrap();

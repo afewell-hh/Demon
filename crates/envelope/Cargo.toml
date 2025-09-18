@@ -1,0 +1,17 @@
+[package]
+name = "envelope"
+version = "0.1.0"
+description = "Helper crate for creating and validating result envelopes"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+jsonschema.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+envelope-derive = { path = "../envelope-derive" }
