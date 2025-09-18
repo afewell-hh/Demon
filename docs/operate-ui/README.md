@@ -198,7 +198,35 @@ async def main():
     await js.add_stream(StreamConfig(name=os.getenv('RITUAL_STREAM_NAME','RITUAL_EVENTS'), subjects=[os.getenv('RITUAL_SUBJECTS','demon.ritual.v1.>')]))
   subj='demon.ritual.v1.e2e-ritual.e2e-run.events'
   await js.publish(subj, json.dumps({"event":"ritual.started:v1","ritualId":"e2e-ritual","runId":"e2e-run","ts":"2025-01-01T00:00:00Z"}).encode(), headers={"Nats-Msg-Id":"e2e-run:1"})
-  await js.publish(subj, json.dumps({"event":"ritual.completed:v1","ritualId":"e2e-ritual","runId":"e2e-run","ts":"2025-01-01T00:00:05Z"}).encode(), headers={"Nats-Msg-Id":"e2e-run:2"})
+  await js.publish(subj, json.dumps({
+    "event":"ritual.completed:v1",
+    "ritualId":"e2e-ritual",
+    "runId":"e2e-run",
+    "ts":"2025-01-01T00:00:05Z",
+    "outputs":{
+      "result":{
+        "success":true,
+        "data":{
+          "echoed_message":"Hello from test",
+          "character_count":15,
+          "timestamp":"2025-01-01T00:00:05Z"
+        }
+      },
+      "diagnostics":[{
+        "level":"info",
+        "message":"Echo operation completed",
+        "timestamp":"2025-01-01T00:00:05Z"
+      }],
+      "metrics":{
+        "counters":{"characterCount":15},
+        "duration":{"total_ms":0.5}
+      },
+      "provenance":{
+        "source":{"system":"echo-capsule","version":"0.0.1"},
+        "timestamp":"2025-01-01T00:00:05Z"
+      }
+    }
+  }).encode(), headers={"Nats-Msg-Id":"e2e-run:2"})
   await nc.drain()
 asyncio.run(main())
 PY
@@ -214,7 +242,7 @@ nats pub -H 'Nats-Msg-Id: e2e-run:1' \
 # Completed
 nats pub -H 'Nats-Msg-Id: e2e-run:2' \
   demon.ritual.v1.e2e-ritual.e2e-run.events \
-  '{"event":"ritual.completed:v1","ritualId":"e2e-ritual","runId":"e2e-run","ts":"2025-01-01T00:00:05Z","outputs":{"printed":"Hello from test"}}'
+  '{"event":"ritual.completed:v1","ritualId":"e2e-ritual","runId":"e2e-run","ts":"2025-01-01T00:00:05Z","outputs":{"result":{"success":true,"data":{"echoed_message":"Hello from test","character_count":15,"timestamp":"2025-01-01T00:00:05Z"}},"diagnostics":[{"level":"info","message":"Echo operation completed","timestamp":"2025-01-01T00:00:05Z"}],"metrics":{"counters":{"characterCount":15},"duration":{"total_ms":0.5}},"provenance":{"source":{"system":"echo-capsule","version":"0.0.1"},"timestamp":"2025-01-01T00:00:05Z"}}}'
 ```
 
 5) Refresh UI
