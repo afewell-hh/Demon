@@ -6,7 +6,9 @@ members = [
   "capsules/echo",
   "demonctl",
   "operate-ui",
-  "bootstrapper/demonctl"
+  "bootstrapper/demonctl",
+  "crates/envelope",
+  "crates/envelope-derive"
 ]
 resolver = "2"
 

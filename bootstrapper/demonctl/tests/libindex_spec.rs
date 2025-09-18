@@ -2,6 +2,9 @@ use httptest::responders::status_code;
 use httptest::{matchers::request, Expectation, Server};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+
+static HTTPS_RESOLVE_MUTEX: Mutex<()> = Mutex::new(());
 
 fn repo_path(rel: &str) -> PathBuf {
     let candidates = [
@@ -57,6 +60,7 @@ fn libindex_missing_file_errors() {
 
 #[test]
 fn libindex_https_resolve_success() {
+    let _guard = HTTPS_RESOLVE_MUTEX.lock().unwrap();
     // Start a test HTTP server
     let server = Server::run();
 
@@ -110,6 +114,7 @@ fn libindex_https_resolve_success() {
 
 #[test]
 fn libindex_https_digest_mismatch() {
+    let _guard = HTTPS_RESOLVE_MUTEX.lock().unwrap();
     // Start a test HTTP server
     let server = Server::run();
 

@@ -1,7 +1,13 @@
-use std::{env, fs, path::PathBuf};
+use std::{env, fs, path::PathBuf, sync::Mutex};
+
+static ENV_MUTEX: Mutex<()> = Mutex::new(());
 
 #[test]
 fn bundle_parses_defaults_and_env_interpolation() {
+    let _guard = ENV_MUTEX.lock().unwrap();
+    let prev_subjects = env::var("RITUAL_SUBJECTS").ok();
+    let prev_dupwin = env::var("RITUAL_DUPWIN_SECONDS").ok();
+
     let dir = env::temp_dir();
     let path: PathBuf = dir.join("bundle_test.yaml");
     fs::write(
@@ -20,13 +26,25 @@ seed:
     )
     .unwrap();
     env::set_var("RITUAL_DUPWIN_SECONDS", "150");
+    // Ensure default subjects are used by clearing any inherited env override
+    env::remove_var("RITUAL_SUBJECTS");
     let b = bootstrapper_demonctl::bundle::load_bundle(&path).unwrap();
     assert_eq!(b.stream.duplicate_window_seconds, 150);
     assert_eq!(b.stream.subjects[0], "demon.ritual.v1.>");
+
+    match prev_subjects {
+        Some(v) => env::set_var("RITUAL_SUBJECTS", v),
+        None => env::remove_var("RITUAL_SUBJECTS"),
+    }
+    match prev_dupwin {
+        Some(v) => env::set_var("RITUAL_DUPWIN_SECONDS", v),
+        None => env::remove_var("RITUAL_DUPWIN_SECONDS"),
+    }
 }
 
 #[test]
 fn precedence_flags_override_bundle() {
+    let _guard = ENV_MUTEX.lock().unwrap();
     let dir = env::temp_dir();
     let path: PathBuf = dir.join("precedence_test.yaml");
     fs::write(
@@ -62,6 +80,7 @@ seed:
 
 #[test]
 fn precedence_bundle_overrides_env() {
+    let _guard = ENV_MUTEX.lock().unwrap();
     // Set environment variables
     env::set_var("NATS_URL", "nats://env.example.com:4222");
     env::set_var("RITUAL_STREAM_NAME", "ENV_STREAM");
@@ -113,6 +132,7 @@ seed:
 
 #[test]
 fn precedence_env_as_fallback() {
+    let _guard = ENV_MUTEX.lock().unwrap();
     // Set environment variables
     env::set_var("NATS_URL", "nats://env.example.com:4222");
     env::set_var("RITUAL_STREAM_NAME", "ENV_STREAM");
