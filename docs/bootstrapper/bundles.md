@@ -1,4 +1,4 @@
-Bundle Library and Offline Verify
+# Bundle Library and Offline Verify
 
 - URI formats:
   - `lib://local/{name}@{version}` resolves against `bootstrapper/library/index.json` (local provider)
