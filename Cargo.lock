@@ -425,6 +425,12 @@ dependencies = [
 [[package]]
 name = "capsules_echo"
 version = "0.0.1"
+dependencies = [
+ "chrono",
+ "envelope",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "cc"
