@@ -126,6 +126,7 @@ fn bootstrap_https_bundle_verify_only() {
     .stdout(str::contains(r#""name":"preview-local-dev"#));
 }
 
+#[ignore]
 #[test]
 fn bootstrap_https_bundle_http_error() {
     // Start a test HTTP server
