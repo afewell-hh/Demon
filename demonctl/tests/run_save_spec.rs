@@ -63,7 +63,11 @@ fn run_with_save_to_current_dir() {
     // Run from the original directory but with cwd set to temp_dir
     let root = workspace_root();
     cmd.current_dir(&temp_dir)
-        .args(["run", &format!("{}/examples/rituals/echo.yaml", root), "--save"])
+        .args([
+            "run",
+            &format!("{}/examples/rituals/echo.yaml", root),
+            "--save",
+        ])
         .assert()
         .success();
 
