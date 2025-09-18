@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
+use std::path::PathBuf;
 use tracing::{info, Level};
 use tracing_subscriber::{fmt, EnvFilter};
 
@@ -19,6 +20,12 @@ enum Commands {
         file: String,
         #[arg(long, default_value = "false")]
         replay: bool,
+        /// Save result envelope to result.json
+        #[arg(long)]
+        save: bool,
+        /// Output directory for saved files (default: current directory)
+        #[arg(long, value_name = "DIR")]
+        output_dir: Option<PathBuf>,
     },
     /// Bootstrap Demon prerequisites (self-host v0)
     Bootstrap {
@@ -90,11 +97,42 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.cmd {
-        Commands::Run { file, replay: _ } => {
+        Commands::Run {
+            file,
+            replay: _,
+            save,
+            output_dir,
+        } => {
             let mut engine = engine::rituals::Engine::new();
-            if let Err(e) = engine.run_from_file(&file) {
-                eprintln!("Error running ritual: {:?}", e);
-                std::process::exit(1);
+
+            if save {
+                // Use the new method that returns the result for saving
+                match engine.run_from_file_with_result(&file) {
+                    Ok(result_event) => {
+                        // Still print to stdout for visibility
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&result_event)
+                                .unwrap_or_else(|_| "Failed to serialize result".to_string())
+                        );
+
+                        // Save the envelope
+                        if let Err(e) = save_result_envelope(&result_event, &output_dir) {
+                            eprintln!("Error saving result envelope: {:?}", e);
+                            std::process::exit(1);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Error running ritual: {:?}", e);
+                        std::process::exit(1);
+                    }
+                }
+            } else {
+                // Use the original method that prints directly
+                if let Err(e) = engine.run_from_file(&file) {
+                    eprintln!("Error running ritual: {:?}", e);
+                    std::process::exit(1);
+                }
             }
         }
         Commands::Bootstrap {
@@ -339,6 +377,44 @@ async fn run_some(
         info!("verify: ok");
     }
     info!("done");
+    Ok(())
+}
+
+/// Save the result envelope from a ritual completion event to result.json
+fn save_result_envelope(
+    result_event: &serde_json::Value,
+    output_dir: &Option<PathBuf>,
+) -> Result<()> {
+    use envelope::EnvelopeValidator;
+
+    // Extract the envelope from the "outputs" field
+    let envelope_value = result_event
+        .get("outputs")
+        .ok_or_else(|| anyhow::anyhow!("No outputs field found in result event"))?;
+
+    // Validate the envelope against the schema
+    let validator = EnvelopeValidator::new()?;
+    if let Err(e) = validator.validate_json(envelope_value) {
+        eprintln!("Warning: Result envelope validation failed: {}", e);
+        eprintln!("Continuing to save the result, but it may not conform to the expected schema.");
+    }
+
+    // Determine output directory
+    let dir = output_dir
+        .as_ref()
+        .map(|p| p.as_path())
+        .unwrap_or_else(|| std::path::Path::new("."));
+
+    // Create directory if it doesn't exist
+    std::fs::create_dir_all(dir)?;
+
+    // Write the envelope to result.json
+    let result_path = dir.join("result.json");
+    let envelope_json = serde_json::to_string_pretty(envelope_value)?;
+    std::fs::write(&result_path, envelope_json)?;
+
+    info!("Result envelope saved to: {}", result_path.display());
+
     Ok(())
 }
 
