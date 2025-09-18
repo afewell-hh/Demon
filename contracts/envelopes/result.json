@@ -1,0 +1,267 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://demon.meta/contracts/envelopes/result.json",
+  "title": "ResultEnvelope",
+  "description": "Standard envelope for operation results with diagnostics, suggestions, metrics, and provenance",
+  "type": "object",
+  "required": ["result"],
+  "properties": {
+    "result": {
+      "description": "The primary result data from the operation",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Indicates whether the operation was successful"
+            },
+            "data": {
+              "description": "The actual result data when successful"
+            },
+            "error": {
+              "type": "object",
+              "description": "Error details when the operation failed",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "description": "Error code identifier"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "Human-readable error message"
+                },
+                "details": {
+                  "type": "object",
+                  "description": "Additional error context",
+                  "additionalProperties": true
+                }
+              },
+              "required": ["message"]
+            }
+          },
+          "required": ["success"]
+        }
+      ]
+    },
+    "diagnostics": {
+      "type": "array",
+      "description": "Diagnostic messages generated during the operation",
+      "items": {
+        "type": "object",
+        "required": ["level", "message"],
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": ["debug", "info", "warning", "error", "fatal"],
+            "description": "Severity level of the diagnostic message"
+          },
+          "message": {
+            "type": "string",
+            "description": "The diagnostic message content"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the diagnostic was generated"
+          },
+          "source": {
+            "type": "string",
+            "description": "Component or module that generated the diagnostic"
+          },
+          "context": {
+            "type": "object",
+            "description": "Additional context for the diagnostic",
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "suggestions": {
+      "type": "array",
+      "description": "Suggested actions or modifications",
+      "items": {
+        "type": "object",
+        "required": ["type", "description"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["action", "modification", "configuration", "optimization"],
+            "description": "Type of suggestion"
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of the suggestion"
+          },
+          "patch": {
+            "type": "array",
+            "description": "JSON Patch operations (RFC 6902) for suggested modifications",
+            "items": {
+              "type": "object",
+              "required": ["op", "path"],
+              "properties": {
+                "op": {
+                  "type": "string",
+                  "enum": ["add", "remove", "replace", "move", "copy", "test"],
+                  "description": "The operation to perform"
+                },
+                "path": {
+                  "type": "string",
+                  "description": "JSON Pointer to the target location"
+                },
+                "value": {
+                  "description": "The value to use for the operation"
+                },
+                "from": {
+                  "type": "string",
+                  "description": "Source location for move/copy operations"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"],
+            "description": "Priority of the suggestion"
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Explanation of why this suggestion is being made"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "description": "Performance and operational metrics",
+      "properties": {
+        "duration": {
+          "type": "object",
+          "description": "Timing metrics",
+          "properties": {
+            "total_ms": {
+              "type": "number",
+              "description": "Total operation duration in milliseconds"
+            },
+            "phases": {
+              "type": "object",
+              "description": "Duration of individual phases",
+              "additionalProperties": {
+                "type": "number"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "resources": {
+          "type": "object",
+          "description": "Resource utilization metrics",
+          "properties": {
+            "memory_bytes": {
+              "type": "integer",
+              "description": "Memory used in bytes"
+            },
+            "cpu_percent": {
+              "type": "number",
+              "description": "CPU utilization percentage"
+            },
+            "io_operations": {
+              "type": "integer",
+              "description": "Number of I/O operations"
+            }
+          },
+          "additionalProperties": true
+        },
+        "counters": {
+          "type": "object",
+          "description": "Operation counters",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        },
+        "custom": {
+          "type": "object",
+          "description": "Custom application-specific metrics",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "description": "Origin and chain of custody information",
+      "properties": {
+        "source": {
+          "type": "object",
+          "description": "Source system information",
+          "properties": {
+            "system": {
+              "type": "string",
+              "description": "Name of the source system"
+            },
+            "version": {
+              "type": "string",
+              "description": "Version of the source system"
+            },
+            "instance": {
+              "type": "string",
+              "description": "Instance identifier"
+            }
+          },
+          "required": ["system"],
+          "additionalProperties": false
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the result was generated"
+        },
+        "trace_id": {
+          "type": "string",
+          "description": "Distributed tracing identifier"
+        },
+        "span_id": {
+          "type": "string",
+          "description": "Span identifier within the trace"
+        },
+        "parent_span_id": {
+          "type": "string",
+          "description": "Parent span identifier for nested operations"
+        },
+        "chain": {
+          "type": "array",
+          "description": "Chain of processing steps",
+          "items": {
+            "type": "object",
+            "required": ["step", "timestamp"],
+            "properties": {
+              "step": {
+                "type": "string",
+                "description": "Processing step identifier"
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When this step occurred"
+              },
+              "actor": {
+                "type": "string",
+                "description": "Entity that performed the step"
+              },
+              "signature": {
+                "type": "string",
+                "description": "Cryptographic signature for verification"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
