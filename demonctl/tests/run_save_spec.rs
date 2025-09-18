@@ -53,15 +53,13 @@ fn run_with_save_creates_result_json() {
 #[test]
 fn run_with_save_to_current_dir() {
     let temp_dir = TempDir::new().unwrap();
-    let original_dir = std::env::current_dir().unwrap();
-
-    // Change to temp directory
-    std::env::set_current_dir(&temp_dir).unwrap();
 
     let mut cmd = Command::cargo_bin("demonctl").unwrap();
 
-    // Run from the original directory but with cwd set to temp_dir
+    // Get the workspace root before changing directories
     let root = workspace_root();
+
+    // Run from temp_dir as current directory
     cmd.current_dir(&temp_dir)
         .args([
             "run",
@@ -70,9 +68,6 @@ fn run_with_save_to_current_dir() {
         ])
         .assert()
         .success();
-
-    // Reset current directory
-    std::env::set_current_dir(&original_dir).unwrap();
 
     // Check that result.json was created in temp_dir (our working directory when we ran the command)
     let result_path = temp_dir.path().join("result.json");
