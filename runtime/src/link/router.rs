@@ -1,4 +1,5 @@
 use anyhow::Result;
+use serde_json;
 
 /// Link-name router stub: resolves a functionRef to a capsule call.
 /// Milestone 0 supports only the `echo` capsule with `{ message: String }`.
@@ -15,8 +16,9 @@ impl Router {
         match ref_name {
             "echo" => {
                 let msg = args.get("message").and_then(|v| v.as_str()).unwrap_or("");
-                let out = capsules_echo::echo(msg.to_string());
-                Ok(serde_json::json!({ "printed": out }))
+                let envelope = capsules_echo::echo(msg.to_string());
+                // Serialize the entire envelope as the result
+                Ok(serde_json::to_value(envelope)?)
             }
             other => anyhow::bail!("unknown functionRef: {other}"),
         }

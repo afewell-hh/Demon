@@ -79,7 +79,32 @@ async fn runs_endpoints_behave_with_and_without_stream() -> anyhow::Result<()> {
             "ritualId": "e2e-ritual",
             "runId": "e2e-run",
             "ts": "2025-01-01T00:00:05Z",
-            "outputs": {"printed": "Hello from test"}
+            "outputs": {
+                "result": {
+                    "success": true,
+                    "data": {
+                        "echoed_message": "Hello from test",
+                        "character_count": 15,
+                        "timestamp": "2025-01-01T00:00:05Z"
+                    }
+                },
+                "diagnostics": [{
+                    "level": "info",
+                    "message": "Echo operation completed",
+                    "timestamp": "2025-01-01T00:00:05Z"
+                }],
+                "metrics": {
+                    "counters": {"characterCount": 15},
+                    "duration": {"total_ms": 0.5}
+                },
+                "provenance": {
+                    "source": {
+                        "system": "echo-capsule",
+                        "version": "0.0.1"
+                    },
+                    "timestamp": "2025-01-01T00:00:05Z"
+                }
+            }
         }))?
         .into(),
     )
