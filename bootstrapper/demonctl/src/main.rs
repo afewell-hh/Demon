@@ -125,7 +125,7 @@ async fn main() -> Result<()> {
                         }
                     }
                 }
-                let resolved = resolve(uri, &idx_path)?;
+                let resolved = tokio::task::block_in_place(|| resolve(uri, &idx_path))?;
                 println!(
                     "{}",
                     serde_json::json!({
@@ -200,7 +200,7 @@ async fn run_all(cfg: &BootstrapConfig, ritual: &str, bundle_uri: Option<&str>) 
                     }
                 }
             }
-            let resolved = resolve(uri, &idx_path)?;
+            let resolved = tokio::task::block_in_place(|| resolve(uri, &idx_path))?;
             resolved.path
         } else {
             std::path::PathBuf::from(uri)
