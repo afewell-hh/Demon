@@ -314,10 +314,10 @@ jobs:
 
       - name: Start Operate UI (background)
         env:
-          RITUAL_STREAM_NAME: RITUAL_EVENTS
+          RITUAL_STREAM_NAME: RITUAL_EVENTS_BS
           APPROVER_ALLOWLIST: ops@example.com
         run: |
-          nohup bash -c 'APPROVER_ALLOWLIST=ops@example.com RITUAL_STREAM_NAME=RITUAL_EVENTS cargo run -q -p operate-ui' >/tmp/ui.log 2>&1 &
+          nohup bash -c 'APPROVER_ALLOWLIST=ops@example.com RITUAL_STREAM_NAME=RITUAL_EVENTS_BS cargo run -q -p operate-ui' >/tmp/ui.log 2>&1 &
           for i in {1..60}; do
             curl -sf http://127.0.0.1:3000/api/runs >/dev/null 2>&1 && break || true
             sleep 0.5
@@ -325,14 +325,14 @@ jobs:
 
       - name: Start TTL worker (background)
         env:
-          RITUAL_STREAM_NAME: RITUAL_EVENTS
+          RITUAL_STREAM_NAME: RITUAL_EVENTS_BS
         run: |
-          nohup bash -c 'TTL_WORKER_ENABLED=1 RITUAL_STREAM_NAME=RITUAL_EVENTS cargo run -q -p engine --bin demon-ttl-worker' >/tmp/worker.log 2>&1 &
+          nohup bash -c 'TTL_WORKER_ENABLED=1 RITUAL_STREAM_NAME=RITUAL_EVENTS_BS cargo run -q -p engine --bin demon-ttl-worker' >/tmp/worker.log 2>&1 &
           sleep 1
 
       - name: Bootstrap ensure+seed+verify (idempotent)
         env:
-          RITUAL_STREAM_NAME: RITUAL_EVENTS
+          RITUAL_STREAM_NAME: RITUAL_EVENTS_BS
           RITUAL_SUBJECTS: demon.ritual.v1.>
         run: |
           cargo run -q -p bootstrapper-demonctl -- --ensure-stream --seed --verify
@@ -378,10 +378,10 @@ jobs:
 
       - name: Start Operate UI (background)
         env:
-          RITUAL_STREAM_NAME: RITUAL_EVENTS
+          RITUAL_STREAM_NAME: RITUAL_EVENTS_DEMONCTL
           APPROVER_ALLOWLIST: ops@example.com
         run: |
-          nohup bash -c 'APPROVER_ALLOWLIST=ops@example.com RITUAL_STREAM_NAME=RITUAL_EVENTS cargo run -q -p operate-ui' >/tmp/ui.log 2>&1 &
+          nohup bash -c 'APPROVER_ALLOWLIST=ops@example.com RITUAL_STREAM_NAME=RITUAL_EVENTS_DEMONCTL cargo run -q -p operate-ui' >/tmp/ui.log 2>&1 &
           for i in {1..60}; do
             curl -sf http://127.0.0.1:3000/api/runs >/dev/null 2>&1 && break || true
             sleep 0.5
@@ -389,14 +389,14 @@ jobs:
 
       - name: Start TTL worker (background)
         env:
-          RITUAL_STREAM_NAME: RITUAL_EVENTS
+          RITUAL_STREAM_NAME: RITUAL_EVENTS_DEMONCTL
         run: |
-          nohup bash -c 'TTL_WORKER_ENABLED=1 RITUAL_STREAM_NAME=RITUAL_EVENTS cargo run -q -p engine --bin demon-ttl-worker' >/tmp/worker.log 2>&1 &
+          nohup bash -c 'TTL_WORKER_ENABLED=1 RITUAL_STREAM_NAME=RITUAL_EVENTS_DEMONCTL cargo run -q -p engine --bin demon-ttl-worker' >/tmp/worker.log 2>&1 &
           sleep 1
 
       - name: demonctl bootstrap ensure+seed+verify (idempotent)
         env:
-          RITUAL_STREAM_NAME: RITUAL_EVENTS
+          RITUAL_STREAM_NAME: RITUAL_EVENTS_DEMONCTL
           RITUAL_SUBJECTS: demon.ritual.v1.>
         run: |
           cargo run -q -p demonctl -- bootstrap --ensure-stream --seed --verify
@@ -404,7 +404,7 @@ jobs:
 
       - name: demonctl bootstrap individual flags
         env:
-          RITUAL_STREAM_NAME: RITUAL_EVENTS
+          RITUAL_STREAM_NAME: RITUAL_EVENTS_DEMONCTL
           RITUAL_SUBJECTS: demon.ritual.v1.>
         run: |
           cargo run -q -p demonctl -- bootstrap --ensure-stream
@@ -413,10 +413,10 @@ jobs:
 
       - name: demonctl bootstrap with overrides
         env:
-          RITUAL_STREAM_NAME: RITUAL_EVENTS
+          RITUAL_STREAM_NAME: RITUAL_EVENTS_DEMONCTL
           RITUAL_SUBJECTS: demon.ritual.v1.>
         run: |
-          cargo run -q -p demonctl -- bootstrap --ensure-stream --stream-name TEST_STREAM --nats-url nats://127.0.0.1:4222
+          RITUAL_SUBJECTS="test.bootstrap.v1.>" cargo run -q -p demonctl -- bootstrap --ensure-stream --stream-name TEST_STREAM_OVERRIDE --nats-url nats://127.0.0.1:4222
 
       - name: Teardown NATS
         if: always()
@@ -458,12 +458,12 @@ jobs:
 
       - name: Start Operate UI + TTL worker
         env:
-          RITUAL_STREAM_NAME: RITUAL_EVENTS
+          RITUAL_STREAM_NAME: RITUAL_EVENTS_BUNDLES
           APPROVER_ALLOWLIST: ops@example.com
         run: |
-          nohup bash -c 'APPROVER_ALLOWLIST=ops@example.com RITUAL_STREAM_NAME=RITUAL_EVENTS cargo run -q -p operate-ui' >/tmp/ui.log 2>&1 &
+          nohup bash -c 'APPROVER_ALLOWLIST=ops@example.com RITUAL_STREAM_NAME=RITUAL_EVENTS_BUNDLES cargo run -q -p operate-ui' >/tmp/ui.log 2>&1 &
           for i in {1..60}; do curl -sf http://127.0.0.1:3000/api/runs >/dev/null 2>&1 && break || sleep 0.5; done
-          nohup bash -c 'TTL_WORKER_ENABLED=1 RITUAL_STREAM_NAME=RITUAL_EVENTS cargo run -q -p engine --bin demon-ttl-worker' >/tmp/worker.log 2>&1 &
+          nohup bash -c 'TTL_WORKER_ENABLED=1 RITUAL_STREAM_NAME=RITUAL_EVENTS_BUNDLES cargo run -q -p engine --bin demon-ttl-worker' >/tmp/worker.log 2>&1 &
           sleep 1
 
       - name: Run local-dev bundle (twice) with idempotency asserts

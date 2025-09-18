@@ -2,7 +2,7 @@ nats:
   url: "${NATS_URL:-nats://127.0.0.1:4223}"
 stream:
   name: "${RITUAL_STREAM_NAME:-RITUAL_EVENTS}"
-  subjects: ["demon.ritual.v1.>"]
+  subjects: ["${RITUAL_SUBJECTS:-demon.ritual.v1.>}"]
   duplicateWindowSeconds: 120
 operateUi:
   baseUrl: "${OPERATE_UI_URL:-http://127.0.0.1:3000}"
