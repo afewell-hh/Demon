@@ -23,30 +23,33 @@ jobs:
           script: |
             const {owner, repo} = context.repo;
             const pr = context.payload.pull_request;
-            const head = pr.head.sha;
 
-            async function fetchBody() {
+            async function fetchState() {
               const res = await github.rest.pulls.get({ owner, repo, pull_number: pr.number });
-              return res.data.body || "";
+              return {
+                body: res.data.body || "",
+                headSha: res.data.head.sha
+              };
             }
 
             async function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 
             // Retry loop to tolerate API eventual consistency on PR body updates
-            let body = await fetchBody();
             let lock = null;
+            let headSha = null;
             const maxAttempts = 10;
             for (let i = 1; i <= maxAttempts; i++) {
+              const { body, headSha: currentHead } = await fetchState();
+              headSha = currentHead;
               const m = body.match(/Review-lock:\s*([0-9a-f]{40})/i);
               lock = m ? m[1] : null;
-              if (lock && lock.toLowerCase() === head.toLowerCase()) {
-                core.info(`Review-lock OK for ${head.slice(0,7)} on attempt ${i}`);
+              if (lock && lock.toLowerCase() === headSha.toLowerCase()) {
+                core.info(`Review-lock OK for ${headSha.slice(0,12)} on attempt ${i}`);
                 break;
               }
               if (i < maxAttempts) {
-                core.info(`Review-lock not aligned yet (attempt ${i}/${maxAttempts}): body=${(lock||'none').slice(0,7)} head=${head.slice(0,7)}; retrying…`);
+                core.info(`Review-lock not aligned yet (attempt ${i}/${maxAttempts}): lock=${(lock||'none').slice(0,12)} headSha=${headSha.slice(0,12)}; retrying…`);
                 await wait(3000);
-                body = await fetchBody();
               }
             }
 
@@ -54,8 +57,8 @@ jobs:
               core.setFailed("Review-lock not found. Add a line: 'Review-lock: <HEAD_SHA>'");
               return;
             }
-            if (lock.toLowerCase() !== head.toLowerCase()) {
-              core.setFailed(`Review-lock mismatch after retries: body=${lock.slice(0,7)} head=${head.slice(0,7)}`);
+            if (lock.toLowerCase() !== headSha.toLowerCase()) {
+              core.setFailed(`Review-lock mismatch after retries: lock=${lock.slice(0,12)} headSha=${headSha.slice(0,12)}`);
             }
   build-test:
     runs-on: ubuntu-latest
