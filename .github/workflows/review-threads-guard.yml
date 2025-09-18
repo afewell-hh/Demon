@@ -66,6 +66,7 @@ jobs:
           exit 0
 
       - name: Check unresolved threads (no author reply)
+        if: steps.decide.outputs.enforce == 'true' && steps.decide.outputs.docsonly != 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
