@@ -139,4 +139,3 @@ fn given_no_input_specified_when_validate_then_exits_with_error() {
         .failure()
         .stderr(predicates::str::contains("Must specify"));
 }
-
