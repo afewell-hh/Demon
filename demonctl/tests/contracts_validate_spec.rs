@@ -1,5 +1,5 @@
 use assert_cmd::Command;
-use predicates::prelude::*;
+use predicates;
 use serde_json::json;
 use std::fs;
 use tempfile::TempDir;
