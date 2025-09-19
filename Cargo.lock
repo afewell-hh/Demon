@@ -600,6 +600,7 @@ dependencies = [
  "anyhow",
  "jsonschema 0.18.3",
  "once_cell",
+ "regex",
  "serde",
  "serde_json",
  "tempfile",

@@ -7,6 +7,9 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 use tracing::{debug, instrument};
 
+pub mod secrets;
+pub use secrets::{EnvFileSecretProvider, SecretError, SecretProvider};
+
 #[derive(Error, Debug)]
 pub enum ConfigError {
     #[error("Schema not found for capsule: {capsule}")]
@@ -26,6 +29,9 @@ pub enum ConfigError {
 
     #[error("IO error: {message}")]
     IoError { message: String },
+
+    #[error("Secret resolution failed: {error}")]
+    SecretResolutionFailed { error: SecretError },
 }
 
 #[derive(Debug, Clone)]
@@ -96,10 +102,24 @@ impl ConfigManager {
 
     #[instrument(skip(self))]
     pub fn load<T: DeserializeOwned>(&self, link_name: &str) -> Result<T, ConfigError> {
+        self.load_with_secrets(link_name, &EnvFileSecretProvider::new())
+    }
+
+    #[instrument(skip(self, provider))]
+    pub fn load_with_secrets<T: DeserializeOwned, P: SecretProvider + ?Sized>(
+        &self,
+        link_name: &str,
+        provider: &P,
+    ) -> Result<T, ConfigError> {
         debug!("Loading config for link: {}", link_name);
 
         // Load and validate against schema
-        let config_value = self.load_config_file(link_name)?;
+        let mut config_value = self.load_config_file(link_name)?;
+
+        // Resolve secrets before validation
+        secrets::resolve_secrets_in_config(&mut config_value, provider)
+            .map_err(|e| ConfigError::SecretResolutionFailed { error: e })?;
+
         self.validate_config(link_name, &config_value)?;
 
         // Deserialize to the target type
@@ -113,6 +133,16 @@ impl ConfigManager {
         &self,
         capsule: &str,
         config_path: &Path,
+    ) -> Result<(), ConfigError> {
+        self.validate_config_file_with_secrets(capsule, config_path, &EnvFileSecretProvider::new())
+    }
+
+    #[instrument(skip(self, provider))]
+    pub fn validate_config_file_with_secrets<P: SecretProvider + ?Sized>(
+        &self,
+        capsule: &str,
+        config_path: &Path,
+        provider: &P,
     ) -> Result<(), ConfigError> {
         debug!(
             "Validating config file: {:?} for capsule: {}",
@@ -129,10 +159,14 @@ impl ConfigManager {
             message: format!("Failed to read config file: {}", e),
         })?;
 
-        let config_value: Value =
+        let mut config_value: Value =
             serde_json::from_str(&config_content).map_err(|e| ConfigError::JsonParsingFailed {
                 message: e.to_string(),
             })?;
+
+        // Resolve secrets before validation
+        secrets::resolve_secrets_in_config(&mut config_value, provider)
+            .map_err(|e| ConfigError::SecretResolutionFailed { error: e })?;
 
         self.validate_config(capsule, &config_value)
     }
@@ -143,7 +177,27 @@ impl ConfigManager {
         capsule: &str,
         config_value: &Value,
     ) -> Result<(), ConfigError> {
-        self.validate_config(capsule, config_value)
+        self.validate_config_value_with_secrets(
+            capsule,
+            config_value,
+            &EnvFileSecretProvider::new(),
+        )
+    }
+
+    #[instrument(skip(self, provider))]
+    pub fn validate_config_value_with_secrets<P: SecretProvider + ?Sized>(
+        &self,
+        capsule: &str,
+        config_value: &Value,
+        provider: &P,
+    ) -> Result<(), ConfigError> {
+        let mut config_value = config_value.clone();
+
+        // Resolve secrets before validation
+        secrets::resolve_secrets_in_config(&mut config_value, provider)
+            .map_err(|e| ConfigError::SecretResolutionFailed { error: e })?;
+
+        self.validate_config(capsule, &config_value)
     }
 
     fn load_config_file(&self, link_name: &str) -> Result<Value, ConfigError> {

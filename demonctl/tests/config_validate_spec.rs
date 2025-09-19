@@ -263,3 +263,149 @@ fn given_no_file_or_stdin_when_validate_config_then_failure() {
         "Must specify either a file path or --stdin",
     ));
 }
+
+#[test]
+fn given_config_with_secrets_and_secrets_file_when_validate_config_then_success() {
+    let temp_dir = setup_test_environment();
+
+    // Create a config with secret references
+    let config_with_secrets = r#"{
+        "messagePrefix": "secret://app/prefix",
+        "enableTrim": true,
+        "maxMessageLength": 500,
+        "outputFormat": "plain"
+    }"#;
+
+    // Create a secrets file
+    let secrets_content = r#"{
+        "app": {
+            "prefix": "Secret Prefix: "
+        }
+    }"#;
+
+    let config_file = temp_dir.path().join("echo_config.json");
+    let secrets_file = temp_dir.path().join("secrets.json");
+    fs::write(&config_file, config_with_secrets).unwrap();
+    fs::write(&secrets_file, secrets_content).unwrap();
+
+    let mut cmd = Command::cargo_bin("demonctl").unwrap();
+    cmd.current_dir(temp_dir.path()).args([
+        "contracts",
+        "validate-config",
+        &config_file.to_string_lossy(),
+        "--secrets-file",
+        &secrets_file.to_string_lossy(),
+    ]);
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("✓ Valid config for capsule: echo"));
+}
+
+#[test]
+fn given_config_with_missing_secret_when_validate_config_then_failure() {
+    let temp_dir = setup_test_environment();
+
+    // Create a config with secret references that don't exist
+    let config_with_secrets = r#"{
+        "messagePrefix": "secret://app/missing_secret",
+        "enableTrim": true,
+        "maxMessageLength": 500,
+        "outputFormat": "plain"
+    }"#;
+
+    // Create an empty secrets file
+    let secrets_content = r#"{
+        "app": {}
+    }"#;
+
+    let config_file = temp_dir.path().join("echo_config.json");
+    let secrets_file = temp_dir.path().join("secrets.json");
+    fs::write(&config_file, config_with_secrets).unwrap();
+    fs::write(&secrets_file, secrets_content).unwrap();
+
+    let mut cmd = Command::cargo_bin("demonctl").unwrap();
+    cmd.current_dir(temp_dir.path()).args([
+        "contracts",
+        "validate-config",
+        &config_file.to_string_lossy(),
+        "--secrets-file",
+        &secrets_file.to_string_lossy(),
+    ]);
+
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("✗ Secret resolution failed"))
+        .stderr(predicate::str::contains(
+            "Secret not found: app/missing_secret",
+        ));
+}
+
+#[test]
+fn given_config_with_secrets_via_env_when_validate_config_then_success() {
+    let temp_dir = setup_test_environment();
+
+    // Create a config with secret references
+    let config_with_secrets = r#"{
+        "messagePrefix": "secret://test/prefix",
+        "enableTrim": true,
+        "maxMessageLength": 500,
+        "outputFormat": "plain"
+    }"#;
+
+    let config_file = temp_dir.path().join("echo_config.json");
+    fs::write(&config_file, config_with_secrets).unwrap();
+
+    let mut cmd = Command::cargo_bin("demonctl").unwrap();
+    cmd.current_dir(temp_dir.path())
+        .env("SECRET_TEST_PREFIX", "Env Secret: ")
+        .args([
+            "contracts",
+            "validate-config",
+            &config_file.to_string_lossy(),
+        ]);
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("✓ Valid config for capsule: echo"));
+}
+
+#[test]
+fn given_config_with_secrets_via_stdin_when_validate_config_then_success() {
+    let temp_dir = setup_test_environment();
+
+    // Create a config with secret references
+    let config_with_secrets = r#"{
+        "messagePrefix": "secret://app/prefix",
+        "enableTrim": true,
+        "maxMessageLength": 500,
+        "outputFormat": "plain"
+    }"#;
+
+    // Create a secrets file
+    let secrets_content = r#"{
+        "app": {
+            "prefix": "Stdin Secret: "
+        }
+    }"#;
+
+    let secrets_file = temp_dir.path().join("secrets.json");
+    fs::write(&secrets_file, secrets_content).unwrap();
+
+    let mut cmd = Command::cargo_bin("demonctl").unwrap();
+    cmd.current_dir(temp_dir.path())
+        .args([
+            "contracts",
+            "validate-config",
+            "--stdin",
+            "--schema",
+            "echo",
+            "--secrets-file",
+            &secrets_file.to_string_lossy(),
+        ])
+        .write_stdin(config_with_secrets);
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("✓ Valid config for capsule: echo"));
+}

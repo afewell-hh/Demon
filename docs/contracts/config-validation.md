@@ -109,6 +109,99 @@ When a configuration file is missing, the system automatically generates a defau
 
 This default configuration is validated against the schema before use.
 
+## Secret Resolution
+
+The configuration system supports resolving secret values using `secret://` URI references. This allows sensitive data to be stored separately from configuration files and resolved at runtime.
+
+### Secret URI Format
+
+Secret references use the format: `secret://scope/key`
+
+- **scope**: A namespace for grouping related secrets (e.g., "database", "api", "app")
+- **key**: The specific secret identifier within the scope
+
+**Example:**
+```json
+{
+  "messagePrefix": "secret://app/prefix",
+  "enableTrim": true,
+  "databaseUrl": "secret://database/connection_string"
+}
+```
+
+### Secret Sources
+
+Secrets are resolved using the following priority order:
+
+1. **Environment Variables**: `SECRET_<SCOPE>_<KEY>` (uppercase with underscores)
+   - `secret://app/prefix` → `SECRET_APP_PREFIX`
+   - `secret://database/password` → `SECRET_DATABASE_PASSWORD`
+
+2. **Secrets File**: JSON file containing nested secret values
+   - Default location: `.demon/secrets.json`
+   - Custom location via `CONFIG_SECRETS_FILE` environment variable
+
+**Example secrets file:**
+```json
+{
+  "app": {
+    "prefix": "Secret Prefix: ",
+    "api_key": "sk-abcd1234"
+  },
+  "database": {
+    "password": "super_secret_password",
+    "connection_string": "postgresql://user:pass@host:5432/db"
+  }
+}
+```
+
+### Secret Resolution Behavior
+
+1. **Resolution Timing**: Secrets are resolved after loading configuration but before schema validation
+2. **Error Handling**: Missing secrets cause configuration validation to fail with `SecretResolutionFailed` error
+3. **Security**: Resolved secret values are redacted in logs and diagnostic output
+4. **Immutability**: Once resolved, secret values are treated as regular configuration values
+
+### Runtime Integration
+
+Secret resolution is automatically enabled in the runtime:
+
+```rust
+use config_loader::{ConfigManager, EnvFileSecretProvider};
+use runtime::link::router::Router;
+
+// Use default secret provider (env vars + .demon/secrets.json)
+let router = Router::new();
+
+// Use custom secrets file
+let config_manager = ConfigManager::new();
+let secret_provider = EnvFileSecretProvider::with_secrets_file("custom-secrets.json");
+let router = Router::with_config_and_secrets(config_manager, secret_provider);
+```
+
+### Policy Decision Events with Secrets
+
+**Secret Resolution Failed:**
+```json
+{
+  "event": "policy.decision:v1",
+  "ts": "2024-01-15T10:30:00Z",
+  "tenantId": "default",
+  "runId": "run-123",
+  "ritualId": "ritual-456",
+  "capability": "echo",
+  "decision": {
+    "allowed": false,
+    "reason": "secret_not_found",
+    "details": "Secret not found: app/missing_key"
+  },
+  "validation": {
+    "type": "config",
+    "schema": "echo-config.v1.json"
+  }
+}
+```
+
 ### Policy Decision Events
 
 The runtime emits policy decisions for configuration validation:
@@ -167,6 +260,9 @@ demonctl contracts validate-config echo_config.json
 
 # Specify capsule explicitly
 demonctl contracts validate-config myconfig.json --schema echo
+
+# Validate config with secrets
+demonctl contracts validate-config echo_config.json --secrets-file secrets.json
 ```
 
 ### Validate from stdin
@@ -174,6 +270,9 @@ demonctl contracts validate-config myconfig.json --schema echo
 ```bash
 # Must specify schema when reading from stdin
 cat config.json | demonctl contracts validate-config --stdin --schema echo
+
+# Validate from stdin with secrets
+cat config.json | demonctl contracts validate-config --stdin --schema echo --secrets-file secrets.json
 ```
 
 ### Example Output
@@ -192,6 +291,11 @@ cat config.json | demonctl contracts validate-config --stdin --schema echo
     Schema: /required
 ```
 
+**Secret resolution failed:**
+```
+✗ Secret resolution failed for capsule 'echo': Secret not found: app/missing_key
+```
+
 ## Error Types
 
 The configuration validation system provides detailed error information:
@@ -202,6 +306,7 @@ The configuration validation system provides detailed error information:
 - **ValidationFailed**: The configuration doesn't match the schema requirements
 - **JsonParsingFailed**: The configuration file contains invalid JSON
 - **IoError**: File system error (permissions, disk full, etc.)
+- **SecretResolutionFailed**: A secret referenced in the configuration could not be resolved
 
 **Note:** For runtime execution, missing configuration files do not generate `ConfigFileNotFound` errors. Instead, the system attempts to use schema defaults. `ConfigFileNotFound` errors only occur when explicitly validating a specific file path using the CLI.
 
@@ -223,12 +328,16 @@ let result = router.dispatch("echo", &args, "run-id", "ritual-id").await?;
 ### Direct Validation
 
 ```rust
-use config_loader::ConfigManager;
+use config_loader::{ConfigManager, EnvFileSecretProvider};
 
 let manager = ConfigManager::new();
 
 // Validate a config file
 manager.validate_config_file("echo", Path::new("config.json"))?;
+
+// Validate a config file with secrets
+let secret_provider = EnvFileSecretProvider::with_secrets_file("secrets.json");
+manager.validate_config_file_with_secrets("echo", Path::new("config.json"), &secret_provider)?;
 
 // Validate a config value
 let config_value = serde_json::json!({
@@ -236,6 +345,13 @@ let config_value = serde_json::json!({
     "enableTrim": true
 });
 manager.validate_config_value("echo", &config_value)?;
+
+// Validate a config value with secrets
+let config_with_secrets = serde_json::json!({
+    "messagePrefix": "secret://app/prefix",
+    "enableTrim": true
+});
+manager.validate_config_value_with_secrets("echo", &config_with_secrets, &secret_provider)?;
 ```
 
 ## Best Practices
@@ -260,3 +376,10 @@ manager.validate_config_value("echo", &config_value)?;
    - Test both valid and invalid configurations
    - Include edge cases (empty values, boundary conditions)
    - Verify error messages are helpful and accurate
+
+5. **Secrets Management**:
+   - Use environment variables for production secrets
+   - Store secrets files outside the repository (add to `.gitignore`)
+   - Use clear, consistent naming for secret scopes and keys
+   - Test secret resolution failures in your test suite
+   - Never log or expose resolved secret values
