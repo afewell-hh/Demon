@@ -83,7 +83,7 @@ fn given_valid_config_when_load_then_success() {
 
     let config: EchoConfig = manager.load("echo").unwrap();
     assert_eq!(config.message_prefix, "Test: ");
-    assert_eq!(config.enable_trim, true);
+    assert!(config.enable_trim);
     assert_eq!(config.max_message_length, Some(500));
     assert_eq!(config.output_format, Some("plain".to_string()));
 }

@@ -199,7 +199,7 @@ fn given_default_router_when_created_then_has_config_manager() {
     let router = Router::new();
     // We can't directly test the internal config_manager, but we can verify
     // the router was created successfully
-    assert!(std::ptr::addr_of!(router) as *const _ != std::ptr::null());
+    assert!(!std::ptr::addr_of!(router).is_null());
 }
 
 #[test]
@@ -212,5 +212,5 @@ fn given_custom_config_manager_when_create_router_then_uses_custom_manager() {
     let router = Router::with_config_manager(config_manager);
 
     // Verify router was created successfully with custom config manager
-    assert!(std::ptr::addr_of!(router) as *const _ != std::ptr::null());
+    assert!(!std::ptr::addr_of!(router).is_null());
 }

@@ -68,7 +68,7 @@ fn given_valid_config_file_when_validate_config_then_success() {
     fs::write(&config_file, valid_config).unwrap();
 
     let mut cmd = Command::cargo_bin("demonctl").unwrap();
-    cmd.current_dir(temp_dir.path()).args(&[
+    cmd.current_dir(temp_dir.path()).args([
         "contracts",
         "validate-config",
         &config_file.to_string_lossy(),
@@ -92,7 +92,7 @@ fn given_invalid_config_file_when_validate_config_then_failure() {
     fs::write(&config_file, invalid_config).unwrap();
 
     let mut cmd = Command::cargo_bin("demonctl").unwrap();
-    cmd.current_dir(temp_dir.path()).args(&[
+    cmd.current_dir(temp_dir.path()).args([
         "contracts",
         "validate-config",
         &config_file.to_string_lossy(),
@@ -115,7 +115,7 @@ fn given_missing_required_field_when_validate_config_then_failure_with_details()
     fs::write(&config_file, invalid_config).unwrap();
 
     let mut cmd = Command::cargo_bin("demonctl").unwrap();
-    cmd.current_dir(temp_dir.path()).args(&[
+    cmd.current_dir(temp_dir.path()).args([
         "contracts",
         "validate-config",
         &config_file.to_string_lossy(),
@@ -144,7 +144,7 @@ fn given_valid_config_with_explicit_schema_when_validate_config_then_success() {
     fs::write(&config_file, valid_config).unwrap();
 
     let mut cmd = Command::cargo_bin("demonctl").unwrap();
-    cmd.current_dir(temp_dir.path()).args(&[
+    cmd.current_dir(temp_dir.path()).args([
         "contracts",
         "validate-config",
         &config_file.to_string_lossy(),
@@ -169,7 +169,7 @@ fn given_nonexistent_schema_when_validate_config_then_failure() {
     fs::write(&config_file, config).unwrap();
 
     let mut cmd = Command::cargo_bin("demonctl").unwrap();
-    cmd.current_dir(temp_dir.path()).args(&[
+    cmd.current_dir(temp_dir.path()).args([
         "contracts",
         "validate-config",
         &config_file.to_string_lossy(),
@@ -193,7 +193,7 @@ fn given_valid_config_via_stdin_when_validate_config_then_success() {
 
     let mut cmd = Command::cargo_bin("demonctl").unwrap();
     cmd.current_dir(temp_dir.path())
-        .args(&[
+        .args([
             "contracts",
             "validate-config",
             "--stdin",
@@ -218,7 +218,7 @@ fn given_invalid_config_via_stdin_when_validate_config_then_failure() {
 
     let mut cmd = Command::cargo_bin("demonctl").unwrap();
     cmd.current_dir(temp_dir.path())
-        .args(&[
+        .args([
             "contracts",
             "validate-config",
             "--stdin",
@@ -243,7 +243,7 @@ fn given_stdin_without_schema_when_validate_config_then_failure() {
 
     let mut cmd = Command::cargo_bin("demonctl").unwrap();
     cmd.current_dir(temp_dir.path())
-        .args(&["contracts", "validate-config", "--stdin"])
+        .args(["contracts", "validate-config", "--stdin"])
         .write_stdin(config);
 
     cmd.assert().failure().stderr(predicate::str::contains(
@@ -257,7 +257,7 @@ fn given_no_file_or_stdin_when_validate_config_then_failure() {
 
     let mut cmd = Command::cargo_bin("demonctl").unwrap();
     cmd.current_dir(temp_dir.path())
-        .args(&["contracts", "validate-config"]);
+        .args(["contracts", "validate-config"]);
 
     cmd.assert().failure().stderr(predicate::str::contains(
         "Must specify either a file path or --stdin",
