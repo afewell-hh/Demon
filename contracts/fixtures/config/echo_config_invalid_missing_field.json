@@ -1,0 +1,5 @@
+{
+  "messagePrefix": "Echo: ",
+  "maxMessageLength": 500,
+  "outputFormat": "plain"
+}

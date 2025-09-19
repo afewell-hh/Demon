@@ -92,6 +92,18 @@ enum ContractsCommands {
         #[arg(long, value_name = "DIR", conflicts_with_all = &["file", "stdin"])]
         bulk: Option<PathBuf>,
     },
+    /// Validate a config file against a capsule's config schema
+    ValidateConfig {
+        /// Path to config JSON file (use --stdin to read from stdin)
+        #[arg(value_name = "FILE", conflicts_with = "stdin")]
+        file: Option<String>,
+        /// Read config from stdin
+        #[arg(long, conflicts_with = "file")]
+        stdin: bool,
+        /// Capsule name for schema selection (auto-detected from filename if not provided)
+        #[arg(long)]
+        schema: Option<String>,
+    },
 }
 
 #[derive(Copy, Clone, Debug, ValueEnum)]
@@ -134,7 +146,7 @@ async fn main() -> Result<()> {
 
             if save {
                 // Use the new method that returns the result for saving
-                match engine.run_from_file_with_result(&file) {
+                match engine.run_from_file_with_result(&file).await {
                     Ok(result_event) => {
                         // Still print to stdout for visibility
                         println!(
@@ -156,7 +168,7 @@ async fn main() -> Result<()> {
                 }
             } else {
                 // Use the original method that prints directly
-                if let Err(e) = engine.run_from_file(&file) {
+                if let Err(e) = engine.run_from_file(&file).await {
                     eprintln!("Error running ritual: {:?}", e);
                     std::process::exit(1);
                 }
@@ -467,6 +479,19 @@ async fn handle_contracts_command(cmd: ContractsCommands) -> Result<()> {
                 anyhow::bail!("Must specify either a file path, --stdin, or --bulk");
             }
         }
+        ContractsCommands::ValidateConfig {
+            file,
+            stdin,
+            schema,
+        } => {
+            if stdin {
+                validate_config_stdin(schema).await?;
+            } else if let Some(file_path) = file {
+                validate_config_file(&file_path, schema).await?;
+            } else {
+                anyhow::bail!("Must specify either a file path or --stdin");
+            }
+        }
     }
     Ok(())
 }
@@ -637,6 +662,85 @@ async fn validate_envelope_remote_raw(
 
     let result: serde_json::Value = response.json().await?;
     Ok(result["valid"].as_bool().unwrap_or(false))
+}
+
+async fn validate_config_file(file_path: &str, schema: Option<String>) -> Result<()> {
+    use config_loader::ConfigManager;
+    use std::path::Path;
+
+    let config_manager = ConfigManager::new();
+    let path = Path::new(file_path);
+
+    // Determine capsule name from schema arg or filename
+    let capsule_name = if let Some(schema_name) = schema {
+        schema_name
+    } else {
+        // Try to extract capsule name from filename
+        match path.file_stem().and_then(|s| s.to_str()) {
+            Some(name) => {
+                // Handle patterns like "echo_config.json" -> "echo"
+                if name.ends_with("_config") {
+                    name.strip_suffix("_config").unwrap_or(name).to_string()
+                } else {
+                    name.to_string()
+                }
+            }
+            None => anyhow::bail!(
+                "Could not determine capsule name from filename. Use --schema to specify."
+            ),
+        }
+    };
+
+    match config_manager.validate_config_file(&capsule_name, path) {
+        Ok(_) => {
+            println!("✓ Valid config for capsule: {}", capsule_name);
+            Ok(())
+        }
+        Err(config_loader::ConfigError::ValidationFailed { errors }) => {
+            eprintln!("✗ Invalid config for capsule '{}':", capsule_name);
+            for error in errors {
+                eprintln!("  Path {}: {}", error.json_pointer, error.message);
+                eprintln!("    Schema: {}", error.schema_path);
+            }
+            std::process::exit(1);
+        }
+        Err(e) => {
+            eprintln!("✗ Config validation failed: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+async fn validate_config_stdin(schema: Option<String>) -> Result<()> {
+    use config_loader::ConfigManager;
+    use std::io::Read;
+
+    let capsule_name =
+        schema.ok_or_else(|| anyhow::anyhow!("--schema is required when reading from stdin"))?;
+
+    let mut buffer = String::new();
+    std::io::stdin().read_to_string(&mut buffer)?;
+    let config_value: serde_json::Value = serde_json::from_str(&buffer)?;
+
+    let config_manager = ConfigManager::new();
+    match config_manager.validate_config_value(&capsule_name, &config_value) {
+        Ok(_) => {
+            println!("✓ Valid config for capsule: {}", capsule_name);
+            Ok(())
+        }
+        Err(config_loader::ConfigError::ValidationFailed { errors }) => {
+            eprintln!("✗ Invalid config for capsule '{}':", capsule_name);
+            for error in errors {
+                eprintln!("  Path {}: {}", error.json_pointer, error.message);
+                eprintln!("    Schema: {}", error.schema_path);
+            }
+            std::process::exit(1);
+        }
+        Err(e) => {
+            eprintln!("✗ Config validation failed: {}", e);
+            std::process::exit(1);
+        }
+    }
 }
 
 // no-op: exercise replies guard

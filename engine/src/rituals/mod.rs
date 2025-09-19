@@ -80,7 +80,7 @@ impl Engine {
     }
 
     /// Execute a minimal ritual: only a single `task` with `end: true` is supported.
-    pub fn run_from_file(&mut self, path: &str) -> Result<()> {
+    pub async fn run_from_file(&mut self, path: &str) -> Result<()> {
         let text = std::fs::read_to_string(path)
             .with_context(|| format!("reading ritual spec: {path}"))?;
         let spec: RitualSpec =
@@ -155,10 +155,15 @@ impl Engine {
                     );
                 }
 
-                let out = self.router.dispatch(
-                    &action.function_ref.ref_name,
-                    &action.function_ref.arguments,
-                )?;
+                let out = self
+                    .router
+                    .dispatch(
+                        &action.function_ref.ref_name,
+                        &action.function_ref.arguments,
+                        &run_id,
+                        &spec.id,
+                    )
+                    .await?;
                 if !end {
                     warn!(
                         "Milestone 0 only supports single task with end=true; treating as terminal"
@@ -183,7 +188,7 @@ impl Engine {
     /// Execute a minimal ritual and return the result envelope without printing to stdout.
     /// This method is similar to run_from_file but returns the ritual completion event
     /// instead of printing it, allowing the caller to save it or process it further.
-    pub fn run_from_file_with_result(&mut self, path: &str) -> Result<serde_json::Value> {
+    pub async fn run_from_file_with_result(&mut self, path: &str) -> Result<serde_json::Value> {
         let text = std::fs::read_to_string(path)
             .with_context(|| format!("reading ritual spec: {path}"))?;
         let spec: RitualSpec =
@@ -258,10 +263,15 @@ impl Engine {
                     );
                 }
 
-                let out = self.router.dispatch(
-                    &action.function_ref.ref_name,
-                    &action.function_ref.arguments,
-                )?;
+                let out = self
+                    .router
+                    .dispatch(
+                        &action.function_ref.ref_name,
+                        &action.function_ref.arguments,
+                        &run_id,
+                        &spec.id,
+                    )
+                    .await?;
                 if !end {
                     warn!(
                         "Milestone 0 only supports single task with end=true; treating as terminal"

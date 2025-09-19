@@ -56,11 +56,12 @@ fn run_with_save_to_current_dir() {
 
     let mut cmd = Command::cargo_bin("demonctl").unwrap();
 
-    // Get the workspace root before changing directories
+    // Get the workspace root
     let root = workspace_root();
 
-    // Run from temp_dir as current directory
+    // Run from temp_dir as current directory, but set CONTRACTS_DIR to find schemas
     cmd.current_dir(&temp_dir)
+        .env("CONTRACTS_DIR", format!("{}/contracts", root))
         .args([
             "run",
             &format!("{}/examples/rituals/echo.yaml", root),

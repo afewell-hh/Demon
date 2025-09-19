@@ -8,8 +8,15 @@ authors.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 envelope = { path = "../crates/envelope" }
+config-loader = { path = "../crates/config-loader" }
 once_cell = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tracing = { workspace = true }
 capsules_echo = { path = "../capsules/echo" }
+async-nats = { workspace = true }
+tokio = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.8"
