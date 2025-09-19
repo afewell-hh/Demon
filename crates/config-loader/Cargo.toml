@@ -15,6 +15,7 @@ jsonschema.workspace = true
 once_cell.workspace = true
 regex.workspace = true
 tempfile = "3.8"
+dirs = "5.0"
 
 [dev-dependencies]
 tempfile = "3.8"
