@@ -179,6 +179,107 @@ impl Engine {
 
         Ok(())
     }
+
+    /// Execute a minimal ritual and return the result envelope without printing to stdout.
+    /// This method is similar to run_from_file but returns the ritual completion event
+    /// instead of printing it, allowing the caller to save it or process it further.
+    pub fn run_from_file_with_result(&mut self, path: &str) -> Result<serde_json::Value> {
+        let text = std::fs::read_to_string(path)
+            .with_context(|| format!("reading ritual spec: {path}"))?;
+        let spec: RitualSpec =
+            serde_yaml::from_str(&text).with_context(|| "parsing ritual yaml")?;
+
+        let run_id = Uuid::new_v4().to_string();
+        info!(ritual = %spec.id, %run_id, "ritual.start");
+
+        let state = spec
+            .states
+            .first()
+            .context("Milestone 0 expects exactly one state")?;
+        match state {
+            State::Task { action, end, .. } => {
+                // Check policy quota before executing action
+                let tenant_id = "default"; // TODO: Extract from ritual spec or context
+                let capability = &action.function_ref.ref_name;
+
+                // Make policy decision if kernel is configured
+                if let Some(ref mut kernel) = self.policy_kernel {
+                    let decision = kernel.allow_and_count(tenant_id, capability);
+
+                    // Emit policy decision event (to stdout for now)
+                    let policy_event = json!({
+                        "event": "policy.decision:v1",
+                        "ritualId": spec.id,
+                        "runId": run_id,
+                        "ts": chrono::Utc::now().to_rfc3339(),
+                        "tenantId": tenant_id,
+                        "capability": capability,
+                        "decision": {
+                            "allowed": decision.allowed,
+                            "reason": if decision.allowed { null } else { json!("limit_exceeded") }
+                        },
+                        "quota": {
+                            "limit": decision.limit,
+                            "windowSeconds": decision.window_seconds,
+                            "remaining": decision.remaining
+                        }
+                    });
+                    println!("{}", serde_json::to_string_pretty(&policy_event)?);
+
+                    if !decision.allowed {
+                        // Quota exceeded - do not execute action but emit completion with policy denial
+                        warn!(
+                            ritual = %spec.id,
+                            %run_id,
+                            %tenant_id,
+                            %capability,
+                            "ritual denied due to quota limits"
+                        );
+                        let evt = json!({
+                          "event": "ritual.completed:v1",
+                          "ritualId": spec.id,
+                          "runId": run_id,
+                          "ts": chrono::Utc::now().to_rfc3339(),
+                          "outputs": null,
+                          "reason": "policy_denied"
+                        });
+                        info!(ritual = %spec.id, %run_id, "ritual.end");
+                        return Ok(evt);
+                    }
+
+                    info!(
+                        ritual = %spec.id,
+                        %run_id,
+                        %tenant_id,
+                        %capability,
+                        limit = decision.limit,
+                        remaining = decision.remaining,
+                        "policy decision: allowed"
+                    );
+                }
+
+                let out = self.router.dispatch(
+                    &action.function_ref.ref_name,
+                    &action.function_ref.arguments,
+                )?;
+                if !end {
+                    warn!(
+                        "Milestone 0 only supports single task with end=true; treating as terminal"
+                    );
+                }
+                // Return the completion event instead of printing it
+                let evt = json!({
+                  "event": "ritual.completed:v1",
+                  "ritualId": spec.id,
+                  "runId": run_id,
+                  "ts": chrono::Utc::now().to_rfc3339(),
+                  "outputs": out
+                });
+                info!(ritual = %spec.id, %run_id, "ritual.end");
+                Ok(evt)
+            }
+        }
+    }
 }
 
 #[cfg(test)]
