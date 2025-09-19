@@ -1,5 +1,7 @@
 use anyhow::{Context, Result};
-use config_loader::{ConfigError, ConfigManager, ValidationError};
+use config_loader::{
+    ConfigError, ConfigManager, EnvFileSecretProvider, SecretProvider, ValidationError,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -30,17 +32,32 @@ impl Default for EchoConfig {
 
 pub struct Router {
     config_manager: ConfigManager,
+    secret_provider: Box<dyn SecretProvider>,
 }
 
 impl Router {
     pub fn new() -> Self {
         Self {
             config_manager: ConfigManager::new(),
+            secret_provider: Box::new(EnvFileSecretProvider::new()),
         }
     }
 
     pub fn with_config_manager(config_manager: ConfigManager) -> Self {
-        Self { config_manager }
+        Self {
+            config_manager,
+            secret_provider: Box::new(EnvFileSecretProvider::new()),
+        }
+    }
+
+    pub fn with_config_and_secrets<P: SecretProvider + 'static>(
+        config_manager: ConfigManager,
+        secret_provider: P,
+    ) -> Self {
+        Self {
+            config_manager,
+            secret_provider: Box::new(secret_provider),
+        }
     }
 
     /// Dispatch a functionRef by name with JSON arguments and return JSON output.
@@ -81,11 +98,21 @@ impl Router {
         run_id: &str,
         ritual_id: &str,
     ) -> Result<EchoConfig, ConfigError> {
-        match self.config_manager.load::<EchoConfig>(capsule_name) {
+        match self
+            .config_manager
+            .load_with_secrets(capsule_name, self.secret_provider.as_ref())
+        {
             Ok(config) => {
                 // Config is valid, emit policy.decision.allowed
                 if let Err(e) = self
-                    .emit_policy_decision(true, None, run_id, ritual_id, capsule_name)
+                    .emit_policy_decision(
+                        true,
+                        None,
+                        "config_validation_passed",
+                        run_id,
+                        ritual_id,
+                        capsule_name,
+                    )
                     .await
                 {
                     tracing::warn!("Failed to emit policy decision (allowed): {}", e);
@@ -93,16 +120,27 @@ impl Router {
                 Ok(config)
             }
             Err(config_error) => {
-                // Config validation failed, emit policy.decision.denied
-                let error_details = match &config_error {
-                    ConfigError::ValidationFailed { errors } => {
-                        Some(self.format_validation_errors(errors))
+                // Config validation or secret resolution failed, emit policy.decision.denied
+                let (error_details, reason) = match &config_error {
+                    ConfigError::ValidationFailed { errors } => (
+                        Some(self.format_validation_errors(errors)),
+                        "config_validation_failed",
+                    ),
+                    ConfigError::SecretResolutionFailed { error } => {
+                        (Some(error.to_string()), "secret_not_found")
                     }
-                    _ => Some(config_error.to_string()),
+                    _ => (Some(config_error.to_string()), "config_validation_failed"),
                 };
 
                 if let Err(e) = self
-                    .emit_policy_decision(false, error_details, run_id, ritual_id, capsule_name)
+                    .emit_policy_decision(
+                        false,
+                        error_details,
+                        reason,
+                        run_id,
+                        ritual_id,
+                        capsule_name,
+                    )
                     .await
                 {
                     tracing::warn!("Failed to emit policy decision (denied): {}", e);
@@ -116,16 +154,17 @@ impl Router {
         &self,
         allowed: bool,
         error_details: Option<String>,
+        reason: &str,
         run_id: &str,
         ritual_id: &str,
         capability: &str,
     ) -> Result<()> {
         let decision_json = if allowed {
-            json!({ "allowed": true })
+            json!({ "allowed": true, "reason": reason })
         } else {
             json!({
                 "allowed": false,
-                "reason": "config_validation_failed",
+                "reason": reason,
                 "details": error_details.unwrap_or_else(|| "Configuration validation failed".to_string())
             })
         };

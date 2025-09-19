@@ -103,6 +103,9 @@ enum ContractsCommands {
         /// Capsule name for schema selection (auto-detected from filename if not provided)
         #[arg(long)]
         schema: Option<String>,
+        /// Path to secrets file for resolving secret:// URIs
+        #[arg(long)]
+        secrets_file: Option<String>,
     },
 }
 
@@ -483,11 +486,12 @@ async fn handle_contracts_command(cmd: ContractsCommands) -> Result<()> {
             file,
             stdin,
             schema,
+            secrets_file,
         } => {
             if stdin {
-                validate_config_stdin(schema).await?;
+                validate_config_stdin(schema, secrets_file).await?;
             } else if let Some(file_path) = file {
-                validate_config_file(&file_path, schema).await?;
+                validate_config_file(&file_path, schema, secrets_file).await?;
             } else {
                 anyhow::bail!("Must specify either a file path or --stdin");
             }
@@ -664,8 +668,12 @@ async fn validate_envelope_remote_raw(
     Ok(result["valid"].as_bool().unwrap_or(false))
 }
 
-async fn validate_config_file(file_path: &str, schema: Option<String>) -> Result<()> {
-    use config_loader::ConfigManager;
+async fn validate_config_file(
+    file_path: &str,
+    schema: Option<String>,
+    secrets_file: Option<String>,
+) -> Result<()> {
+    use config_loader::{ConfigManager, EnvFileSecretProvider};
     use std::path::Path;
 
     let config_manager = ConfigManager::new();
@@ -691,7 +699,15 @@ async fn validate_config_file(file_path: &str, schema: Option<String>) -> Result
         }
     };
 
-    match config_manager.validate_config_file(&capsule_name, path) {
+    // Create secret provider if secrets file is specified
+    let result = if let Some(secrets_path) = secrets_file {
+        let secret_provider = EnvFileSecretProvider::with_secrets_file(secrets_path);
+        config_manager.validate_config_file_with_secrets(&capsule_name, path, &secret_provider)
+    } else {
+        config_manager.validate_config_file(&capsule_name, path)
+    };
+
+    match result {
         Ok(_) => {
             println!("✓ Valid config for capsule: {}", capsule_name);
             Ok(())
@@ -704,6 +720,13 @@ async fn validate_config_file(file_path: &str, schema: Option<String>) -> Result
             }
             std::process::exit(1);
         }
+        Err(config_loader::ConfigError::SecretResolutionFailed { error }) => {
+            eprintln!(
+                "✗ Secret resolution failed for capsule '{}': {}",
+                capsule_name, error
+            );
+            std::process::exit(1);
+        }
         Err(e) => {
             eprintln!("✗ Config validation failed: {}", e);
             std::process::exit(1);
@@ -711,8 +734,8 @@ async fn validate_config_file(file_path: &str, schema: Option<String>) -> Result
     }
 }
 
-async fn validate_config_stdin(schema: Option<String>) -> Result<()> {
-    use config_loader::ConfigManager;
+async fn validate_config_stdin(schema: Option<String>, secrets_file: Option<String>) -> Result<()> {
+    use config_loader::{ConfigManager, EnvFileSecretProvider};
     use std::io::Read;
 
     let capsule_name =
@@ -723,7 +746,20 @@ async fn validate_config_stdin(schema: Option<String>) -> Result<()> {
     let config_value: serde_json::Value = serde_json::from_str(&buffer)?;
 
     let config_manager = ConfigManager::new();
-    match config_manager.validate_config_value(&capsule_name, &config_value) {
+
+    // Create secret provider if secrets file is specified
+    let result = if let Some(secrets_path) = secrets_file {
+        let secret_provider = EnvFileSecretProvider::with_secrets_file(secrets_path);
+        config_manager.validate_config_value_with_secrets(
+            &capsule_name,
+            &config_value,
+            &secret_provider,
+        )
+    } else {
+        config_manager.validate_config_value(&capsule_name, &config_value)
+    };
+
+    match result {
         Ok(_) => {
             println!("✓ Valid config for capsule: {}", capsule_name);
             Ok(())
@@ -734,6 +770,13 @@ async fn validate_config_stdin(schema: Option<String>) -> Result<()> {
                 eprintln!("  Path {}: {}", error.json_pointer, error.message);
                 eprintln!("    Schema: {}", error.schema_path);
             }
+            std::process::exit(1);
+        }
+        Err(config_loader::ConfigError::SecretResolutionFailed { error }) => {
+            eprintln!(
+                "✗ Secret resolution failed for capsule '{}': {}",
+                capsule_name, error
+            );
             std::process::exit(1);
         }
         Err(e) => {
