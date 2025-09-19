@@ -7,5 +7,9 @@ authors.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+envelope = { path = "../crates/envelope" }
+once_cell = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+tracing = { workspace = true }
 capsules_echo = { path = "../capsules/echo" }

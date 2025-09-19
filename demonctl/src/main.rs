@@ -27,6 +27,11 @@ enum Commands {
         #[arg(long, value_name = "DIR")]
         output_dir: Option<PathBuf>,
     },
+    /// Contract management commands
+    Contracts {
+        #[command(subcommand)]
+        cmd: ContractsCommands,
+    },
     /// Bootstrap Demon prerequisites (self-host v0)
     Bootstrap {
         /// Profile: local-dev (default) or remote-nats
@@ -65,6 +70,28 @@ enum Commands {
     },
     /// Print version and exit
     Version,
+}
+
+#[derive(Subcommand)]
+enum ContractsCommands {
+    /// Validate an envelope against the result envelope schema
+    ValidateEnvelope {
+        /// Path to envelope JSON file (use --stdin to read from stdin)
+        #[arg(value_name = "FILE", conflicts_with = "stdin")]
+        file: Option<String>,
+        /// Read envelope from stdin
+        #[arg(long, conflicts_with = "file")]
+        stdin: bool,
+        /// Use remote registry endpoint instead of local validation
+        #[arg(long)]
+        remote: bool,
+        /// Registry endpoint URL (defaults to http://localhost:8090)
+        #[arg(long, default_value = "http://localhost:8090")]
+        registry_endpoint: String,
+        /// Validate all result.json files in directory (bulk mode)
+        #[arg(long, value_name = "DIR", conflicts_with_all = &["file", "stdin"])]
+        bulk: Option<PathBuf>,
+    },
 }
 
 #[derive(Copy, Clone, Debug, ValueEnum)]
@@ -160,6 +187,9 @@ async fn main() -> Result<()> {
                 verify_only,
             )
             .await?;
+        }
+        Commands::Contracts { cmd } => {
+            handle_contracts_command(cmd).await?;
         }
         Commands::Version => {
             println!("{}", env!("CARGO_PKG_VERSION"));
@@ -416,6 +446,197 @@ fn save_result_envelope(
     info!("Result envelope saved to: {}", result_path.display());
 
     Ok(())
+}
+
+async fn handle_contracts_command(cmd: ContractsCommands) -> Result<()> {
+    match cmd {
+        ContractsCommands::ValidateEnvelope {
+            file,
+            stdin,
+            remote,
+            registry_endpoint,
+            bulk,
+        } => {
+            if let Some(bulk_dir) = bulk {
+                validate_bulk_envelopes(&bulk_dir, remote, &registry_endpoint).await?;
+            } else if stdin {
+                validate_envelope_stdin(remote, &registry_endpoint).await?;
+            } else if let Some(file_path) = file {
+                validate_envelope_file(&file_path, remote, &registry_endpoint).await?;
+            } else {
+                anyhow::bail!("Must specify either a file path, --stdin, or --bulk");
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn validate_envelope_file(
+    file_path: &str,
+    remote: bool,
+    registry_endpoint: &str,
+) -> Result<()> {
+    use envelope::EnvelopeValidator;
+
+    let content = std::fs::read_to_string(file_path)?;
+    let envelope: serde_json::Value = serde_json::from_str(&content)?;
+
+    if remote {
+        validate_envelope_remote(&envelope, registry_endpoint).await
+    } else {
+        let validator = EnvelopeValidator::new()?;
+        match validator.validate_json(&envelope) {
+            Ok(_) => {
+                println!("✓ Valid envelope");
+                Ok(())
+            }
+            Err(e) => {
+                eprintln!("✗ Invalid envelope:");
+                eprintln!("  {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
+}
+
+async fn validate_envelope_stdin(remote: bool, registry_endpoint: &str) -> Result<()> {
+    use envelope::EnvelopeValidator;
+    use std::io::Read;
+
+    let mut buffer = String::new();
+    std::io::stdin().read_to_string(&mut buffer)?;
+    let envelope: serde_json::Value = serde_json::from_str(&buffer)?;
+
+    if remote {
+        validate_envelope_remote(&envelope, registry_endpoint).await
+    } else {
+        let validator = EnvelopeValidator::new()?;
+        match validator.validate_json(&envelope) {
+            Ok(_) => {
+                println!("✓ Valid envelope");
+                Ok(())
+            }
+            Err(e) => {
+                eprintln!("✗ Invalid envelope:");
+                eprintln!("  {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
+}
+
+async fn validate_bulk_envelopes(
+    dir: &PathBuf,
+    remote: bool,
+    registry_endpoint: &str,
+) -> Result<()> {
+    use envelope::EnvelopeValidator;
+    use std::fs;
+
+    let entries = fs::read_dir(dir)?;
+    let mut results = Vec::new();
+
+    let validator = if !remote {
+        Some(EnvelopeValidator::new()?)
+    } else {
+        None
+    };
+
+    for entry in entries {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_file() && path.file_name() == Some(std::ffi::OsStr::new("result.json")) {
+            let content = fs::read_to_string(&path)?;
+            let envelope: serde_json::Value = match serde_json::from_str(&content) {
+                Ok(v) => v,
+                Err(e) => {
+                    results.push((path, false, format!("JSON parse error: {}", e)));
+                    continue;
+                }
+            };
+
+            if remote {
+                match validate_envelope_remote_raw(&envelope, registry_endpoint).await {
+                    Ok(valid) => results.push((path, valid, String::new())),
+                    Err(e) => results.push((path, false, e.to_string())),
+                }
+            } else if let Some(ref v) = validator {
+                match v.validate_json(&envelope) {
+                    Ok(_) => results.push((path, true, String::new())),
+                    Err(e) => results.push((path, false, e.to_string())),
+                }
+            }
+        }
+    }
+
+    let valid_count = results.iter().filter(|(_, valid, _)| *valid).count();
+    let invalid_count = results.len() - valid_count;
+
+    println!("Validation Results:");
+    println!("  Valid: {}", valid_count);
+    println!("  Invalid: {}", invalid_count);
+
+    if invalid_count > 0 {
+        println!("\nInvalid envelopes:");
+        for (path, valid, error) in &results {
+            if !valid {
+                println!("  ✗ {}: {}", path.display(), error);
+            }
+        }
+        std::process::exit(1);
+    } else {
+        println!("\n✓ All envelopes valid");
+    }
+
+    Ok(())
+}
+
+async fn validate_envelope_remote(
+    envelope: &serde_json::Value,
+    registry_endpoint: &str,
+) -> Result<()> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/api/contracts/validate/envelope", registry_endpoint);
+
+    let response = client.post(&url).json(envelope).send().await?;
+
+    if !response.status().is_success() {
+        anyhow::bail!("Registry returned error: {}", response.status());
+    }
+
+    let result: serde_json::Value = response.json().await?;
+
+    if result["valid"].as_bool().unwrap_or(false) {
+        println!("✓ Valid envelope");
+        Ok(())
+    } else {
+        eprintln!("✗ Invalid envelope:");
+        if let Some(errors) = result["errors"].as_array() {
+            for error in errors {
+                let path = error["path"].as_str().unwrap_or("");
+                let message = error["message"].as_str().unwrap_or("Unknown error");
+                eprintln!("  {} at {}", message, path);
+            }
+        }
+        std::process::exit(1);
+    }
+}
+
+async fn validate_envelope_remote_raw(
+    envelope: &serde_json::Value,
+    registry_endpoint: &str,
+) -> Result<bool> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/api/contracts/validate/envelope", registry_endpoint);
+
+    let response = client.post(&url).json(envelope).send().await?;
+
+    if !response.status().is_success() {
+        anyhow::bail!("Registry returned error: {}", response.status());
+    }
+
+    let result: serde_json::Value = response.json().await?;
+    Ok(result["valid"].as_bool().unwrap_or(false))
 }
 
 // no-op: exercise replies guard

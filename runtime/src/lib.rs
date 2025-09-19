@@ -1,2 +1,2 @@
+pub mod contracts;
 pub mod link;
-// guard: second no-op
