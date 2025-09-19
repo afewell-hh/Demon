@@ -8,7 +8,9 @@ use thiserror::Error;
 use tracing::{debug, instrument};
 
 pub mod secrets;
+pub mod secrets_store;
 pub use secrets::{EnvFileSecretProvider, SecretError, SecretProvider};
+pub use secrets_store::{SecretsStore, StoreError};
 
 #[derive(Error, Debug)]
 pub enum ConfigError {
