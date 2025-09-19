@@ -1,0 +1,6 @@
+{
+  "messagePrefix": "Echo: ",
+  "enableTrim": "not_a_boolean",
+  "maxMessageLength": "not_a_number",
+  "outputFormat": "invalid_format"
+}

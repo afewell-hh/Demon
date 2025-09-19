@@ -1,0 +1,6 @@
+{
+  "messagePrefix": "Echo: ",
+  "enableTrim": true,
+  "maxMessageLength": 500,
+  "outputFormat": "plain"
+}
