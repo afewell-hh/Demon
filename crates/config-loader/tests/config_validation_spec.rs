@@ -135,10 +135,24 @@ fn given_nonexistent_config_file_when_load_then_file_not_found_error() {
     let (_temp_dir, manager) = setup_test_environment();
 
     let result: Result<EchoConfig, ConfigError> = manager.load("nonexistent");
-    assert!(matches!(
-        result,
-        Err(ConfigError::ConfigFileNotFound { .. })
-    ));
+    // This should fail with SchemaNotFound since there's no schema for "nonexistent" capsule
+    assert!(matches!(result, Err(ConfigError::SchemaNotFound { .. })));
+}
+
+#[test]
+fn given_missing_config_file_with_valid_schema_when_load_then_uses_defaults() {
+    let (_temp_dir, manager) = setup_test_environment();
+
+    // Don't create a config file for echo, but the schema exists
+    let result: Result<EchoConfig, ConfigError> = manager.load("echo");
+
+    // Should succeed and load defaults from schema
+    assert!(result.is_ok());
+    let config = result.unwrap();
+    assert_eq!(config.message_prefix, "");
+    assert!(config.enable_trim);
+    assert_eq!(config.max_message_length, Some(1000));
+    assert_eq!(config.output_format, Some("plain".to_string()));
 }
 
 #[test]

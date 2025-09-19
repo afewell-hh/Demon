@@ -64,6 +64,15 @@ impl ConfigManager {
     }
 
     fn find_contracts_dir() -> Option<PathBuf> {
+        // Check environment variable first
+        if let Ok(contracts_dir) = std::env::var("CONTRACTS_DIR") {
+            let path = PathBuf::from(contracts_dir);
+            if path.is_dir() {
+                return Some(path);
+            }
+        }
+
+        // Fall back to searching up the directory tree
         let mut current = std::env::current_dir().ok()?;
         loop {
             let contracts_path = current.join("contracts");
@@ -110,6 +119,12 @@ impl ConfigManager {
             config_path, capsule
         );
 
+        if !config_path.exists() {
+            return Err(ConfigError::ConfigFileNotFound {
+                path: config_path.to_string_lossy().to_string(),
+            });
+        }
+
         let config_content = fs::read_to_string(config_path).map_err(|e| ConfigError::IoError {
             message: format!("Failed to read config file: {}", e),
         })?;
@@ -137,9 +152,8 @@ impl ConfigManager {
         debug!("Loading config from: {:?}", config_path);
 
         if !config_path.exists() {
-            return Err(ConfigError::ConfigFileNotFound {
-                path: config_path.to_string_lossy().to_string(),
-            });
+            debug!("Config file not found, loading defaults from schema");
+            return self.load_default_config(link_name);
         }
 
         let content = fs::read_to_string(&config_path).map_err(|e| ConfigError::IoError {
@@ -149,6 +163,50 @@ impl ConfigManager {
         serde_json::from_str(&content).map_err(|e| ConfigError::JsonParsingFailed {
             message: e.to_string(),
         })
+    }
+
+    fn load_default_config(&self, link_name: &str) -> Result<Value, ConfigError> {
+        // Load the schema to extract defaults
+        let schema_path = self
+            .contracts_dir
+            .join("config")
+            .join(format!("{}-config.v1.json", link_name));
+
+        if !schema_path.exists() {
+            return Err(ConfigError::SchemaNotFound {
+                capsule: link_name.to_string(),
+            });
+        }
+
+        let schema_content =
+            fs::read_to_string(&schema_path).map_err(|e| ConfigError::IoError {
+                message: format!("Failed to read schema file: {}", e),
+            })?;
+
+        let schema_value: Value =
+            serde_json::from_str(&schema_content).map_err(|e| ConfigError::JsonParsingFailed {
+                message: e.to_string(),
+            })?;
+
+        // Extract defaults from schema properties
+        let mut default_config = serde_json::Map::new();
+
+        if let Some(properties) = schema_value.get("properties").and_then(|p| p.as_object()) {
+            for (key, property) in properties {
+                if let Some(default_value) = property.get("default") {
+                    default_config.insert(key.clone(), default_value.clone());
+                }
+            }
+        }
+
+        let default_config_value = Value::Object(default_config);
+
+        // Validate that the default config is valid according to the schema
+        // This ensures the schema defaults work correctly
+        self.validate_config(link_name, &default_config_value)?;
+
+        debug!("Loaded default config: {}", default_config_value);
+        Ok(default_config_value)
     }
 
     fn validate_config(&self, capsule: &str, config: &Value) -> Result<(), ConfigError> {
@@ -244,10 +302,10 @@ mod tests {
             "$schema": "http://json-schema.org/draft-07/schema#",
             "type": "object",
             "properties": {
-                "messagePrefix": { "type": "string" },
-                "enableTrim": { "type": "boolean" },
-                "maxMessageLength": { "type": "integer", "minimum": 1 },
-                "outputFormat": { "type": "string", "enum": ["plain", "json", "structured"] }
+                "messagePrefix": { "type": "string", "default": "" },
+                "enableTrim": { "type": "boolean", "default": true },
+                "maxMessageLength": { "type": "integer", "minimum": 1, "default": 1000 },
+                "outputFormat": { "type": "string", "enum": ["plain", "json", "structured"], "default": "plain" }
             },
             "required": ["messagePrefix", "enableTrim"],
             "additionalProperties": false
@@ -318,5 +376,33 @@ mod tests {
 
         fs::write(&config_path, invalid_config).unwrap();
         assert!(manager.validate_config_file("echo", &config_path).is_err());
+    }
+
+    #[test]
+    fn test_load_missing_config_uses_defaults() {
+        let (_temp_dir, manager) = setup_test_env();
+
+        // Don't create a config file - should load defaults from schema
+        let config: EchoConfig = manager.load("echo").unwrap();
+
+        // Should get the defaults from the schema
+        assert_eq!(config.message_prefix, "");
+        assert!(config.enable_trim);
+        assert_eq!(config.max_message_length, Some(1000));
+        assert_eq!(config.output_format, Some("plain".to_string()));
+    }
+
+    #[test]
+    fn test_validate_config_file_missing_still_fails() {
+        let (_temp_dir, manager) = setup_test_env();
+
+        let missing_path = manager.config_dir.join("missing.json");
+        let result = manager.validate_config_file("echo", &missing_path);
+
+        // Explicit file validation should still fail for missing files
+        assert!(matches!(
+            result,
+            Err(ConfigError::ConfigFileNotFound { .. })
+        ));
     }
 }

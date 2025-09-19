@@ -131,7 +131,7 @@ async fn given_invalid_config_when_dispatch_echo_then_config_validation_failure(
 }
 
 #[tokio::test]
-async fn given_missing_config_when_dispatch_echo_then_config_not_found_error() {
+async fn given_missing_config_when_dispatch_echo_then_uses_defaults() {
     let temp_dir = TempDir::new().unwrap();
     let contracts_dir = temp_dir.path().join("contracts");
     let config_dir = temp_dir.path().join("config");
@@ -139,15 +139,36 @@ async fn given_missing_config_when_dispatch_echo_then_config_not_found_error() {
     fs::create_dir_all(contracts_dir.join("config")).unwrap();
     fs::create_dir_all(&config_dir).unwrap();
 
-    // Create echo config schema but no config file
+    // Create echo config schema with defaults but no config file
     let schema_content = r#"{
         "$schema": "http://json-schema.org/draft-07/schema#",
-        "$id": "echo-config.v1.json",
         "title": "Echo Capsule Configuration",
+        "description": "Configuration schema for the echo capsule",
         "type": "object",
         "properties": {
-            "messagePrefix": { "type": "string" },
-            "enableTrim": { "type": "boolean" }
+            "messagePrefix": {
+                "type": "string",
+                "description": "Prefix to add to echoed messages",
+                "default": ""
+            },
+            "enableTrim": {
+                "type": "boolean",
+                "description": "Whether to trim whitespace from messages",
+                "default": true
+            },
+            "maxMessageLength": {
+                "type": "integer",
+                "description": "Maximum length of messages to process",
+                "minimum": 1,
+                "maximum": 10000,
+                "default": 1000
+            },
+            "outputFormat": {
+                "type": "string",
+                "description": "Format for output messages",
+                "enum": ["plain", "json", "structured"],
+                "default": "plain"
+            }
         },
         "required": ["messagePrefix", "enableTrim"],
         "additionalProperties": false
@@ -170,10 +191,26 @@ async fn given_missing_config_when_dispatch_echo_then_config_not_found_error() {
         .dispatch("echo", &args, "test-run", "test-ritual")
         .await;
 
-    // Should fail due to missing config file
-    assert!(result.is_err());
-    let error_msg = result.unwrap_err().to_string();
-    assert!(error_msg.contains("Configuration validation failed"));
+    match result {
+        Ok(envelope_json) => {
+            // Verify that we got a valid result envelope
+            assert!(envelope_json.is_object());
+            let envelope = envelope_json.as_object().unwrap();
+            assert!(envelope.contains_key("result"));
+        }
+        Err(e) => {
+            // If NATS is not available, we might get a connection error
+            // In that case, we verify the error is related to NATS, not config validation
+            let error_msg = e.to_string();
+            assert!(
+                error_msg.contains("Failed to connect to NATS")
+                    || error_msg.contains("connection refused")
+                    || error_msg.contains("Connect"),
+                "Unexpected error: {}",
+                error_msg
+            );
+        }
+    }
 }
 
 #[tokio::test]
