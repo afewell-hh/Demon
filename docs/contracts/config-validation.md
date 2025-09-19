@@ -383,3 +383,111 @@ manager.validate_config_value_with_secrets("echo", &config_with_secrets, &secret
    - Use clear, consistent naming for secret scopes and keys
    - Test secret resolution failures in your test suite
    - Never log or expose resolved secret values
+
+## Managing Secrets with CLI
+
+The `demonctl secrets` command provides tools for managing capsule secrets through the command line. This is the recommended way to set up secrets for development and testing.
+
+### Setting Secrets
+
+```bash
+# Set a secret value
+demonctl secrets set database/password my_secret_value
+
+# Set from environment variable (avoids shell history)
+export DB_PASS="secret123"
+demonctl secrets set database/password --from-env DB_PASS
+
+# Set from stdin (for scripting)
+echo "secret_value" | demonctl secrets set api/key --stdin
+
+# Use custom secrets file location
+demonctl secrets set app/token secret123 --secrets-file /path/to/secrets.json
+```
+
+### Getting Secrets
+
+```bash
+# Get redacted secret (default behavior)
+demonctl secrets get database/password
+# Output: database/password: my_***
+
+# Get raw secret value
+demonctl secrets get database/password --raw
+# Output: my_secret_value
+
+# Use custom secrets file
+demonctl secrets get api/key --secrets-file /path/to/secrets.json
+```
+
+### Listing Secrets
+
+```bash
+# List all secrets (redacted)
+demonctl secrets list
+
+# List secrets for specific scope
+demonctl secrets list --scope database
+
+# Use custom secrets file
+demonctl secrets list --secrets-file /path/to/secrets.json
+```
+
+### Deleting Secrets
+
+```bash
+# Delete a secret
+demonctl secrets delete database/password
+
+# Use custom secrets file
+demonctl secrets delete api/key --secrets-file /path/to/secrets.json
+```
+
+### Security Best Practices
+
+1. **File Permissions**: The CLI automatically sets secrets files to mode 0600 (owner read/write only) on Unix systems
+2. **Avoid Shell History**: Use `--from-env` or `--stdin` flags instead of passing secrets as command arguments
+3. **Custom Location**: Use `CONFIG_SECRETS_FILE` environment variable or `--secrets-file` flag to store secrets outside the project directory
+4. **Raw Access**: Only use `--raw` flag when necessary, as it bypasses redaction
+
+### Integration Example
+
+```bash
+# Set up secrets for echo capsule
+demonctl secrets set echo/api_key your_api_key_here
+demonctl secrets set echo/prefix "Secret: "
+
+# Create config file using secret URIs
+cat > .demon/config/echo.json << EOF
+{
+  "messagePrefix": "secret://echo/prefix",
+  "enableTrim": true,
+  "apiKey": "secret://echo/api_key"
+}
+EOF
+
+# Validate config with secrets
+demonctl contracts validate-config .demon/config/echo.json --secrets-file .demon/secrets.json
+
+# Run ritual (secrets automatically resolved)
+demonctl run examples/rituals/echo.yaml
+```
+
+### File Format
+
+The secrets file uses the same JSON format as the `EnvFileSecretProvider`:
+
+```json
+{
+  "database": {
+    "password": "super_secret_password",
+    "connection_string": "postgresql://user:pass@host:5432/db"
+  },
+  "api": {
+    "key": "sk-abcd1234",
+    "secret": "secret_token"
+  }
+}
+```
+
+This format is compatible with all existing secret resolution functionality in the runtime.

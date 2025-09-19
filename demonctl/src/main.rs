@@ -32,6 +32,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: ContractsCommands,
     },
+    /// Manage secrets for capsules
+    Secrets {
+        #[command(subcommand)]
+        cmd: SecretsCommands,
+    },
     /// Bootstrap Demon prerequisites (self-host v0)
     Bootstrap {
         /// Profile: local-dev (default) or remote-nats
@@ -70,6 +75,62 @@ enum Commands {
     },
     /// Print version and exit
     Version,
+}
+
+#[derive(Subcommand)]
+enum SecretsCommands {
+    /// Set a secret value
+    Set {
+        /// Scope and key in format: scope/key
+        #[arg(value_name = "SCOPE/KEY")]
+        key_path: String,
+        /// Secret value (use --from-env to read from environment variable)
+        #[arg(
+            value_name = "VALUE",
+            conflicts_with = "from_env",
+            required_unless_present = "from_env"
+        )]
+        value: Option<String>,
+        /// Read value from environment variable
+        #[arg(long, conflicts_with = "value")]
+        from_env: Option<String>,
+        /// Read value from stdin
+        #[arg(long, conflicts_with_all = &["value", "from_env"])]
+        stdin: bool,
+        /// Path to secrets file (defaults to CONFIG_SECRETS_FILE or .demon/secrets.json)
+        #[arg(long)]
+        secrets_file: Option<String>,
+    },
+    /// Get a secret value
+    Get {
+        /// Scope and key in format: scope/key
+        #[arg(value_name = "SCOPE/KEY")]
+        key_path: String,
+        /// Output raw value without redaction
+        #[arg(long)]
+        raw: bool,
+        /// Path to secrets file (defaults to CONFIG_SECRETS_FILE or .demon/secrets.json)
+        #[arg(long)]
+        secrets_file: Option<String>,
+    },
+    /// List secrets
+    List {
+        /// Filter by scope
+        #[arg(long)]
+        scope: Option<String>,
+        /// Path to secrets file (defaults to CONFIG_SECRETS_FILE or .demon/secrets.json)
+        #[arg(long)]
+        secrets_file: Option<String>,
+    },
+    /// Delete a secret
+    Delete {
+        /// Scope and key in format: scope/key
+        #[arg(value_name = "SCOPE/KEY")]
+        key_path: String,
+        /// Path to secrets file (defaults to CONFIG_SECRETS_FILE or .demon/secrets.json)
+        #[arg(long)]
+        secrets_file: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -205,6 +266,9 @@ async fn main() -> Result<()> {
         }
         Commands::Contracts { cmd } => {
             handle_contracts_command(cmd).await?;
+        }
+        Commands::Secrets { cmd } => {
+            handle_secrets_command(cmd)?;
         }
         Commands::Version => {
             println!("{}", env!("CARGO_PKG_VERSION"));
@@ -784,6 +848,119 @@ async fn validate_config_stdin(schema: Option<String>, secrets_file: Option<Stri
             std::process::exit(1);
         }
     }
+}
+
+fn handle_secrets_command(cmd: SecretsCommands) -> Result<()> {
+    use config_loader::{secrets_store, SecretsStore};
+    use std::io::Read;
+
+    match cmd {
+        SecretsCommands::Set {
+            key_path,
+            value,
+            from_env,
+            stdin,
+            secrets_file,
+        } => {
+            let store = if let Some(path) = secrets_file {
+                SecretsStore::new(path)
+            } else {
+                SecretsStore::default_location()
+            };
+
+            let (scope, key) = SecretsStore::parse_scope_key(&key_path)?;
+
+            let secret_value = if stdin {
+                let mut buffer = String::new();
+                std::io::stdin().read_to_string(&mut buffer)?;
+                buffer.trim().to_string()
+            } else if let Some(env_var) = from_env {
+                std::env::var(&env_var)
+                    .map_err(|_| anyhow::anyhow!("Environment variable {} not found", env_var))?
+            } else {
+                value.ok_or_else(|| anyhow::anyhow!("No value provided"))?
+            };
+
+            store.set(&scope, &key, &secret_value)?;
+
+            #[cfg(unix)]
+            store.check_permissions()?;
+
+            println!("✓ Secret {}/{} set successfully", scope, key);
+            println!("  Stored in: {}", store.path().display());
+        }
+        SecretsCommands::Get {
+            key_path,
+            raw,
+            secrets_file,
+        } => {
+            let store = if let Some(path) = secrets_file {
+                SecretsStore::new(path)
+            } else {
+                SecretsStore::default_location()
+            };
+
+            let (scope, key) = SecretsStore::parse_scope_key(&key_path)?;
+            let value = store.get(&scope, &key)?;
+
+            if raw {
+                println!("{}", value);
+            } else {
+                println!("{}/{}: {}", scope, key, secrets_store::redact_value(&value));
+            }
+        }
+        SecretsCommands::List {
+            scope,
+            secrets_file,
+        } => {
+            let store = if let Some(path) = secrets_file {
+                SecretsStore::new(path)
+            } else {
+                SecretsStore::default_location()
+            };
+
+            if let Some(scope_filter) = scope {
+                let secrets = store.list_scope(&scope_filter)?;
+                if secrets.is_empty() {
+                    println!("No secrets found for scope: {}", scope_filter);
+                } else {
+                    println!("Secrets in scope '{}':", scope_filter);
+                    for (key, value) in secrets {
+                        println!("  {}: {}", key, value);
+                    }
+                }
+            } else {
+                let all_secrets = store.list()?;
+                if all_secrets.is_empty() {
+                    println!("No secrets found");
+                } else {
+                    println!("Secrets:");
+                    for (scope, secrets) in all_secrets {
+                        println!("  {}:", scope);
+                        for (key, value) in secrets {
+                            println!("    {}: {}", key, value);
+                        }
+                    }
+                }
+            }
+        }
+        SecretsCommands::Delete {
+            key_path,
+            secrets_file,
+        } => {
+            let store = if let Some(path) = secrets_file {
+                SecretsStore::new(path)
+            } else {
+                SecretsStore::default_location()
+            };
+
+            let (scope, key) = SecretsStore::parse_scope_key(&key_path)?;
+            store.delete(&scope, &key)?;
+            println!("✓ Secret {}/{} deleted", scope, key);
+        }
+    }
+
+    Ok(())
 }
 
 // no-op: exercise replies guard
