@@ -1,4 +1,5 @@
 use assert_cmd::Command;
+use predicates::prelude::*;
 use serde_json::json;
 use std::fs;
 use tempfile::TempDir;
@@ -18,7 +19,7 @@ fn given_valid_envelope_file_when_validate_then_exits_successfully() {
     fs::write(&file_path, serde_json::to_string(&envelope).unwrap()).unwrap();
 
     let mut cmd = Command::cargo_bin("demonctl").unwrap();
-    cmd.args(&[
+    cmd.args([
         "contracts",
         "validate-envelope",
         file_path.to_str().unwrap(),
@@ -40,7 +41,7 @@ fn given_invalid_envelope_file_when_validate_then_exits_with_error() {
     fs::write(&file_path, serde_json::to_string(&envelope).unwrap()).unwrap();
 
     let mut cmd = Command::cargo_bin("demonctl").unwrap();
-    cmd.args(&[
+    cmd.args([
         "contracts",
         "validate-envelope",
         file_path.to_str().unwrap(),
@@ -60,7 +61,7 @@ fn given_valid_envelope_on_stdin_when_validate_then_exits_successfully() {
     });
 
     let mut cmd = Command::cargo_bin("demonctl").unwrap();
-    cmd.args(&["contracts", "validate-envelope", "--stdin"])
+    cmd.args(["contracts", "validate-envelope", "--stdin"])
         .write_stdin(serde_json::to_string(&envelope).unwrap())
         .assert()
         .success()
@@ -83,7 +84,7 @@ fn given_invalid_envelope_on_stdin_when_validate_then_exits_with_error() {
     });
 
     let mut cmd = Command::cargo_bin("demonctl").unwrap();
-    cmd.args(&["contracts", "validate-envelope", "--stdin"])
+    cmd.args(["contracts", "validate-envelope", "--stdin"])
         .write_stdin(serde_json::to_string(&envelope).unwrap())
         .assert()
         .failure()
@@ -120,7 +121,7 @@ fn given_directory_with_result_files_when_bulk_validate_then_processes_all() {
     .unwrap();
 
     let mut cmd = Command::cargo_bin("demonctl").unwrap();
-    cmd.args(&[
+    cmd.args([
         "contracts",
         "validate-envelope",
         "--bulk",
@@ -134,7 +135,7 @@ fn given_directory_with_result_files_when_bulk_validate_then_processes_all() {
 #[test]
 fn given_no_input_specified_when_validate_then_exits_with_error() {
     let mut cmd = Command::cargo_bin("demonctl").unwrap();
-    cmd.args(&["contracts", "validate-envelope"])
+    cmd.args(["contracts", "validate-envelope"])
         .assert()
         .failure()
         .stderr(predicates::str::contains("Must specify"));
