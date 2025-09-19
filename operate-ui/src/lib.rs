@@ -1,5 +1,6 @@
 // Library interface for operate-ui
 
+pub mod contracts;
 pub mod jetstream;
 pub mod routes;
 
@@ -283,6 +284,15 @@ async fn handle_static_file_error() -> impl IntoResponse {
 pub fn create_app(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
+        // Contract validation endpoints
+        .route(
+            "/api/contracts/validate/envelope",
+            post(contracts::validate_envelope_endpoint),
+        )
+        .route(
+            "/api/contracts/validate/envelope/bulk",
+            post(contracts::validate_envelope_bulk_endpoint),
+        )
         // Legacy routes (redirect to default tenant)
         .route("/runs", get(routes::list_runs_html))
         .route("/runs/:run_id", get(routes::get_run_html))

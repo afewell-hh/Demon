@@ -7,6 +7,7 @@ authors.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+runtime = { path = "../runtime" }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 tokio.workspace = true
@@ -33,3 +34,4 @@ reqwest = { version = "0.11", default-features = false, features = ["json", "rus
 [dev-dependencies]
 tempfile = "3"
 tower = "0.4"
+axum-test = "14.0"
