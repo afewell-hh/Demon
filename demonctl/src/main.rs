@@ -88,7 +88,7 @@ enum SecretsCommands {
         #[arg(
             value_name = "VALUE",
             conflicts_with = "from_env",
-            required_unless_present = "from_env"
+            required_unless_present_any = ["from_env", "stdin"]
         )]
         value: Option<String>,
         /// Read value from environment variable
