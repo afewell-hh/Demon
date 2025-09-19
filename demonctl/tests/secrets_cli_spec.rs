@@ -17,7 +17,7 @@ fn test_secrets_set_get_delete_flow() -> Result<()> {
 
     // Set a secret
     Command::cargo_bin("demonctl")?
-        .args(&["secrets", "set", "database/password", "secretvalue123"])
+        .args(["secrets", "set", "database/password", "secretvalue123"])
         .arg("--secrets-file")
         .arg(&secrets_file)
         .assert()
@@ -28,7 +28,7 @@ fn test_secrets_set_get_delete_flow() -> Result<()> {
 
     // Get the secret (redacted)
     Command::cargo_bin("demonctl")?
-        .args(&["secrets", "get", "database/password"])
+        .args(["secrets", "get", "database/password"])
         .arg("--secrets-file")
         .arg(&secrets_file)
         .assert()
@@ -37,7 +37,7 @@ fn test_secrets_set_get_delete_flow() -> Result<()> {
 
     // Get the secret (raw)
     Command::cargo_bin("demonctl")?
-        .args(&["secrets", "get", "database/password", "--raw"])
+        .args(["secrets", "get", "database/password", "--raw"])
         .arg("--secrets-file")
         .arg(&secrets_file)
         .assert()
@@ -48,7 +48,7 @@ fn test_secrets_set_get_delete_flow() -> Result<()> {
 
     // Delete the secret
     Command::cargo_bin("demonctl")?
-        .args(&["secrets", "delete", "database/password"])
+        .args(["secrets", "delete", "database/password"])
         .arg("--secrets-file")
         .arg(&secrets_file)
         .assert()
@@ -57,7 +57,7 @@ fn test_secrets_set_get_delete_flow() -> Result<()> {
 
     // Try to get deleted secret (should fail)
     Command::cargo_bin("demonctl")?
-        .args(&["secrets", "get", "database/password"])
+        .args(["secrets", "get", "database/password"])
         .arg("--secrets-file")
         .arg(&secrets_file)
         .assert()
@@ -74,7 +74,7 @@ fn test_secrets_set_from_env() -> Result<()> {
     std::env::set_var("TEST_SECRET_VALUE", "env_secret_123");
 
     Command::cargo_bin("demonctl")?
-        .args(&[
+        .args([
             "secrets",
             "set",
             "api/token",
@@ -91,7 +91,7 @@ fn test_secrets_set_from_env() -> Result<()> {
 
     // Verify it was set correctly
     Command::cargo_bin("demonctl")?
-        .args(&["secrets", "get", "api/token", "--raw"])
+        .args(["secrets", "get", "api/token", "--raw"])
         .arg("--secrets-file")
         .arg(&secrets_file)
         .assert()
@@ -108,21 +108,21 @@ fn test_secrets_list() -> Result<()> {
 
     // Set multiple secrets
     Command::cargo_bin("demonctl")?
-        .args(&["secrets", "set", "database/password", "dbpass123"])
+        .args(["secrets", "set", "database/password", "dbpass123"])
         .arg("--secrets-file")
         .arg(&secrets_file)
         .assert()
         .success();
 
     Command::cargo_bin("demonctl")?
-        .args(&["secrets", "set", "database/username", "admin"])
+        .args(["secrets", "set", "database/username", "admin"])
         .arg("--secrets-file")
         .arg(&secrets_file)
         .assert()
         .success();
 
     Command::cargo_bin("demonctl")?
-        .args(&["secrets", "set", "api/key", "apikey456"])
+        .args(["secrets", "set", "api/key", "apikey456"])
         .arg("--secrets-file")
         .arg(&secrets_file)
         .assert()
@@ -130,7 +130,7 @@ fn test_secrets_list() -> Result<()> {
 
     // List all secrets
     Command::cargo_bin("demonctl")?
-        .args(&["secrets", "list"])
+        .args(["secrets", "list"])
         .arg("--secrets-file")
         .arg(&secrets_file)
         .assert()
@@ -145,7 +145,7 @@ fn test_secrets_list() -> Result<()> {
 
     // List by scope
     Command::cargo_bin("demonctl")?
-        .args(&["secrets", "list", "--scope", "database"])
+        .args(["secrets", "list", "--scope", "database"])
         .arg("--secrets-file")
         .arg(&secrets_file)
         .assert()
@@ -165,7 +165,7 @@ fn test_secrets_invalid_format() -> Result<()> {
 
     // Invalid format (no slash)
     Command::cargo_bin("demonctl")?
-        .args(&["secrets", "set", "invalidkey", "value"])
+        .args(["secrets", "set", "invalidkey", "value"])
         .arg("--secrets-file")
         .arg(&secrets_file)
         .assert()
@@ -174,7 +174,7 @@ fn test_secrets_invalid_format() -> Result<()> {
 
     // Invalid format (empty scope)
     Command::cargo_bin("demonctl")?
-        .args(&["secrets", "set", "/key", "value"])
+        .args(["secrets", "set", "/key", "value"])
         .arg("--secrets-file")
         .arg(&secrets_file)
         .assert()
@@ -183,7 +183,7 @@ fn test_secrets_invalid_format() -> Result<()> {
 
     // Invalid format (empty key)
     Command::cargo_bin("demonctl")?
-        .args(&["secrets", "set", "scope/", "value"])
+        .args(["secrets", "set", "scope/", "value"])
         .arg("--secrets-file")
         .arg(&secrets_file)
         .assert()
@@ -199,14 +199,14 @@ fn test_secrets_file_format() -> Result<()> {
 
     // Set some secrets
     Command::cargo_bin("demonctl")?
-        .args(&["secrets", "set", "echo/api_key", "echo123"])
+        .args(["secrets", "set", "echo/api_key", "echo123"])
         .arg("--secrets-file")
         .arg(&secrets_file)
         .assert()
         .success();
 
     Command::cargo_bin("demonctl")?
-        .args(&[
+        .args([
             "secrets",
             "set",
             "database/connection",
@@ -234,7 +234,7 @@ fn test_secrets_empty_list() -> Result<()> {
     let (_temp_dir, secrets_file) = setup_test_env();
 
     Command::cargo_bin("demonctl")?
-        .args(&["secrets", "list"])
+        .args(["secrets", "list"])
         .arg("--secrets-file")
         .arg(&secrets_file)
         .assert()
@@ -249,7 +249,7 @@ fn test_secrets_delete_nonexistent() -> Result<()> {
     let (_temp_dir, secrets_file) = setup_test_env();
 
     Command::cargo_bin("demonctl")?
-        .args(&["secrets", "delete", "nonexistent/key"])
+        .args(["secrets", "delete", "nonexistent/key"])
         .arg("--secrets-file")
         .arg(&secrets_file)
         .assert()
@@ -274,7 +274,7 @@ fn test_secrets_integration_with_config_validation() -> Result<()> {
 
     // Set the secret using our CLI
     Command::cargo_bin("demonctl")?
-        .args(&["secrets", "set", "echo/prefix", "Test Secret: "])
+        .args(["secrets", "set", "echo/prefix", "Test Secret: "])
         .arg("--secrets-file")
         .arg(secrets_file.to_str().unwrap())
         .assert()
@@ -284,7 +284,7 @@ fn test_secrets_integration_with_config_validation() -> Result<()> {
     // Note: This assumes the echo schema exists in contracts/config/
     // We'll just verify the command structure is correct
     let result = Command::cargo_bin("demonctl")?
-        .args(&["contracts", "validate-config"])
+        .args(["contracts", "validate-config"])
         .arg(config_file.to_str().unwrap())
         .arg("--schema")
         .arg("echo")

@@ -290,10 +290,12 @@ impl SecretsStore {
 
 /// Redact a secret value for display
 pub fn redact_value(value: &str) -> String {
-    if value.len() <= 6 {
+    let char_count = value.chars().count();
+    if char_count <= 6 {
         "***".to_string()
     } else {
-        format!("{}***", &value[..3])
+        let prefix: String = value.chars().take(3).collect();
+        format!("{}***", prefix)
     }
 }
 
@@ -400,5 +402,17 @@ mod tests {
         assert_eq!(redact_value("abc"), "***");
         assert_eq!(redact_value("secret"), "***");
         assert_eq!(redact_value("verylongsecret"), "ver***");
+    }
+
+    #[test]
+    fn test_redact_value_multibyte() {
+        // Test with emoji and non-ASCII characters
+        assert_eq!(redact_value("🔑🔒secret"), "🔑🔒s***");
+        assert_eq!(redact_value("密码12345"), "密码1***");
+        assert_eq!(redact_value("αβγδεζ"), "***");
+        assert_eq!(redact_value("🚀"), "***");
+        // Ensure no panic on empty or short multibyte strings
+        assert_eq!(redact_value(""), "***");
+        assert_eq!(redact_value("🔑"), "***");
     }
 }
