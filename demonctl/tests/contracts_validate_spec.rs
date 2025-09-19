@@ -1,5 +1,5 @@
 use assert_cmd::Command;
-use predicates;
+use predicates::str;
 use serde_json::json;
 use std::fs;
 use tempfile::TempDir;
@@ -26,7 +26,7 @@ fn given_valid_envelope_file_when_validate_then_exits_successfully() {
     ])
     .assert()
     .success()
-    .stdout(predicates::str::contains("✓ Valid envelope"));
+    .stdout(str::contains("✓ Valid envelope"));
 }
 
 #[test]
@@ -48,7 +48,7 @@ fn given_invalid_envelope_file_when_validate_then_exits_with_error() {
     ])
     .assert()
     .failure()
-    .stderr(predicates::str::contains("✗ Invalid envelope"));
+    .stderr(str::contains("✗ Invalid envelope"));
 }
 
 #[test]
@@ -65,7 +65,7 @@ fn given_valid_envelope_on_stdin_when_validate_then_exits_successfully() {
         .write_stdin(serde_json::to_string(&envelope).unwrap())
         .assert()
         .success()
-        .stdout(predicates::str::contains("✓ Valid envelope"));
+        .stdout(str::contains("✓ Valid envelope"));
 }
 
 #[test]
@@ -88,7 +88,7 @@ fn given_invalid_envelope_on_stdin_when_validate_then_exits_with_error() {
         .write_stdin(serde_json::to_string(&envelope).unwrap())
         .assert()
         .failure()
-        .stderr(predicates::str::contains("✗ Invalid envelope"));
+        .stderr(str::contains("✗ Invalid envelope"));
 }
 
 #[test]
@@ -129,7 +129,7 @@ fn given_directory_with_result_files_when_bulk_validate_then_processes_all() {
     ])
     .assert()
     .success()
-    .stdout(predicates::str::contains("Valid: 1"));
+    .stdout(str::contains("Valid: 1"));
 }
 
 #[test]
@@ -138,5 +138,5 @@ fn given_no_input_specified_when_validate_then_exits_with_error() {
     cmd.args(["contracts", "validate-envelope"])
         .assert()
         .failure()
-        .stderr(predicates::str::contains("Must specify"));
+        .stderr(str::contains("Must specify"));
 }
