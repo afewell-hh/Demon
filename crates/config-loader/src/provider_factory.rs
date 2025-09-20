@@ -113,12 +113,43 @@ impl VaultStubProvider {
         Self::new(vault_addr, vault_token)
     }
 
+    /// Validate scope name to prevent directory traversal attacks
+    fn validate_scope_name(scope: &str) -> Result<(), String> {
+        if scope.is_empty() {
+            return Err("Scope name cannot be empty".to_string());
+        }
+
+        // Only allow alphanumeric characters, hyphens, and underscores
+        if !scope.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+            return Err(format!(
+                "Invalid scope name '{}': only alphanumeric characters, hyphens, and underscores are allowed",
+                scope
+            ));
+        }
+
+        // Additional safety check for specific dangerous patterns
+        if scope.contains("..") || scope.starts_with('.') || scope.starts_with('/') || scope.starts_with('\\') {
+            return Err(format!(
+                "Invalid scope name '{}': path traversal patterns are not allowed",
+                scope
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Resolve a secret using the vault stub
     fn resolve_secret(
         &self,
         scope: &str,
         key: &str,
     ) -> Result<String, crate::secrets::SecretError> {
+        Self::validate_scope_name(scope)
+            .map_err(|e| crate::secrets::SecretError::SecretsFileError {
+                path: scope.to_string(),
+                message: e,
+            })?;
+
         match &self.mode {
             VaultMode::File { base_path } => self.resolve_from_file(base_path, scope, key),
             VaultMode::Http => self.resolve_from_http(scope, key),
@@ -127,6 +158,8 @@ impl VaultStubProvider {
 
     /// Store a secret using the vault stub
     fn store_secret(&self, scope: &str, key: &str, value: &str) -> Result<(), String> {
+        Self::validate_scope_name(scope)?;
+
         match &self.mode {
             VaultMode::File { base_path } => self.store_to_file(base_path, scope, key, value),
             VaultMode::Http => self.store_to_http(scope, key, value),
@@ -135,6 +168,8 @@ impl VaultStubProvider {
 
     /// Delete a secret using the vault stub
     fn delete_secret(&self, scope: &str, key: &str) -> Result<(), String> {
+        Self::validate_scope_name(scope)?;
+
         match &self.mode {
             VaultMode::File { base_path } => self.delete_from_file(base_path, scope, key),
             VaultMode::Http => self.delete_from_http(scope, key),
@@ -335,6 +370,11 @@ impl VaultStubProvider {
         scope: Option<&str>,
     ) -> Result<std::collections::HashMap<String, std::collections::HashMap<String, String>>, String>
     {
+        // Validate scope name if provided
+        if let Some(scope_name) = scope {
+            Self::validate_scope_name(scope_name)?;
+        }
+
         match &self.mode {
             VaultMode::File { base_path } => self.list_from_file(base_path, scope),
             VaultMode::Http => {
@@ -487,5 +527,50 @@ mod tests {
     fn test_vault_stub_invalid_addr() {
         let result = VaultStubProvider::new(Some("invalid://addr".to_string()), None);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_vault_stub_scope_validation_prevents_path_traversal() {
+        let temp_dir = TempDir::new().unwrap();
+        let vault_addr = format!("file://{}", temp_dir.path().display());
+        let provider = VaultStubProvider::new(Some(vault_addr), None).unwrap();
+
+        // Test dangerous scope names that could cause directory traversal
+        let dangerous_scopes = vec![
+            "../etc",
+            "../../tmp",
+            ".ssh",
+            "/etc/passwd",
+            "scope/with/slash",
+            "scope..parent",
+            "scope with spaces",
+            "scope!@#$",
+            "",  // empty scope
+        ];
+
+        for dangerous_scope in dangerous_scopes {
+            // All these operations should fail with scope validation errors
+            assert!(provider.put(dangerous_scope, "key", "value").is_err(),
+                    "put should fail for dangerous scope: {}", dangerous_scope);
+            assert!(provider.resolve(dangerous_scope, "key").is_err(),
+                    "resolve should fail for dangerous scope: {}", dangerous_scope);
+            assert!(provider.delete(dangerous_scope, "key").is_err(),
+                    "delete should fail for dangerous scope: {}", dangerous_scope);
+            assert!(provider.list(Some(dangerous_scope)).is_err(),
+                    "list should fail for dangerous scope: {}", dangerous_scope);
+        }
+
+        // Test valid scope names should work
+        let valid_scopes = vec!["test", "api", "database", "my-app", "app_1", "Test123"];
+
+        for valid_scope in valid_scopes {
+            // These should all succeed
+            assert!(provider.put(valid_scope, "key", "value").is_ok(),
+                    "put should succeed for valid scope: {}", valid_scope);
+            assert!(provider.resolve(valid_scope, "key").is_ok(),
+                    "resolve should succeed for valid scope: {}", valid_scope);
+            assert!(provider.delete(valid_scope, "key").is_ok(),
+                    "delete should succeed for valid scope: {}", valid_scope);
+        }
     }
 }
