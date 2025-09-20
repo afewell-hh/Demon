@@ -120,7 +120,10 @@ impl VaultStubProvider {
         }
 
         // Only allow alphanumeric characters, hyphens, and underscores
-        if !scope.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+        if !scope
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        {
             return Err(format!(
                 "Invalid scope name '{}': only alphanumeric characters, hyphens, and underscores are allowed",
                 scope
@@ -128,7 +131,11 @@ impl VaultStubProvider {
         }
 
         // Additional safety check for specific dangerous patterns
-        if scope.contains("..") || scope.starts_with('.') || scope.starts_with('/') || scope.starts_with('\\') {
+        if scope.contains("..")
+            || scope.starts_with('.')
+            || scope.starts_with('/')
+            || scope.starts_with('\\')
+        {
             return Err(format!(
                 "Invalid scope name '{}': path traversal patterns are not allowed",
                 scope
@@ -144,11 +151,12 @@ impl VaultStubProvider {
         scope: &str,
         key: &str,
     ) -> Result<String, crate::secrets::SecretError> {
-        Self::validate_scope_name(scope)
-            .map_err(|e| crate::secrets::SecretError::SecretsFileError {
+        Self::validate_scope_name(scope).map_err(|e| {
+            crate::secrets::SecretError::SecretsFileError {
                 path: scope.to_string(),
                 message: e,
-            })?;
+            }
+        })?;
 
         match &self.mode {
             VaultMode::File { base_path } => self.resolve_from_file(base_path, scope, key),
@@ -545,19 +553,31 @@ mod tests {
             "scope..parent",
             "scope with spaces",
             "scope!@#$",
-            "",  // empty scope
+            "", // empty scope
         ];
 
         for dangerous_scope in dangerous_scopes {
             // All these operations should fail with scope validation errors
-            assert!(provider.put(dangerous_scope, "key", "value").is_err(),
-                    "put should fail for dangerous scope: {}", dangerous_scope);
-            assert!(provider.resolve(dangerous_scope, "key").is_err(),
-                    "resolve should fail for dangerous scope: {}", dangerous_scope);
-            assert!(provider.delete(dangerous_scope, "key").is_err(),
-                    "delete should fail for dangerous scope: {}", dangerous_scope);
-            assert!(provider.list(Some(dangerous_scope)).is_err(),
-                    "list should fail for dangerous scope: {}", dangerous_scope);
+            assert!(
+                provider.put(dangerous_scope, "key", "value").is_err(),
+                "put should fail for dangerous scope: {}",
+                dangerous_scope
+            );
+            assert!(
+                provider.resolve(dangerous_scope, "key").is_err(),
+                "resolve should fail for dangerous scope: {}",
+                dangerous_scope
+            );
+            assert!(
+                provider.delete(dangerous_scope, "key").is_err(),
+                "delete should fail for dangerous scope: {}",
+                dangerous_scope
+            );
+            assert!(
+                provider.list(Some(dangerous_scope)).is_err(),
+                "list should fail for dangerous scope: {}",
+                dangerous_scope
+            );
         }
 
         // Test valid scope names should work
@@ -565,12 +585,21 @@ mod tests {
 
         for valid_scope in valid_scopes {
             // These should all succeed
-            assert!(provider.put(valid_scope, "key", "value").is_ok(),
-                    "put should succeed for valid scope: {}", valid_scope);
-            assert!(provider.resolve(valid_scope, "key").is_ok(),
-                    "resolve should succeed for valid scope: {}", valid_scope);
-            assert!(provider.delete(valid_scope, "key").is_ok(),
-                    "delete should succeed for valid scope: {}", valid_scope);
+            assert!(
+                provider.put(valid_scope, "key", "value").is_ok(),
+                "put should succeed for valid scope: {}",
+                valid_scope
+            );
+            assert!(
+                provider.resolve(valid_scope, "key").is_ok(),
+                "resolve should succeed for valid scope: {}",
+                valid_scope
+            );
+            assert!(
+                provider.delete(valid_scope, "key").is_ok(),
+                "delete should succeed for valid scope: {}",
+                valid_scope
+            );
         }
     }
 }
