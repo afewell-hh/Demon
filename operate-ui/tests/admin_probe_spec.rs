@@ -12,6 +12,7 @@ async fn admin_probe_open_when_no_token() {
         jetstream_client,
         tera,
         admin_token: None, // Explicitly no admin token
+        bundle_loader: runtime::bundle::BundleLoader::new(None),
     };
     let app = operate_ui::create_app(state);
     let response = app
@@ -35,6 +36,7 @@ async fn admin_probe_requires_token_when_set() {
         jetstream_client,
         tera,
         admin_token: Some("secret".to_string()), // Explicitly set admin token
+        bundle_loader: runtime::bundle::BundleLoader::new(None),
     };
     let app = operate_ui::create_app(state);
     // missing token -> 401
