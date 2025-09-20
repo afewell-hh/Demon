@@ -10,9 +10,11 @@ use tracing::{debug, instrument};
 pub mod provider_factory;
 pub mod secrets;
 pub mod secrets_store;
+pub mod vault_http;
 pub use provider_factory::{ProviderFactoryError, SecretProviderFactory, VaultStubProvider};
 pub use secrets::{EnvFileSecretProvider, SecretError, SecretProvider};
 pub use secrets_store::{SecretsStore, StoreError};
+pub use vault_http::VaultHttpSecretProvider;
 
 #[derive(Error, Debug)]
 pub enum ConfigError {

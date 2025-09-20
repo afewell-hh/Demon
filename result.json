@@ -1,0 +1,32 @@
+{
+  "diagnostics": [
+    {
+      "level": "info",
+      "message": "Echo operation completed at 2025-09-20 00:18:02 UTC",
+      "timestamp": "2025-09-20T00:18:02.128142076Z"
+    }
+  ],
+  "metrics": {
+    "counters": {
+      "characterCount": 17
+    },
+    "duration": {
+      "total_ms": 0.07144199999999999
+    }
+  },
+  "provenance": {
+    "source": {
+      "system": "echo-capsule",
+      "version": "0.0.1"
+    },
+    "timestamp": "2025-09-20T00:18:02.128144720Z"
+  },
+  "result": {
+    "data": {
+      "character_count": 17,
+      "echoed_message": "Hello from Demon!",
+      "timestamp": "2025-09-20T00:18:02.128078363Z"
+    },
+    "success": true
+  }
+}
