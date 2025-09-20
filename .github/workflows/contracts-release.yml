@@ -1,0 +1,172 @@
+name: Contract Bundle Release
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+    branches: [main]
+
+jobs:
+  publish-contracts-release:
+    name: Publish contract bundle to GitHub Releases
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Download contract bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: contract-bundle
+          path: dist/contracts/
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Extract manifest metadata
+        id: manifest
+        run: |
+          # Extract metadata from manifest.json
+          VERSION=$(jq -r '.version' dist/contracts/manifest.json)
+          TIMESTAMP=$(jq -r '.timestamp' dist/contracts/manifest.json)
+          GIT_SHA=$(jq -r '.git.sha' dist/contracts/manifest.json)
+          BUNDLE_SHA256=$(jq -r '.bundle_sha256' dist/contracts/manifest.json)
+
+          # Create release tag from timestamp and short SHA
+          TAG="contracts-$(date -d "$TIMESTAMP" +%Y%m%d)-${GIT_SHA:0:8}"
+
+          # Set outputs
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "timestamp=$TIMESTAMP" >> $GITHUB_OUTPUT
+          echo "git_sha=$GIT_SHA" >> $GITHUB_OUTPUT
+          echo "bundle_sha256=$BUNDLE_SHA256" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+          echo "Release tag: $TAG"
+          echo "Bundle SHA-256: $BUNDLE_SHA256"
+
+      - name: Verify bundle integrity
+        run: |
+          # Recompute SHA-256 to verify integrity
+          ACTUAL_SHA=$(shasum -a 256 dist/contracts/bundle.json | cut -d' ' -f1)
+          EXPECTED_SHA="${{ steps.manifest.outputs.bundle_sha256 }}"
+
+          if [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
+            echo "❌ Bundle SHA-256 mismatch!"
+            echo "  Expected: $EXPECTED_SHA"
+            echo "  Actual:   $ACTUAL_SHA"
+            exit 1
+          fi
+
+          echo "✓ Bundle integrity verified: $ACTUAL_SHA"
+
+      - name: Create bundle checksum file
+        run: |
+          # Create separate checksum file for easy verification
+          echo "${{ steps.manifest.outputs.bundle_sha256 }}  bundle.json" > dist/contracts/bundle.sha256
+          echo "${{ steps.manifest.outputs.bundle_sha256 }}  bundle.json"
+
+      - name: Create release notes
+        id: notes
+        run: |
+          # Generate release notes from manifest metadata
+          cat > release_notes.md << EOF
+          # Contract Bundle Release
+
+          This release contains the Demon contract schemas and WIT definitions.
+
+          ## Metadata
+          - **Version**: ${{ steps.manifest.outputs.version }}
+          - **Timestamp**: ${{ steps.manifest.outputs.timestamp }}
+          - **Git SHA**: ${{ steps.manifest.outputs.git_sha }}
+          - **Bundle SHA-256**: \`${{ steps.manifest.outputs.bundle_sha256 }}\`
+
+          ## Files
+          - \`bundle.json\` - Contract schemas and WIT definitions
+          - \`manifest.json\` - Bundle metadata with integrity hash
+          - \`bundle.sha256\` - SHA-256 checksum for verification
+
+          ## Verification
+          To verify the bundle integrity:
+          \`\`\`bash
+          shasum -a 256 -c bundle.sha256
+          \`\`\`
+
+          ## Usage
+          Download with demonctl:
+          \`\`\`bash
+          demonctl contracts fetch-bundle --release ${{ steps.manifest.outputs.tag }}
+          \`\`\`
+
+          Or download directly:
+          \`\`\`bash
+          gh release download ${{ steps.manifest.outputs.tag }} -p "*.json" -p "*.sha256"
+          \`\`\`
+          EOF
+
+      - name: Check if release exists
+        id: check_release
+        run: |
+          TAG="${{ steps.manifest.outputs.tag }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Release $TAG already exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Release $TAG does not exist, will create"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create or update GitHub Release
+        run: |
+          TAG="${{ steps.manifest.outputs.tag }}"
+
+          if [ "${{ steps.check_release.outputs.exists }}" = "true" ]; then
+            echo "Updating existing release: $TAG"
+            gh release upload "$TAG" \
+              dist/contracts/bundle.json \
+              dist/contracts/manifest.json \
+              dist/contracts/bundle.sha256 \
+              --clobber
+          else
+            echo "Creating new release: $TAG"
+            gh release create "$TAG" \
+              dist/contracts/bundle.json \
+              dist/contracts/manifest.json \
+              dist/contracts/bundle.sha256 \
+              --title "Contract Bundle ${{ steps.manifest.outputs.version }} ($TAG)" \
+              --notes-file release_notes.md \
+              --target "${{ steps.manifest.outputs.git_sha }}"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update latest release
+        run: |
+          TAG="${{ steps.manifest.outputs.tag }}"
+
+          # Check if "contracts-latest" release exists
+          if gh release view "contracts-latest" >/dev/null 2>&1; then
+            echo "Deleting existing contracts-latest release"
+            gh release delete "contracts-latest" --yes --cleanup-tag
+          fi
+
+          # Create new "latest" release pointing to same commit
+          echo "Creating contracts-latest release pointing to $TAG"
+          gh release create "contracts-latest" \
+            dist/contracts/bundle.json \
+            dist/contracts/manifest.json \
+            dist/contracts/bundle.sha256 \
+            --title "Contract Bundle (Latest)" \
+            --notes "This is an alias for the latest contract bundle release: [$TAG](https://github.com/${{ github.repository }}/releases/tag/$TAG)" \
+            --target "${{ steps.manifest.outputs.git_sha }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

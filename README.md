@@ -3,6 +3,7 @@
 
 - [Preview Kit](docs/preview/alpha/README.md)
 - [Bundle Library & Signatures](docs/bootstrapper/bundles.md) (offline, reproducible, CI-enforced)
+- [Contract Bundle Releases](docs/contracts/releases.md) (automated GitHub Releases for contract schemas)
 
 <sub>Local verify:</sub>
 <code>target/debug/demonctl bootstrap --verify-only --bundle lib://local/preview-local-dev@0.0.1 \
@@ -63,6 +64,59 @@ cargo run -p demonctl -- contracts bundle --include-wit
 # Export as JSON
 cargo run -p demonctl -- contracts bundle --format json --include-wit
 ```
+
+#### Publishing Contract Bundles
+
+For distribution and automation, use the bundling Make target:
+
+```bash
+# Create distributable contract bundle
+make bundle-contracts
+```
+
+This creates:
+- `dist/contracts/bundle.json` - Complete contract bundle with schemas and WIT definitions
+- `dist/contracts/manifest.json` - Metadata including version, timestamp, git info, and SHA-256 digest
+
+The bundle is automatically generated and uploaded as CI artifacts on main branch merges. Each bundle includes a SHA-256 digest for integrity verification. External teams can download contract artifacts from GitHub Actions artifacts for integration.
+
+#### Fetching Contract Bundles
+
+Download the latest contract bundle from GitHub Actions artifacts:
+
+```bash
+# Fetch latest bundle to default location (contracts/bundle.json)
+GH_TOKEN=your_token cargo run -p demonctl -- contracts fetch-bundle
+
+# Fetch to custom location with manifest
+GH_TOKEN=your_token cargo run -p demonctl -- contracts fetch-bundle \
+  --dest downloaded/bundle.json --manifest
+
+# Fetch from specific repository
+GH_TOKEN=your_token cargo run -p demonctl -- contracts fetch-bundle \
+  --repo owner/repo --dest bundle.json
+
+# Fetch specific workflow run
+GH_TOKEN=your_token cargo run -p demonctl -- contracts fetch-bundle \
+  --run-id 12345 --dest bundle.json
+
+# Skip verification (NOT RECOMMENDED)
+GH_TOKEN=your_token cargo run -p demonctl -- contracts fetch-bundle \
+  --skip-verification --dest bundle.json
+```
+
+**Security**: By default, all downloaded bundles are verified using SHA-256 digests from the manifest. This ensures bundle integrity and authenticity.
+
+**Manual Verification**: You can verify a bundle manually using:
+```bash
+# Compare with manifest
+EXPECTED=$(jq -r '.bundle_sha256' manifest.json)
+ACTUAL=$(shasum -a 256 bundle.json | cut -d' ' -f1)
+echo "Expected: $EXPECTED"
+echo "Actual:   $ACTUAL"
+```
+
+**Requirements**: GitHub token with `actions:read` scope set as `GH_TOKEN` or `GITHUB_TOKEN` environment variable.
 
 ## Approvals API
 
