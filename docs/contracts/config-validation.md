@@ -141,10 +141,18 @@ The secret resolution system supports pluggable providers, allowing you to integ
    - Default file location: `.demon/secrets.json`
    - Custom location via `CONFIG_SECRETS_FILE` environment variable
 
-2. **Vault Stub Provider** (`vault`):
-   - Simulates Vault-like secret storage for development and testing
-   - Supports file-based and HTTP modes
-   - Configured via `VAULT_ADDR` and optional `VAULT_TOKEN` environment variables
+2. **Vault Provider** (`vault`):
+   - Integrates with HashiCorp Vault or Vault-compatible servers
+   - Automatically selects implementation based on `VAULT_ADDR`:
+     - **HTTP Provider**: For `http://` or `https://` URLs - connects to real Vault servers
+     - **Stub Provider**: For `file://` URLs - simulates Vault for development/testing
+   - Configured via environment variables:
+     - `VAULT_ADDR`: Vault server address (required)
+     - `VAULT_TOKEN`: Authentication token (required for HTTP mode)
+     - `VAULT_NAMESPACE`: Optional namespace for enterprise Vault
+     - `VAULT_RETRY_ATTEMPTS`: Number of retry attempts for failed requests (default: 3)
+     - `VAULT_CA_CERT`: Path to CA certificate for TLS verification
+     - `VAULT_SKIP_VERIFY`: Skip TLS verification (development only)
 
 #### Provider Configuration
 
@@ -156,11 +164,23 @@ export CONFIG_SECRETS_PROVIDER=envfile
 export CONFIG_SECRETS_FILE=.demon/secrets.json  # optional
 ```
 
-**Using Vault Stub Provider:**
+**Using Vault Provider with Real Server:**
 ```bash
 export CONFIG_SECRETS_PROVIDER=vault
-export VAULT_ADDR=file://vault_stub  # or http://vault-server:8200
-export VAULT_TOKEN=your-token  # optional for stub mode
+export VAULT_ADDR=http://vault-server:8200  # or https://vault-server:8200
+export VAULT_TOKEN=your-vault-token         # Required for HTTP mode
+export VAULT_NAMESPACE=my-namespace         # Optional for enterprise Vault
+
+# Optional TLS configuration
+export VAULT_CA_CERT=/path/to/ca-cert.pem   # For custom CA
+export VAULT_SKIP_VERIFY=true               # For development only
+```
+
+**Using Vault Stub Provider (Development):**
+```bash
+export CONFIG_SECRETS_PROVIDER=vault
+export VAULT_ADDR=file://vault_stub  # File-based stub for testing
+# No token required for file stub mode
 ```
 
 #### EnvFile Provider Sources
@@ -189,21 +209,62 @@ Secrets are resolved using the following priority order:
 }
 ```
 
-#### Vault Stub Provider
+#### Vault Provider Details
 
-The Vault stub provider supports two modes:
+The Vault provider automatically selects the appropriate implementation based on `VAULT_ADDR`:
 
-**File Mode** (default):
+**HTTP Provider** (Production):
+- For URLs starting with `http://` or `https://`
+- Connects to real HashiCorp Vault servers using KV v2 API
+- Supports token authentication via `X-Vault-Token` header
+- Implements automatic retry with exponential backoff for transient failures
+- Does not retry on authentication failures (401/403)
+- Secret path format: `secret/data/<scope>/<key>`
+
 ```bash
-export VAULT_ADDR=file://vault_stub
-# Stores secrets in ~/.demon/vault_stub/ as JSON files
+# Example: Using a production Vault server
+export CONFIG_SECRETS_PROVIDER=vault
+export VAULT_ADDR=https://vault.example.com:8200
+export VAULT_TOKEN=hvs.CAESIJr...  # Your Vault token
+export VAULT_NAMESPACE=production   # Optional namespace
+
+# Secrets stored at paths like:
+# secret/data/database/password
+# secret/data/api/key
 ```
 
-**HTTP Mode**:
+**Stub Provider** (Development):
+- For URLs starting with `file://`
+- Stores secrets locally in JSON files for testing
+- Default location: `~/.demon/vault_stub/`
+- No authentication required
+- Useful for local development without a Vault server
+
 ```bash
-export VAULT_ADDR=http://127.0.0.1:8200
-export VAULT_TOKEN=vault-token
-# Makes HTTP requests to Vault-compatible endpoints (minimal implementation)
+# Example: Using the file stub for development
+export CONFIG_SECRETS_PROVIDER=vault
+export VAULT_ADDR=file://vault_stub
+# Secrets stored in ~/.demon/vault_stub/<scope>.json
+```
+
+**TLS Configuration** (HTTP Provider):
+```bash
+# Custom CA certificate
+export VAULT_CA_CERT=/path/to/ca-cert.pem
+
+# Skip TLS verification (DEVELOPMENT ONLY - INSECURE)
+export VAULT_SKIP_VERIFY=true
+```
+
+**Retry Configuration** (HTTP Provider):
+```bash
+# Configure retry attempts (default: 3)
+export VAULT_RETRY_ATTEMPTS=5
+
+# Retry behavior:
+# - Retries on 5xx errors and network failures
+# - Exponential backoff: 100ms, 200ms, 400ms, ...
+# - No retry on auth failures (401/403) or not found (404)
 ```
 
 ### Secret Resolution Behavior
@@ -447,7 +508,19 @@ The `demonctl secrets` command provides tools for managing capsule secrets throu
 
 All secrets commands support the `--provider` flag to specify which secret provider to use:
 - `--provider envfile` (default): Uses environment file provider
-- `--provider vault`: Uses Vault stub provider
+- `--provider vault`: Uses Vault provider (automatically selects HTTP or stub based on `VAULT_ADDR`)
+
+### Vault Provider Selection
+
+When using `--provider vault`, the CLI automatically selects the appropriate implementation:
+- **HTTP Provider**: When `VAULT_ADDR` starts with `http://` or `https://`
+  - Connects to real Vault servers
+  - Requires `VAULT_TOKEN` environment variable
+  - Supports all Vault features (namespaces, TLS, retry)
+- **Stub Provider**: When `VAULT_ADDR` starts with `file://`
+  - Uses local file storage for development
+  - No authentication required
+  - Limited functionality (list operation not supported for HTTP)
 
 ### Setting Secrets
 
@@ -535,9 +608,16 @@ demonctl secrets delete api/key --secrets-file /path/to/secrets.json --provider 
 demonctl secrets set echo/api_key your_api_key_here --provider envfile
 demonctl secrets set echo/prefix "Secret: " --provider envfile
 
-# Or using vault provider
+# Or using vault provider with stub
 export CONFIG_SECRETS_PROVIDER=vault
 export VAULT_ADDR=file://vault_stub
+demonctl secrets set echo/api_key your_api_key_here --provider vault
+demonctl secrets set echo/prefix "Secret: " --provider vault
+
+# Or using vault provider with real server
+export CONFIG_SECRETS_PROVIDER=vault
+export VAULT_ADDR=http://vault-server:8200
+export VAULT_TOKEN=your-vault-token
 demonctl secrets set echo/api_key your_api_key_here --provider vault
 demonctl secrets set echo/prefix "Secret: " --provider vault
 

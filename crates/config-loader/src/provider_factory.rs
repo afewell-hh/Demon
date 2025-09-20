@@ -1,4 +1,5 @@
 use crate::secrets::{EnvFileSecretProvider, SecretProvider};
+use crate::vault_http::VaultHttpSecretProvider;
 use std::env;
 use thiserror::Error;
 
@@ -21,7 +22,7 @@ impl SecretProviderFactory {
     ///
     /// Uses CONFIG_SECRETS_PROVIDER environment variable:
     /// - "envfile" (default): EnvFileSecretProvider
-    /// - "vault": VaultStubProvider
+    /// - "vault": VaultStubProvider (file://) or VaultHttpSecretProvider (http[s]://)
     pub fn create() -> Result<Box<dyn SecretProvider>, ProviderFactoryError> {
         let provider_type =
             env::var("CONFIG_SECRETS_PROVIDER").unwrap_or_else(|_| "envfile".to_string());
@@ -29,9 +30,28 @@ impl SecretProviderFactory {
         match provider_type.as_str() {
             "envfile" => Ok(Box::new(EnvFileSecretProvider::new())),
             "vault" => {
-                let vault_provider = VaultStubProvider::from_env()
-                    .map_err(|e| ProviderFactoryError::VaultConfigError { message: e })?;
-                Ok(Box::new(vault_provider))
+                // Check VAULT_ADDR to decide between stub and HTTP provider
+                let vault_addr =
+                    env::var("VAULT_ADDR").unwrap_or_else(|_| "file://vault_stub".to_string());
+
+                if vault_addr.starts_with("file://") {
+                    // Use stub provider for file:// URLs
+                    let vault_provider = VaultStubProvider::from_env()
+                        .map_err(|e| ProviderFactoryError::VaultConfigError { message: e })?;
+                    Ok(Box::new(vault_provider))
+                } else if vault_addr.starts_with("http://") || vault_addr.starts_with("https://") {
+                    // Use HTTP provider for http[s]:// URLs
+                    let vault_provider = VaultHttpSecretProvider::from_env().map_err(|e| {
+                        ProviderFactoryError::VaultConfigError {
+                            message: e.to_string(),
+                        }
+                    })?;
+                    Ok(Box::new(vault_provider))
+                } else {
+                    Err(ProviderFactoryError::VaultConfigError {
+                        message: format!("Invalid VAULT_ADDR format: {}. Must start with file://, http://, or https://", vault_addr),
+                    })
+                }
             }
             other => Err(ProviderFactoryError::UnknownProviderType {
                 provider_type: other.to_string(),
