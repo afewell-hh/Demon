@@ -49,6 +49,21 @@ A JSON event for `ritual.completed:v1` is printed to stdout.
 
 **Note**: M0-3 includes per-capability quotas with policy decisions. Default quotas allow reasonable development usage without configuration.
 
+### Contract Registry
+
+Export all contracts (schemas and WIT definitions):
+
+```bash
+# Summary view
+cargo run -p demonctl -- contracts bundle
+
+# Include WIT definitions
+cargo run -p demonctl -- contracts bundle --include-wit
+
+# Export as JSON
+cargo run -p demonctl -- contracts bundle --format json --include-wit
+```
+
 ## Approvals API
 
 The M0-4 Approvals API provides REST endpoints for granting and denying approval gates:
