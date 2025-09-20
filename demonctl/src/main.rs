@@ -4,6 +4,14 @@ use std::path::PathBuf;
 use tracing::{info, Level};
 use tracing_subscriber::{fmt, EnvFilter};
 
+#[derive(ValueEnum, Clone, Debug)]
+enum ProviderType {
+    /// Environment file provider (default)
+    Envfile,
+    /// Vault stub provider
+    Vault,
+}
+
 #[derive(Parser)]
 #[command(name = "demonctl", version)]
 struct Cli {
@@ -100,6 +108,9 @@ enum SecretsCommands {
         /// Path to secrets file (defaults to CONFIG_SECRETS_FILE or .demon/secrets.json)
         #[arg(long)]
         secrets_file: Option<String>,
+        /// Secret provider to use (envfile or vault)
+        #[arg(long, value_enum, default_value_t = ProviderType::Envfile)]
+        provider: ProviderType,
     },
     /// Get a secret value
     Get {
@@ -112,6 +123,9 @@ enum SecretsCommands {
         /// Path to secrets file (defaults to CONFIG_SECRETS_FILE or .demon/secrets.json)
         #[arg(long)]
         secrets_file: Option<String>,
+        /// Secret provider to use (envfile or vault)
+        #[arg(long, value_enum, default_value_t = ProviderType::Envfile)]
+        provider: ProviderType,
     },
     /// List secrets
     List {
@@ -121,6 +135,9 @@ enum SecretsCommands {
         /// Path to secrets file (defaults to CONFIG_SECRETS_FILE or .demon/secrets.json)
         #[arg(long)]
         secrets_file: Option<String>,
+        /// Secret provider to use (envfile or vault)
+        #[arg(long, value_enum, default_value_t = ProviderType::Envfile)]
+        provider: ProviderType,
     },
     /// Delete a secret
     Delete {
@@ -130,6 +147,9 @@ enum SecretsCommands {
         /// Path to secrets file (defaults to CONFIG_SECRETS_FILE or .demon/secrets.json)
         #[arg(long)]
         secrets_file: Option<String>,
+        /// Secret provider to use (envfile or vault)
+        #[arg(long, value_enum, default_value_t = ProviderType::Envfile)]
+        provider: ProviderType,
     },
 }
 
@@ -851,7 +871,7 @@ async fn validate_config_stdin(schema: Option<String>, secrets_file: Option<Stri
 }
 
 fn handle_secrets_command(cmd: SecretsCommands) -> Result<()> {
-    use config_loader::{secrets_store, SecretsStore};
+    use config_loader::{secrets_store, SecretProvider, SecretsStore, VaultStubProvider};
     use std::io::Read;
 
     match cmd {
@@ -861,13 +881,8 @@ fn handle_secrets_command(cmd: SecretsCommands) -> Result<()> {
             from_env,
             stdin,
             secrets_file,
+            provider,
         } => {
-            let store = if let Some(path) = secrets_file {
-                SecretsStore::new(path)
-            } else {
-                SecretsStore::default_location()
-            };
-
             let (scope, key) = SecretsStore::parse_scope_key(&key_path)?;
 
             let secret_value = if stdin {
@@ -881,60 +896,150 @@ fn handle_secrets_command(cmd: SecretsCommands) -> Result<()> {
                 value.ok_or_else(|| anyhow::anyhow!("No value provided"))?
             };
 
-            store.set(&scope, &key, &secret_value)?;
+            match provider {
+                ProviderType::Envfile => {
+                    let store = if let Some(path) = secrets_file {
+                        SecretsStore::new(path)
+                    } else {
+                        SecretsStore::default_location()
+                    };
 
-            #[cfg(unix)]
-            store.check_permissions()?;
+                    store.set(&scope, &key, &secret_value)?;
 
-            println!("✓ Secret {}/{} set successfully", scope, key);
-            println!("  Stored in: {}", store.path().display());
+                    #[cfg(unix)]
+                    store.check_permissions()?;
+
+                    println!("✓ Secret {}/{} set successfully", scope, key);
+                    println!("  Stored in: {}", store.path().display());
+                }
+                ProviderType::Vault => {
+                    if secrets_file.is_some() {
+                        eprintln!("⚠ Warning: --secrets-file is ignored when using vault provider");
+                    }
+
+                    let vault_provider = VaultStubProvider::from_env().map_err(|e| {
+                        anyhow::anyhow!("Failed to initialize vault provider: {}", e)
+                    })?;
+
+                    vault_provider
+                        .put(&scope, &key, &secret_value)
+                        .map_err(|e| anyhow::anyhow!("Failed to store secret in vault: {}", e))?;
+
+                    println!("✓ Secret {}/{} set successfully in vault", scope, key);
+                }
+            }
         }
         SecretsCommands::Get {
             key_path,
             raw,
             secrets_file,
+            provider,
         } => {
-            let store = if let Some(path) = secrets_file {
-                SecretsStore::new(path)
-            } else {
-                SecretsStore::default_location()
-            };
-
             let (scope, key) = SecretsStore::parse_scope_key(&key_path)?;
-            let value = store.get(&scope, &key)?;
 
-            if raw {
-                println!("{}", value);
-            } else {
-                println!("{}/{}: {}", scope, key, secrets_store::redact_value(&value));
+            match provider {
+                ProviderType::Envfile => {
+                    let store = if let Some(path) = secrets_file {
+                        SecretsStore::new(path)
+                    } else {
+                        SecretsStore::default_location()
+                    };
+
+                    let value = store.get(&scope, &key)?;
+
+                    if raw {
+                        println!("{}", value);
+                    } else {
+                        println!("{}/{}: {}", scope, key, secrets_store::redact_value(&value));
+                    }
+                }
+                ProviderType::Vault => {
+                    if secrets_file.is_some() {
+                        eprintln!("⚠ Warning: --secrets-file is ignored when using vault provider");
+                    }
+
+                    let vault_provider = VaultStubProvider::from_env().map_err(|e| {
+                        anyhow::anyhow!("Failed to initialize vault provider: {}", e)
+                    })?;
+
+                    let value = vault_provider
+                        .resolve(&scope, &key)
+                        .map_err(|e| anyhow::anyhow!("Failed to get secret from vault: {}", e))?;
+
+                    if raw {
+                        println!("{}", value);
+                    } else {
+                        println!("{}/{}: {}", scope, key, secrets_store::redact_value(&value));
+                    }
+                }
             }
         }
         SecretsCommands::List {
             scope,
             secrets_file,
-        } => {
-            let store = if let Some(path) = secrets_file {
-                SecretsStore::new(path)
-            } else {
-                SecretsStore::default_location()
-            };
-
-            if let Some(scope_filter) = scope {
-                let secrets = store.list_scope(&scope_filter)?;
-                if secrets.is_empty() {
-                    println!("No secrets found for scope: {}", scope_filter);
+            provider,
+        } => match provider {
+            ProviderType::Envfile => {
+                let store = if let Some(path) = secrets_file {
+                    SecretsStore::new(path)
                 } else {
-                    println!("Secrets in scope '{}':", scope_filter);
-                    for (key, value) in secrets {
-                        println!("  {}: {}", key, value);
+                    SecretsStore::default_location()
+                };
+
+                if let Some(scope_filter) = scope {
+                    let secrets = store.list_scope(&scope_filter)?;
+                    if secrets.is_empty() {
+                        println!("No secrets found for scope: {}", scope_filter);
+                    } else {
+                        println!("Secrets in scope '{}':", scope_filter);
+                        for (key, value) in secrets {
+                            println!("  {}: {}", key, value);
+                        }
+                    }
+                } else {
+                    let all_secrets = store.list()?;
+                    if all_secrets.is_empty() {
+                        println!("No secrets found");
+                    } else {
+                        println!("Secrets:");
+                        for (scope, secrets) in all_secrets {
+                            println!("  {}:", scope);
+                            for (key, value) in secrets {
+                                println!("    {}: {}", key, value);
+                            }
+                        }
                     }
                 }
-            } else {
-                let all_secrets = store.list()?;
+            }
+            ProviderType::Vault => {
+                if secrets_file.is_some() {
+                    eprintln!("⚠ Warning: --secrets-file is ignored when using vault provider");
+                }
+
+                let vault_provider = VaultStubProvider::from_env()
+                    .map_err(|e| anyhow::anyhow!("Failed to initialize vault provider: {}", e))?;
+
+                let all_secrets = vault_provider
+                    .list(scope.as_deref())
+                    .map_err(|e| anyhow::anyhow!("Failed to list secrets from vault: {}", e))?;
+
                 if all_secrets.is_empty() {
-                    println!("No secrets found");
+                    if let Some(scope_filter) = scope {
+                        println!("No secrets found for scope: {}", scope_filter);
+                    } else {
+                        println!("No secrets found");
+                    }
+                } else if let Some(scope_filter) = scope {
+                    if let Some(secrets) = all_secrets.get(&scope_filter) {
+                        println!("Secrets in scope '{}' (vault):", scope_filter);
+                        for (key, value) in secrets {
+                            println!("  {}: {}", key, value);
+                        }
+                    } else {
+                        println!("No secrets found for scope: {}", scope_filter);
+                    }
                 } else {
-                    println!("Secrets:");
+                    println!("Secrets (vault):");
                     for (scope, secrets) in all_secrets {
                         println!("  {}:", scope);
                         for (key, value) in secrets {
@@ -943,20 +1048,41 @@ fn handle_secrets_command(cmd: SecretsCommands) -> Result<()> {
                     }
                 }
             }
-        }
+        },
         SecretsCommands::Delete {
             key_path,
             secrets_file,
+            provider,
         } => {
-            let store = if let Some(path) = secrets_file {
-                SecretsStore::new(path)
-            } else {
-                SecretsStore::default_location()
-            };
-
             let (scope, key) = SecretsStore::parse_scope_key(&key_path)?;
-            store.delete(&scope, &key)?;
-            println!("✓ Secret {}/{} deleted", scope, key);
+
+            match provider {
+                ProviderType::Envfile => {
+                    let store = if let Some(path) = secrets_file {
+                        SecretsStore::new(path)
+                    } else {
+                        SecretsStore::default_location()
+                    };
+
+                    store.delete(&scope, &key)?;
+                    println!("✓ Secret {}/{} deleted", scope, key);
+                }
+                ProviderType::Vault => {
+                    if secrets_file.is_some() {
+                        eprintln!("⚠ Warning: --secrets-file is ignored when using vault provider");
+                    }
+
+                    let vault_provider = VaultStubProvider::from_env().map_err(|e| {
+                        anyhow::anyhow!("Failed to initialize vault provider: {}", e)
+                    })?;
+
+                    vault_provider.delete(&scope, &key).map_err(|e| {
+                        anyhow::anyhow!("Failed to delete secret from vault: {}", e)
+                    })?;
+
+                    println!("✓ Secret {}/{} deleted from vault", scope, key);
+                }
+            }
         }
     }
 

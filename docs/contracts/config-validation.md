@@ -129,7 +129,41 @@ Secret references use the format: `secret://scope/key`
 }
 ```
 
-### Secret Sources
+### Secret Providers
+
+The secret resolution system supports pluggable providers, allowing you to integrate with different secret management systems. The provider is selected using the `CONFIG_SECRETS_PROVIDER` environment variable.
+
+#### Available Providers
+
+1. **EnvFile Provider** (`envfile` - default):
+   - Resolves secrets from environment variables and JSON files
+   - Environment variables: `SECRET_<SCOPE>_<KEY>` (uppercase with underscores)
+   - Default file location: `.demon/secrets.json`
+   - Custom location via `CONFIG_SECRETS_FILE` environment variable
+
+2. **Vault Stub Provider** (`vault`):
+   - Simulates Vault-like secret storage for development and testing
+   - Supports file-based and HTTP modes
+   - Configured via `VAULT_ADDR` and optional `VAULT_TOKEN` environment variables
+
+#### Provider Configuration
+
+**Using EnvFile Provider (default):**
+```bash
+# Provider is envfile by default, no configuration needed
+# Or explicitly set:
+export CONFIG_SECRETS_PROVIDER=envfile
+export CONFIG_SECRETS_FILE=.demon/secrets.json  # optional
+```
+
+**Using Vault Stub Provider:**
+```bash
+export CONFIG_SECRETS_PROVIDER=vault
+export VAULT_ADDR=file://vault_stub  # or http://vault-server:8200
+export VAULT_TOKEN=your-token  # optional for stub mode
+```
+
+#### EnvFile Provider Sources
 
 Secrets are resolved using the following priority order:
 
@@ -155,6 +189,23 @@ Secrets are resolved using the following priority order:
 }
 ```
 
+#### Vault Stub Provider
+
+The Vault stub provider supports two modes:
+
+**File Mode** (default):
+```bash
+export VAULT_ADDR=file://vault_stub
+# Stores secrets in ~/.demon/vault_stub/ as JSON files
+```
+
+**HTTP Mode**:
+```bash
+export VAULT_ADDR=http://127.0.0.1:8200
+export VAULT_TOKEN=vault-token
+# Makes HTTP requests to Vault-compatible endpoints (minimal implementation)
+```
+
 ### Secret Resolution Behavior
 
 1. **Resolution Timing**: Secrets are resolved after loading configuration but before schema validation
@@ -164,17 +215,23 @@ Secrets are resolved using the following priority order:
 
 ### Runtime Integration
 
-Secret resolution is automatically enabled in the runtime:
+Secret resolution is automatically enabled in the runtime using the configured provider:
 
 ```rust
-use config_loader::{ConfigManager, EnvFileSecretProvider};
+use config_loader::{ConfigManager, SecretProviderFactory, EnvFileSecretProvider};
 use runtime::link::router::Router;
 
-// Use default secret provider (env vars + .demon/secrets.json)
+// Use provider based on CONFIG_SECRETS_PROVIDER environment variable
 let router = Router::new();
 
-// Use custom secrets file
+// For explicit provider control:
 let config_manager = ConfigManager::new();
+
+// Create provider from factory (respects CONFIG_SECRETS_PROVIDER)
+let secret_provider = SecretProviderFactory::create().unwrap();
+let router = Router::with_config_and_secrets(config_manager, secret_provider);
+
+// Or use specific provider
 let secret_provider = EnvFileSecretProvider::with_secrets_file("custom-secrets.json");
 let router = Router::with_config_and_secrets(config_manager, secret_provider);
 ```
@@ -388,59 +445,78 @@ manager.validate_config_value_with_secrets("echo", &config_with_secrets, &secret
 
 The `demonctl secrets` command provides tools for managing capsule secrets through the command line. This is the recommended way to set up secrets for development and testing.
 
+All secrets commands support the `--provider` flag to specify which secret provider to use:
+- `--provider envfile` (default): Uses environment file provider
+- `--provider vault`: Uses Vault stub provider
+
 ### Setting Secrets
 
 ```bash
-# Set a secret value
+# Set a secret value (uses default envfile provider)
 demonctl secrets set database/password my_secret_value
+
+# Set with explicit provider
+demonctl secrets set database/password my_secret_value --provider envfile
+demonctl secrets set api/key vault_secret --provider vault
 
 # Set from environment variable (avoids shell history)
 export DB_PASS="secret123"
-demonctl secrets set database/password --from-env DB_PASS
+demonctl secrets set database/password --from-env DB_PASS --provider envfile
 
 # Set from stdin (for scripting)
-echo "secret_value" | demonctl secrets set api/key --stdin
+echo "secret_value" | demonctl secrets set api/key --stdin --provider vault
 
-# Use custom secrets file location
-demonctl secrets set app/token secret123 --secrets-file /path/to/secrets.json
+# Use custom secrets file location (envfile provider only)
+demonctl secrets set app/token secret123 --secrets-file /path/to/secrets.json --provider envfile
 ```
 
 ### Getting Secrets
 
 ```bash
-# Get redacted secret (default behavior)
+# Get redacted secret (default envfile provider)
 demonctl secrets get database/password
 # Output: database/password: my_***
 
-# Get raw secret value
-demonctl secrets get database/password --raw
+# Get raw secret value with specific provider
+demonctl secrets get database/password --raw --provider envfile
 # Output: my_secret_value
 
-# Use custom secrets file
-demonctl secrets get api/key --secrets-file /path/to/secrets.json
+demonctl secrets get api/key --raw --provider vault
+# Output: vault_secret_value
+
+# Use custom secrets file (envfile provider only)
+demonctl secrets get api/key --secrets-file /path/to/secrets.json --provider envfile
 ```
 
 ### Listing Secrets
 
 ```bash
-# List all secrets (redacted)
+# List all secrets (redacted, default envfile provider)
 demonctl secrets list
 
-# List secrets for specific scope
-demonctl secrets list --scope database
+# List with specific provider
+demonctl secrets list --provider vault
+demonctl secrets list --provider envfile
 
-# Use custom secrets file
-demonctl secrets list --secrets-file /path/to/secrets.json
+# List secrets for specific scope
+demonctl secrets list --scope database --provider vault
+
+# Use custom secrets file (envfile provider only)
+demonctl secrets list --secrets-file /path/to/secrets.json --provider envfile
 ```
 
 ### Deleting Secrets
 
 ```bash
-# Delete a secret
+# Delete a secret (default envfile provider)
 demonctl secrets delete database/password
 
-# Use custom secrets file
-demonctl secrets delete api/key --secrets-file /path/to/secrets.json
+# Delete with specific provider
+demonctl secrets delete api/key --provider vault
+demonctl secrets delete database/password --provider envfile
+
+# Use custom secrets file (envfile provider only)
+demonctl secrets delete api/key --secrets-file /path/to/secrets.json --provider envfile
 ```
 
 ### Security Best Practices
@@ -449,13 +525,21 @@ demonctl secrets delete api/key --secrets-file /path/to/secrets.json
 2. **Avoid Shell History**: Use `--from-env` or `--stdin` flags instead of passing secrets as command arguments
 3. **Custom Location**: Use `CONFIG_SECRETS_FILE` environment variable or `--secrets-file` flag to store secrets outside the project directory
 4. **Raw Access**: Only use `--raw` flag when necessary, as it bypasses redaction
+5. **Provider Consistency**: Use the same provider for all operations on a secret scope to avoid confusion
+6. **Vault Warnings**: The CLI warns when `--secrets-file` is used with `--provider vault` since file options are ignored
 
 ### Integration Example
 
 ```bash
-# Set up secrets for echo capsule
-demonctl secrets set echo/api_key your_api_key_here
-demonctl secrets set echo/prefix "Secret: "
+# Set up secrets for echo capsule using envfile provider
+demonctl secrets set echo/api_key your_api_key_here --provider envfile
+demonctl secrets set echo/prefix "Secret: " --provider envfile
+
+# Or using vault provider
+export CONFIG_SECRETS_PROVIDER=vault
+export VAULT_ADDR=file://vault_stub
+demonctl secrets set echo/api_key your_api_key_here --provider vault
+demonctl secrets set echo/prefix "Secret: " --provider vault
 
 # Create config file using secret URIs
 cat > .demon/config/echo.json << EOF
@@ -466,10 +550,13 @@ cat > .demon/config/echo.json << EOF
 }
 EOF
 
-# Validate config with secrets
+# Validate config with secrets (respects CONFIG_SECRETS_PROVIDER)
+demonctl contracts validate-config .demon/config/echo.json
+
+# Or validate with specific secrets file (envfile only)
 demonctl contracts validate-config .demon/config/echo.json --secrets-file .demon/secrets.json
 
-# Run ritual (secrets automatically resolved)
+# Run ritual (secrets automatically resolved using configured provider)
 demonctl run examples/rituals/echo.yaml
 ```
 

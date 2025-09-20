@@ -7,8 +7,10 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 use tracing::{debug, instrument};
 
+pub mod provider_factory;
 pub mod secrets;
 pub mod secrets_store;
+pub use provider_factory::{ProviderFactoryError, SecretProviderFactory, VaultStubProvider};
 pub use secrets::{EnvFileSecretProvider, SecretError, SecretProvider};
 pub use secrets_store::{SecretsStore, StoreError};
 

@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use config_loader::{
-    ConfigError, ConfigManager, EnvFileSecretProvider, SecretProvider, ValidationError,
+    ConfigError, ConfigManager, EnvFileSecretProvider, SecretProvider, SecretProviderFactory,
+    ValidationError,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -37,16 +38,30 @@ pub struct Router {
 
 impl Router {
     pub fn new() -> Self {
+        // Use factory to create provider based on environment configuration
+        let secret_provider = SecretProviderFactory::create()
+            .unwrap_or_else(|e| {
+                tracing::warn!("Failed to create secret provider from factory: {}. Falling back to EnvFileSecretProvider", e);
+                Box::new(EnvFileSecretProvider::new())
+            });
+
         Self {
             config_manager: ConfigManager::new(),
-            secret_provider: Box::new(EnvFileSecretProvider::new()),
+            secret_provider,
         }
     }
 
     pub fn with_config_manager(config_manager: ConfigManager) -> Self {
+        // Use factory to create provider based on environment configuration
+        let secret_provider = SecretProviderFactory::create()
+            .unwrap_or_else(|e| {
+                tracing::warn!("Failed to create secret provider from factory: {}. Falling back to EnvFileSecretProvider", e);
+                Box::new(EnvFileSecretProvider::new())
+            });
+
         Self {
             config_manager,
-            secret_provider: Box::new(EnvFileSecretProvider::new()),
+            secret_provider,
         }
     }
 
