@@ -111,6 +111,7 @@ fn cancel_prevents_fire_without_sleep() {
     let run = "run-ttl-4";
     let ritual = "ritual-ttl";
     let gate = "g-4";
+    engine::rituals::timers::reset_cancel_counter();
     let key = engine::rituals::approvals::expiry_key(run, gate);
 
     let mut wheel = engine::rituals::timers::TimerWheel::new_with_time(t0);
