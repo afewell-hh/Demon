@@ -176,7 +176,9 @@ async fn test_router_succeeds_with_vault_secret_resolution() {
 
     // Verify the secret was actually stored by creating a new provider instance
     let verify_provider = VaultStubProvider::from_env().unwrap();
-    verify_provider.resolve("api", "key").expect("Secret should be stored and retrievable");
+    verify_provider
+        .resolve("api", "key")
+        .expect("Secret should be stored and retrievable");
     drop(verify_provider);
 
     let config_manager = config_loader::ConfigManager::with_dirs(contracts_dir, config_dir);
@@ -196,10 +198,17 @@ async fn test_router_succeeds_with_vault_secret_resolution() {
         eprintln!("Router dispatch failed: {}", e);
         eprintln!("Error details: {:?}", e);
         eprintln!("VAULT_ADDR: {:?}", env::var("VAULT_ADDR"));
-        eprintln!("CONFIG_SECRETS_PROVIDER: {:?}", env::var("CONFIG_SECRETS_PROVIDER"));
+        eprintln!(
+            "CONFIG_SECRETS_PROVIDER: {:?}",
+            env::var("CONFIG_SECRETS_PROVIDER")
+        );
         eprintln!("Vault dir exists: {}", vault_dir.exists());
-        eprintln!("Vault dir contents: {:?}", fs::read_dir(&vault_dir).map(|entries|
-            entries.map(|e| e.map(|entry| entry.file_name())).collect::<Result<Vec<_>, _>>()));
+        eprintln!(
+            "Vault dir contents: {:?}",
+            fs::read_dir(&vault_dir).map(|entries| entries
+                .map(|e| e.map(|entry| entry.file_name()))
+                .collect::<Result<Vec<_>, _>>())
+        );
     }
     assert!(result.is_ok(), "Router dispatch failed: {:?}", result.err());
 
