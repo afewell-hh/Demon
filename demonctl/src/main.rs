@@ -188,6 +188,15 @@ enum ContractsCommands {
         #[arg(long)]
         secrets_file: Option<String>,
     },
+    /// Export contracts bundle with schemas and WIT definitions
+    Bundle {
+        /// Output format (json, summary)
+        #[arg(long, default_value = "summary")]
+        format: String,
+        /// Include WIT definitions in the bundle
+        #[arg(long)]
+        include_wit: bool,
+    },
 }
 
 #[derive(Copy, Clone, Debug, ValueEnum)]
@@ -580,6 +589,12 @@ async fn handle_contracts_command(cmd: ContractsCommands) -> Result<()> {
                 anyhow::bail!("Must specify either a file path or --stdin");
             }
         }
+        ContractsCommands::Bundle {
+            format,
+            include_wit,
+        } => {
+            export_contracts_bundle(&format, include_wit).await?;
+        }
     }
     Ok(())
 }
@@ -868,6 +883,96 @@ async fn validate_config_stdin(schema: Option<String>, secrets_file: Option<Stri
             std::process::exit(1);
         }
     }
+}
+
+async fn export_contracts_bundle(format: &str, include_wit: bool) -> Result<()> {
+    use std::collections::BTreeMap;
+    use std::fs;
+
+    let contracts_dir = PathBuf::from("contracts");
+
+    // Collect all schemas
+    let schemas_dir = contracts_dir.join("schemas");
+    let mut schemas = BTreeMap::new();
+
+    if schemas_dir.exists() {
+        for entry in fs::read_dir(&schemas_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("json") {
+                let name = path
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unknown");
+                let content = fs::read_to_string(&path)?;
+                schemas.insert(name.to_string(), content);
+            }
+        }
+    }
+
+    // Collect the envelope schema
+    let envelope_schema_path = contracts_dir.join("envelopes/result.json");
+    if envelope_schema_path.exists() {
+        let content = fs::read_to_string(&envelope_schema_path)?;
+        schemas.insert("result-envelope.json".to_string(), content);
+    }
+
+    // Collect WIT definitions if requested
+    let mut wit_definitions = BTreeMap::new();
+    if include_wit {
+        let wit_dir = contracts_dir.join("wit");
+        if wit_dir.exists() {
+            for entry in fs::read_dir(&wit_dir)? {
+                let entry = entry?;
+                let path = entry.path();
+                if path.extension().and_then(|s| s.to_str()) == Some("wit") {
+                    let name = path
+                        .file_name()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("unknown");
+                    let content = fs::read_to_string(&path)?;
+                    wit_definitions.insert(name.to_string(), content);
+                }
+            }
+        }
+    }
+
+    match format {
+        "json" => {
+            let bundle = serde_json::json!({
+                "version": "1.0.0",
+                "schemas": schemas,
+                "wit": wit_definitions,
+            });
+            println!("{}", serde_json::to_string_pretty(&bundle)?);
+        }
+        _ => {
+            println!("Contract Bundle Summary");
+            println!("=======================");
+            println!();
+            println!("Schemas ({}):", schemas.len());
+            for (name, content) in &schemas {
+                let lines = content.lines().count();
+                let bytes = content.len();
+                println!("  - {} ({} lines, {} bytes)", name, lines, bytes);
+            }
+
+            if include_wit && !wit_definitions.is_empty() {
+                println!();
+                println!("WIT Definitions ({}):", wit_definitions.len());
+                for (name, content) in &wit_definitions {
+                    let lines = content.lines().count();
+                    let bytes = content.len();
+                    println!("  - {} ({} lines, {} bytes)", name, lines, bytes);
+                }
+            }
+
+            println!();
+            println!("Total contracts: {}", schemas.len() + wit_definitions.len());
+        }
+    }
+
+    Ok(())
 }
 
 fn handle_secrets_command(cmd: SecretsCommands) -> Result<()> {

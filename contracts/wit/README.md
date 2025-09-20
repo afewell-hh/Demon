@@ -1,4 +1,16 @@
 # WIT Contracts (Sigils)
 
-This folder will contain WIT interfaces such as `demon.timer`, `demon.kv`, and `demon.http`.
-Milestone 0 does not implement WIT yet, but the structure exists to enforce interface-first design.
+This folder contains WebAssembly Interface Type (WIT) definitions for Demon contracts.
+
+## Available Interfaces
+
+- `demon-envelope.wit` - Result envelope interface with typed bindings for operation results, diagnostics, suggestions, metrics, and provenance
+
+## Usage
+
+These WIT definitions provide typed interfaces that can be used by capsule authors and downstream tooling to ensure type safety when working with Demon contracts.
+
+To export all contracts including WIT definitions:
+```bash
+demonctl contracts bundle --include-wit --format json
+```

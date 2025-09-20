@@ -1,0 +1,170 @@
+// Result Envelope WIT Interface
+// This interface defines typed bindings for the Demon Result Envelope contract
+// Version: v1
+
+package demon:contracts@0.1.0;
+
+/// The Result Envelope interface for operation results with diagnostics, suggestions, and metrics
+interface result-envelope {
+    /// Represents a timestamp in RFC3339 format
+    type timestamp = string;
+
+    /// Diagnostic severity levels
+    enum diagnostic-level {
+        debug,
+        info,
+        warning,
+        error,
+        fatal,
+    }
+
+    /// Types of suggestions that can be provided
+    enum suggestion-type {
+        action,
+        modification,
+        configuration,
+        optimization,
+    }
+
+    /// Priority levels for suggestions
+    enum suggestion-priority {
+        low,
+        medium,
+        high,
+        critical,
+    }
+
+    /// JSON Patch operation types (RFC 6902)
+    enum json-patch-op {
+        add,
+        remove,
+        replace,
+        move,
+        copy,
+        test,
+    }
+
+    /// Error information for failed operations
+    record error-info {
+        message: string,
+        code: option<string>,
+        details: option<string>, // JSON serialized details
+    }
+
+    /// Diagnostic message with context
+    record diagnostic {
+        level: diagnostic-level,
+        message: string,
+        timestamp: option<timestamp>,
+        source: option<string>,
+        context: option<string>, // JSON serialized context
+    }
+
+    /// JSON Patch operation definition
+    record json-patch-operation {
+        op: json-patch-op,
+        path: string,
+        value: option<string>, // JSON serialized value
+        from: option<string>,
+    }
+
+    /// Suggestion for improvements or corrections
+    record suggestion {
+        suggestion-type: suggestion-type,
+        description: string,
+        patch: option<list<json-patch-operation>>,
+        priority: option<suggestion-priority>,
+        rationale: option<string>,
+    }
+
+    /// Duration metrics
+    record duration-metrics {
+        total-ms: option<float64>,
+        phases: list<tuple<string, float64>>, // Phase name to duration mapping
+    }
+
+    /// Resource usage metrics
+    record resource-metrics {
+        memory-bytes: option<s64>,
+        cpu-percent: option<float64>,
+        io-operations: option<s64>,
+        additional: list<tuple<string, string>>, // Additional metrics as JSON values
+    }
+
+    /// Performance and operational metrics
+    record metrics {
+        duration: option<duration-metrics>,
+        resources: option<resource-metrics>,
+        counters: list<tuple<string, s64>>, // Counter name to value mapping
+        custom: option<string>, // JSON serialized custom metrics
+    }
+
+    /// Source system information
+    record source-info {
+        system: string,
+        version: option<string>,
+        instance: option<string>,
+    }
+
+    /// Processing step in the chain of custody
+    record processing-step {
+        step: string,
+        timestamp: timestamp,
+        actor: option<string>,
+        signature: option<string>,
+    }
+
+    /// Provenance and chain of custody information
+    record provenance {
+        source: option<source-info>,
+        timestamp: option<timestamp>,
+        trace-id: option<string>,
+        span-id: option<string>,
+        parent-span-id: option<string>,
+        chain: list<processing-step>,
+    }
+
+    /// Operation result variant - success case
+    record success-result {
+        success: bool,
+        data: string, // JSON serialized data
+    }
+
+    /// Operation result variant - error case
+    record error-result {
+        success: bool,
+        error: error-info,
+    }
+
+    /// The complete result envelope
+    record result-envelope {
+        /// Result must be either success or error variant
+        result: variant {
+            success(success-result),
+            error(error-result),
+        },
+        diagnostics: list<diagnostic>,
+        suggestions: list<suggestion>,
+        metrics: option<metrics>,
+        provenance: option<provenance>,
+    }
+
+    /// Parse a JSON string into a result envelope
+    parse-envelope: func(json: string) -> result<result-envelope, string>;
+
+    /// Serialize a result envelope to JSON
+    serialize-envelope: func(envelope: result-envelope) -> result<string, string>;
+
+    /// Validate a result envelope against the schema
+    validate-envelope: func(envelope: result-envelope) -> result<bool, list<string>>;
+}
+
+/// World definition for capsules that produce result envelopes
+world capsule-with-envelope {
+    import result-envelope;
+}
+
+/// World definition for systems that consume result envelopes
+world envelope-consumer {
+    export result-envelope;
+}

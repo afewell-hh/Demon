@@ -6,7 +6,8 @@ The Result Envelope provides a standardized format for operation results through
 
 ## Schema
 
-- **Location**: `contracts/envelopes/result.json`
+- **JSON Schema**: `contracts/envelopes/result.json`
+- **WIT Definition**: `contracts/wit/demon-envelope.wit`
 - **Schema Draft**: JSON Schema Draft 7
 - **ID**: `https://demon.meta/contracts/envelopes/result.json`
 
@@ -107,6 +108,23 @@ Schema validation is enforced through:
 - JSON Schema validation in tests
 - Runtime validation in consuming services
 - CI/CD pipeline validation for fixture updates
+
+## WIT Interface
+
+The Result Envelope has a corresponding WebAssembly Interface Type (WIT) definition at `contracts/wit/demon-envelope.wit` that provides:
+
+- Typed bindings for all envelope components
+- Support for capsule authors to generate type-safe code
+- Functions for parsing, serializing, and validating envelopes
+
+## Registry Export
+
+The Result Envelope schema and WIT definition are published as part of the contract registry:
+
+```bash
+# Export all contracts including the envelope
+demonctl contracts bundle --include-wit --format json
+```
 
 ## Integration Points
 

@@ -1,0 +1,9 @@
+{
+  "result": {
+    "success": true,
+    "data": {
+      "message": "Operation completed successfully",
+      "id": "op-12345"
+    }
+  }
+}
