@@ -24,6 +24,7 @@ pub struct AppState {
     pub jetstream_client: Option<jetstream::JetStreamClient>,
     pub tera: Tera,
     pub admin_token: Option<String>,
+    pub bundle_loader: runtime::bundle::BundleLoader,
 }
 
 impl AppState {
@@ -82,10 +83,14 @@ impl AppState {
 
         let admin_token = std::env::var("ADMIN_TOKEN").ok();
 
+        // Initialize bundle loader
+        let bundle_loader = runtime::bundle::BundleLoader::new(None);
+
         Self {
             jetstream_client,
             tera,
             admin_token,
+            bundle_loader,
         }
     }
 
@@ -292,6 +297,11 @@ pub fn create_app(state: AppState) -> Router {
         .route(
             "/api/contracts/validate/envelope/bulk",
             post(contracts::validate_envelope_bulk_endpoint),
+        )
+        // Contract bundle status endpoint
+        .route(
+            "/api/contracts/status",
+            get(contracts::bundle_status_endpoint),
         )
         // Legacy routes (redirect to default tenant)
         .route("/runs", get(routes::list_runs_html))
