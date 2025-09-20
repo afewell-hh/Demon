@@ -169,6 +169,9 @@ async fn test_router_succeeds_with_vault_secret_resolution() {
     let vault_provider = VaultStubProvider::from_env().unwrap();
     vault_provider.put("api", "key", "test-api-key").unwrap();
 
+    // Ensure the vault data is properly flushed
+    drop(vault_provider);
+
     let config_manager = config_loader::ConfigManager::with_dirs(contracts_dir, config_dir);
     let router = Router::with_config_manager(config_manager);
 
@@ -182,7 +185,11 @@ async fn test_router_succeeds_with_vault_secret_resolution() {
         )
         .await;
 
-    assert!(result.is_ok());
+    if let Err(e) = &result {
+        eprintln!("Router dispatch failed: {}", e);
+        eprintln!("Error details: {:?}", e);
+    }
+    assert!(result.is_ok(), "Router dispatch failed: {:?}", result.err());
 
     // Clean up
     env::remove_var("CONFIG_SECRETS_PROVIDER");
