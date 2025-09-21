@@ -1,41 +1,8 @@
-use config_loader::{SecretProvider, VaultHttpSecretProvider};
-use serde_json::json;
-use std::sync::{Arc, Mutex};
+use config_loader::VaultHttpSecretProvider;
 
-/// Mock HTTP server for testing Vault interactions
-struct MockVaultServer {
-    received_requests: Arc<Mutex<Vec<MockRequest>>>,
-    port: u16,
-}
-
-#[derive(Debug, Clone)]
-struct MockRequest {
-    method: String,
-    path: String,
-    headers: Vec<(String, String)>,
-    body: Option<String>,
-}
-
-impl MockVaultServer {
-    fn new() -> Self {
-        // Use httptest would be ideal, but for now we'll use a simpler approach
-        // In a real implementation, we'd use httptest or similar
-        Self {
-            received_requests: Arc::new(Mutex::new(Vec::new())),
-            port: 8200, // Default Vault port
-        }
-    }
-
-    fn start(&self) -> String {
-        // In a real implementation, this would start an HTTP server
-        // For now, return the mock URL
-        format!("http://127.0.0.1:{}", self.port)
-    }
-
-    fn get_requests(&self) -> Vec<MockRequest> {
-        self.received_requests.lock().unwrap().clone()
-    }
-}
+// Note: Full integration tests with actual HTTP calls would require httptest
+// or a similar mock server library. For now, we're testing the configuration
+// and initialization aspects.
 
 #[test]
 fn test_vault_http_provider_creation_with_token() {
@@ -116,10 +83,6 @@ fn test_vault_http_provider_retry_configuration() {
     std::env::remove_var("VAULT_ADDR");
     std::env::remove_var("VAULT_RETRY_ATTEMPTS");
 }
-
-// Note: Full integration tests with actual HTTP calls would require httptest
-// or a similar mock server library. For now, we're testing the configuration
-// and initialization aspects.
 
 #[test]
 #[ignore] // This test requires a running Vault instance or httptest
