@@ -6,10 +6,21 @@ use config_loader::VaultHttpSecretProvider;
 
 #[test]
 fn test_vault_http_provider_creation_with_token() {
+    // Clean up any existing environment variables first
+    std::env::remove_var("VAULT_TOKEN");
+    std::env::remove_var("VAULT_ADDR");
+    std::env::remove_var("VAULT_NAMESPACE");
+    std::env::remove_var("VAULT_CA_CERT");
+    std::env::remove_var("VAULT_SKIP_VERIFY");
+    std::env::remove_var("VAULT_RETRY_ATTEMPTS");
+
     std::env::set_var("VAULT_TOKEN", "test-token-123");
     std::env::set_var("VAULT_ADDR", "http://localhost:8200");
 
     let provider = VaultHttpSecretProvider::from_env();
+    if let Err(ref e) = provider {
+        eprintln!("Provider creation failed with error: {}", e);
+    }
     assert!(provider.is_ok(), "Should create provider with valid token");
 
     std::env::remove_var("VAULT_TOKEN");
