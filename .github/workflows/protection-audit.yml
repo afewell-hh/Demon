@@ -44,8 +44,8 @@ jobs:
           # Get protection settings
           protection=$(gh api repos/:owner/:repo/branches/$BR/protection)
 
-          # Required checks (exactly these 3)
-          required_contexts='["Bootstrapper bundles — verify (offline, signature ok)","Bootstrapper bundles — negative verify (tamper ⇒ failed)","review-lock-guard"]'
+          # Required checks (exactly these 4)
+          required_contexts='["Bootstrapper bundles — verify (offline, signature ok)","Bootstrapper bundles — negative verify (tamper ⇒ failed)","review-lock-guard","review-threads-guard (PR) / guard"]'
           actual_contexts=$(echo "$protection" | jq -c '.required_status_checks.contexts | sort')
           expected_contexts=$(echo "$required_contexts" | jq -c 'sort')
 
