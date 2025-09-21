@@ -660,6 +660,44 @@ jobs:
           fi
           echo "✓ Second remote-nats bootstrap run completed successfully"
 
+      - name: Generate contract bundle for release
+        run: |
+          echo "=== Generating contract bundle ==="
+          mkdir -p dist/contracts
+
+          # Generate bundle.json with schemas and WIT definitions
+          cargo run -p demonctl -- contracts bundle --format json --include-wit > dist/contracts/bundle.json
+
+          # Calculate SHA-256 of bundle
+          BUNDLE_SHA256=$(shasum -a 256 dist/contracts/bundle.json | cut -d' ' -f1)
+
+          # Create manifest.json with metadata
+          jq -n \
+            --arg version "1.0.0" \
+            --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg git_sha "$(git rev-parse HEAD)" \
+            --arg bundle_sha256 "$BUNDLE_SHA256" \
+            '{
+              version: $version,
+              timestamp: $timestamp,
+              git: {sha: $git_sha},
+              bundle_sha256: $bundle_sha256
+            }' > dist/contracts/manifest.json
+
+          # Create checksum file for easy verification
+          echo "$BUNDLE_SHA256  bundle.json" > dist/contracts/bundle.sha256
+
+          echo "Bundle SHA-256: $BUNDLE_SHA256"
+          echo "Generated files:"
+          ls -la dist/contracts/
+
+      - name: Upload contract bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-bundle
+          path: dist/contracts/
+          retention-days: 30
+
       - name: Teardown NATS
         if: always()
         run: |
