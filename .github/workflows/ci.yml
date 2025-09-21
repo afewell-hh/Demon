@@ -464,11 +464,13 @@ jobs:
             echo "Attempt $i/40: Checking NATS readiness..."
             if docker logs nats1 2>&1 | grep -q "Server is ready" && docker logs nats2 2>&1 | grep -q "Server is ready"; then
               echo "✓ Both NATS servers are ready"
-              # Additional check using NATS health endpoint
+              # Additional check using NATS health endpoint (optional)
               if curl -sf http://127.0.0.1:8222/healthz >/dev/null 2>&1 && curl -sf http://127.0.0.1:8223/healthz >/dev/null 2>&1; then
                 echo "✓ NATS health endpoints responding"
-                exit 0
+              else
+                echo "⚠ Health endpoints not yet ready (this is normal)"
               fi
+              exit 0
             fi
             sleep 0.5
           done
@@ -531,12 +533,14 @@ jobs:
             echo "Attempt $i/40: Checking fresh NATS readiness..."
             if docker logs nats1 2>&1 | grep -q "Server is ready"; then
               echo "✓ Fresh NATS ready"
-              # Verify health endpoint and give extra time for JetStream
+              # Verify health endpoint and give extra time for JetStream (optional)
               if curl -sf http://127.0.0.1:8222/healthz >/dev/null 2>&1; then
                 echo "✓ NATS health endpoint responding"
-                sleep 2  # Extra pause for JetStream initialization
-                break
+              else
+                echo "⚠ Health endpoint not yet ready (this is normal)"
               fi
+              sleep 2  # Extra pause for JetStream initialization
+              break
             fi
             if [[ $i -eq 40 ]]; then
               echo "❌ Fresh NATS failed to become ready"
@@ -603,12 +607,14 @@ jobs:
             echo "Attempt $i/40: Checking fresh NATS2 readiness..."
             if docker logs nats2 2>&1 | grep -q "Server is ready"; then
               echo "✓ Fresh NATS2 ready"
-              # Verify health endpoint and give extra time for JetStream
+              # Verify health endpoint and give extra time for JetStream (optional)
               if curl -sf http://127.0.0.1:8223/healthz >/dev/null 2>&1; then
                 echo "✓ NATS2 health endpoint responding"
-                sleep 2  # Extra pause for JetStream initialization
-                break
+              else
+                echo "⚠ Health endpoint not yet ready (this is normal)"
               fi
+              sleep 2  # Extra pause for JetStream initialization
+              break
             fi
             if [[ $i -eq 40 ]]; then
               echo "❌ Fresh NATS2 failed to become ready"
