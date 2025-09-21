@@ -86,5 +86,5 @@ jobs:
           echo "✅ MVP protection policy verified"
       - name: Info mode (no admin token)
         if: steps.gate.outputs.audit_skip_admin == 'true'
-        run: echo "Audit in info mode: no admin token; skipping protection assertions."
+        run: echo "Audit in info mode - no admin token, skipping protection assertions."
 
