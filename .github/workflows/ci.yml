@@ -473,8 +473,11 @@ jobs:
         run: |
           # Capture stderr to prevent error messages from being lost
           cargo run -q -p demonctl -- bootstrap --profile local-dev --ensure-stream --seed --verify 2>&1 | tee /tmp/local1.log
-          # Clean up NATS streams between runs to ensure idempotency
-          docker exec nats1 nats stream rm RITUAL_EVENTS --force || true
+          # Restart NATS container to clean state between runs
+          docker restart nats1
+          for i in {1..40}; do
+            docker logs nats1 2>&1 | grep -q "Server is ready" && break || sleep 0.5
+          done
           cargo run -q -p demonctl -- bootstrap --profile local-dev --ensure-stream --seed --verify 2>&1 | tee /tmp/local2.log
           # second run should complete cleanly
           grep -q 'seed: ok' /tmp/local2.log
@@ -486,8 +489,11 @@ jobs:
         run: |
           # Capture stderr to prevent error messages from being lost
           cargo run -q -p demonctl -- bootstrap --profile remote-nats --ensure-stream --seed --verify 2>&1 | tee /tmp/remote1.log
-          # Clean up NATS streams between runs to ensure idempotency
-          docker exec nats2 nats stream rm RITUAL_EVENTS --force || true
+          # Restart NATS container to clean state between runs
+          docker restart nats2
+          for i in {1..40}; do
+            docker logs nats2 2>&1 | grep -q "Server is ready" && break || sleep 0.5
+          done
           cargo run -q -p demonctl -- bootstrap --profile remote-nats --ensure-stream --seed --verify 2>&1 | tee /tmp/remote2.log
           grep -q 'seed: ok' /tmp/remote2.log
           grep -q 'verify: ok' /tmp/remote2.log
