@@ -473,6 +473,13 @@ jobs:
         run: |
           # Capture stderr to prevent error messages from being lost
           cargo run -q -p demonctl -- bootstrap --profile local-dev --ensure-stream --seed --verify 2>&1 | tee /tmp/local1.log
+          # Recreate NATS container to clean state between runs (restart preserves JetStream data)
+          docker stop nats1 || true && docker rm nats1 || true
+          docker run -d --rm --name nats1 -p 4222:4222 -p 8222:8222 nats:2.10 -js
+          for i in {1..40}; do
+            docker logs nats1 2>&1 | grep -q "Server is ready" && break || sleep 0.5
+          done
+          sleep 2  # Extra pause for JetStream initialization
           cargo run -q -p demonctl -- bootstrap --profile local-dev --ensure-stream --seed --verify 2>&1 | tee /tmp/local2.log
           # second run should complete cleanly
           grep -q 'seed: ok' /tmp/local2.log
@@ -484,6 +491,13 @@ jobs:
         run: |
           # Capture stderr to prevent error messages from being lost
           cargo run -q -p demonctl -- bootstrap --profile remote-nats --ensure-stream --seed --verify 2>&1 | tee /tmp/remote1.log
+          # Recreate NATS container to clean state between runs (restart preserves JetStream data)
+          docker stop nats2 || true && docker rm nats2 || true
+          docker run -d --rm --name nats2 -p 4223:4222 -p 8223:8222 nats:2.10 -js
+          for i in {1..40}; do
+            docker logs nats2 2>&1 | grep -q "Server is ready" && break || sleep 0.5
+          done
+          sleep 2  # Extra pause for JetStream initialization
           cargo run -q -p demonctl -- bootstrap --profile remote-nats --ensure-stream --seed --verify 2>&1 | tee /tmp/remote2.log
           grep -q 'seed: ok' /tmp/remote2.log
           grep -q 'verify: ok' /tmp/remote2.log
