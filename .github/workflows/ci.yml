@@ -473,8 +473,9 @@ jobs:
         run: |
           # Capture stderr to prevent error messages from being lost
           cargo run -q -p demonctl -- bootstrap --profile local-dev --ensure-stream --seed --verify 2>&1 | tee /tmp/local1.log
-          # Restart NATS container to clean state between runs
-          docker restart nats1
+          # Recreate NATS container to clean state between runs (restart preserves JetStream data)
+          docker stop nats1 && docker rm nats1
+          docker run -d --rm --name nats1 -p 4222:4222 -p 8222:8222 nats:2.10 -js
           for i in {1..40}; do
             docker logs nats1 2>&1 | grep -q "Server is ready" && break || sleep 0.5
           done
@@ -489,8 +490,9 @@ jobs:
         run: |
           # Capture stderr to prevent error messages from being lost
           cargo run -q -p demonctl -- bootstrap --profile remote-nats --ensure-stream --seed --verify 2>&1 | tee /tmp/remote1.log
-          # Restart NATS container to clean state between runs
-          docker restart nats2
+          # Recreate NATS container to clean state between runs (restart preserves JetStream data)
+          docker stop nats2 && docker rm nats2
+          docker run -d --rm --name nats2 -p 4223:4222 -p 8223:8222 nats:2.10 -js
           for i in {1..40}; do
             docker logs nats2 2>&1 | grep -q "Server is ready" && break || sleep 0.5
           done
