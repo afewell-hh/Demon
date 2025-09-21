@@ -158,5 +158,3 @@ curl -X POST http://localhost:3000/api/approvals/{run_id}/{gate_id}/deny \
 - One‑pager: docs/process/MVP.md
 - Branch protections (MVP): docs/process/branch_protection_mvp.md
 - Project board: https://github.com/users/afewell-hh/projects/1
-
-# Test comment to trigger audit
