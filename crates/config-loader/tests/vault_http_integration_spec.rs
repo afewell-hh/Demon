@@ -1,11 +1,17 @@
 use config_loader::VaultHttpSecretProvider;
+use std::sync::Mutex;
 
 // Note: Full integration tests with actual HTTP calls would require httptest
 // or a similar mock server library. For now, we're testing the configuration
 // and initialization aspects.
 
+// Mutex to ensure environment variable tests run serially
+static ENV_MUTEX: Mutex<()> = Mutex::new(());
+
 #[test]
 fn test_vault_http_provider_creation_with_token() {
+    let _guard = ENV_MUTEX.lock().unwrap();
+
     // Clean up any existing environment variables first
     std::env::remove_var("VAULT_TOKEN");
     std::env::remove_var("VAULT_ADDR");
@@ -29,6 +35,8 @@ fn test_vault_http_provider_creation_with_token() {
 
 #[test]
 fn test_vault_http_provider_creation_without_token_fails() {
+    let _guard = ENV_MUTEX.lock().unwrap();
+
     std::env::remove_var("VAULT_TOKEN");
     std::env::set_var("VAULT_ADDR", "http://localhost:8200");
 
@@ -47,6 +55,8 @@ fn test_vault_http_provider_creation_without_token_fails() {
 
 #[test]
 fn test_vault_http_provider_invalid_addr() {
+    let _guard = ENV_MUTEX.lock().unwrap();
+
     std::env::set_var("VAULT_TOKEN", "test-token");
     std::env::set_var("VAULT_ADDR", "invalid://address");
 
@@ -66,6 +76,8 @@ fn test_vault_http_provider_invalid_addr() {
 
 #[test]
 fn test_vault_http_provider_with_namespace() {
+    let _guard = ENV_MUTEX.lock().unwrap();
+
     std::env::set_var("VAULT_TOKEN", "test-token");
     std::env::set_var("VAULT_ADDR", "http://localhost:8200");
     std::env::set_var("VAULT_NAMESPACE", "my-namespace");
@@ -80,6 +92,8 @@ fn test_vault_http_provider_with_namespace() {
 
 #[test]
 fn test_vault_http_provider_retry_configuration() {
+    let _guard = ENV_MUTEX.lock().unwrap();
+
     std::env::set_var("VAULT_TOKEN", "test-token");
     std::env::set_var("VAULT_ADDR", "http://localhost:8200");
     std::env::set_var("VAULT_RETRY_ATTEMPTS", "5");
