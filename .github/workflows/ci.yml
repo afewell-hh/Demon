@@ -447,14 +447,37 @@ jobs:
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
+      - name: Clean up any existing containers
+        run: |
+          echo "=== Initial container cleanup ==="
+          docker rm -f nats1 nats2 || true
+          docker ps -a | grep nats || echo "No NATS containers found"
+
       - name: Start NATS (4222) and NATS (4223)
         run: |
+          echo "=== Starting NATS containers ==="
           docker run -d --rm --name nats1 -p 4222:4222 -p 8222:8222 nats:2.10 -js
           docker run -d --rm --name nats2 -p 4223:4222 -p 8223:8222 nats:2.10 -js
+
+          echo "=== Waiting for NATS readiness ==="
           for i in {1..40}; do
-            docker logs nats1 2>&1 | grep -q "Server is ready" && docker logs nats2 2>&1 | grep -q "Server is ready" && exit 0 || sleep 0.5
+            echo "Attempt $i/40: Checking NATS readiness..."
+            if docker logs nats1 2>&1 | grep -q "Server is ready" && docker logs nats2 2>&1 | grep -q "Server is ready"; then
+              echo "✓ Both NATS servers are ready"
+              # Additional check using NATS health endpoint
+              if curl -sf http://127.0.0.1:8222/healthz >/dev/null 2>&1 && curl -sf http://127.0.0.1:8223/healthz >/dev/null 2>&1; then
+                echo "✓ NATS health endpoints responding"
+                exit 0
+              fi
+            fi
+            sleep 0.5
           done
-          echo ready check failed; exit 1
+          echo "❌ NATS readiness check failed"
+          echo "=== NATS1 logs ==="
+          docker logs nats1 || true
+          echo "=== NATS2 logs ==="
+          docker logs nats2 || true
+          exit 1
 
       - name: Build workspace
         run: cargo build --workspace
@@ -464,43 +487,154 @@ jobs:
           RITUAL_STREAM_NAME: RITUAL_EVENTS_BUNDLES
           APPROVER_ALLOWLIST: ops@example.com
         run: |
+          echo "=== Starting Operate UI ==="
           nohup bash -c 'APPROVER_ALLOWLIST=ops@example.com RITUAL_STREAM_NAME=RITUAL_EVENTS_BUNDLES cargo run -q -p operate-ui' >/tmp/ui.log 2>&1 &
-          for i in {1..60}; do curl -sf http://127.0.0.1:3000/api/runs >/dev/null 2>&1 && break || sleep 0.5; done
+
+          echo "=== Waiting for Operate UI readiness ==="
+          for i in {1..60}; do
+            echo "Attempt $i/60: Checking operate-ui readiness..."
+            code=$(curl -sS -o /tmp/runs.json -w "%{http_code}" http://127.0.0.1:3000/api/runs 2>/dev/null || echo "000")
+            if [[ "$code" == "200" ]] && jq -e . /tmp/runs.json >/dev/null 2>&1; then
+              echo "✓ Operate UI ready (HTTP $code)"
+              break
+            elif [[ $i -eq 60 ]]; then
+              echo "❌ Operate UI failed to start after 30 seconds"
+              echo "=== Operate UI logs ==="
+              cat /tmp/ui.log || true
+              exit 1
+            fi
+            sleep 0.5
+          done
+
+          echo "=== Starting TTL worker ==="
           nohup bash -c 'TTL_WORKER_ENABLED=1 RITUAL_STREAM_NAME=RITUAL_EVENTS_BUNDLES cargo run -q -p engine --bin demon-ttl-worker' >/tmp/worker.log 2>&1 &
           sleep 1
 
       - name: Run local-dev bundle (twice) with idempotency asserts
         run: |
-          # Capture stderr to prevent error messages from being lost
+          echo "=== First bootstrap run ==="
           cargo run -q -p demonctl -- bootstrap --profile local-dev --ensure-stream --seed --verify 2>&1 | tee /tmp/local1.log
-          # Recreate NATS container to clean state between runs (restart preserves JetStream data)
-          docker stop nats1 || true && docker rm nats1 || true
+
+          echo "=== Inspecting NATS streams before cleanup ==="
+          docker exec nats1 nats stream ls || echo "No streams or command failed"
+
+          echo "=== Recreating NATS container for clean state ==="
+          # Stop and remove to ensure no JetStream state persists
+          docker stop nats1 || true
+          docker rm nats1 || true
+
+          # Recreate with clean state
           docker run -d --rm --name nats1 -p 4222:4222 -p 8222:8222 nats:2.10 -js
+
+          echo "=== Waiting for fresh NATS readiness ==="
           for i in {1..40}; do
-            docker logs nats1 2>&1 | grep -q "Server is ready" && break || sleep 0.5
+            echo "Attempt $i/40: Checking fresh NATS readiness..."
+            if docker logs nats1 2>&1 | grep -q "Server is ready"; then
+              echo "✓ Fresh NATS ready"
+              # Verify health endpoint and give extra time for JetStream
+              if curl -sf http://127.0.0.1:8222/healthz >/dev/null 2>&1; then
+                echo "✓ NATS health endpoint responding"
+                sleep 2  # Extra pause for JetStream initialization
+                break
+              fi
+            fi
+            if [[ $i -eq 40 ]]; then
+              echo "❌ Fresh NATS failed to become ready"
+              docker logs nats1 || true
+              exit 1
+            fi
+            sleep 0.5
           done
-          sleep 2  # Extra pause for JetStream initialization
+
+          echo "=== Waiting for Operate UI to reconnect ==="
+          for i in {1..30}; do
+            echo "Attempt $i/30: Checking operate-ui after NATS restart..."
+            code=$(curl -sS -o /tmp/runs_check.json -w "%{http_code}" http://127.0.0.1:3000/api/runs 2>/dev/null || echo "000")
+            if [[ "$code" == "200" ]] && jq -e . /tmp/runs_check.json >/dev/null 2>&1; then
+              echo "✓ Operate UI reconnected (HTTP $code)"
+              break
+            elif [[ $i -eq 30 ]]; then
+              echo "❌ Operate UI failed to reconnect to fresh NATS"
+              echo "=== Operate UI logs after reconnection attempt ==="
+              tail -20 /tmp/ui.log || true
+              exit 1
+            fi
+            sleep 0.5
+          done
+
+          echo "=== Second bootstrap run ==="
           cargo run -q -p demonctl -- bootstrap --profile local-dev --ensure-stream --seed --verify 2>&1 | tee /tmp/local2.log
-          # second run should complete cleanly
-          grep -q 'seed: ok' /tmp/local2.log
-          grep -q 'verify: ok' /tmp/local2.log
+
+          echo "=== Verifying second run success ==="
+          if ! grep -q 'seed: ok' /tmp/local2.log; then
+            echo "❌ Second run did not show 'seed: ok'"
+            echo "=== Local2 log content ==="
+            cat /tmp/local2.log
+            exit 1
+          fi
+          if ! grep -q 'verify: ok' /tmp/local2.log; then
+            echo "❌ Second run did not show 'verify: ok'"
+            echo "=== Local2 log content ==="
+            cat /tmp/local2.log
+            exit 1
+          fi
+          echo "✓ Second bootstrap run completed successfully"
 
       - name: Run remote-nats bundle (twice) with idempotency asserts
         env:
           NATS_URL: nats://127.0.0.1:4223
         run: |
-          # Capture stderr to prevent error messages from being lost
+          echo "=== First remote-nats bootstrap run ==="
           cargo run -q -p demonctl -- bootstrap --profile remote-nats --ensure-stream --seed --verify 2>&1 | tee /tmp/remote1.log
-          # Recreate NATS container to clean state between runs (restart preserves JetStream data)
-          docker stop nats2 || true && docker rm nats2 || true
+
+          echo "=== Inspecting NATS2 streams before cleanup ==="
+          docker exec nats2 nats stream ls || echo "No streams or command failed"
+
+          echo "=== Recreating NATS2 container for clean state ==="
+          # Stop and remove to ensure no JetStream state persists
+          docker stop nats2 || true
+          docker rm nats2 || true
+
+          # Recreate with clean state
           docker run -d --rm --name nats2 -p 4223:4222 -p 8223:8222 nats:2.10 -js
+
+          echo "=== Waiting for fresh NATS2 readiness ==="
           for i in {1..40}; do
-            docker logs nats2 2>&1 | grep -q "Server is ready" && break || sleep 0.5
+            echo "Attempt $i/40: Checking fresh NATS2 readiness..."
+            if docker logs nats2 2>&1 | grep -q "Server is ready"; then
+              echo "✓ Fresh NATS2 ready"
+              # Verify health endpoint and give extra time for JetStream
+              if curl -sf http://127.0.0.1:8223/healthz >/dev/null 2>&1; then
+                echo "✓ NATS2 health endpoint responding"
+                sleep 2  # Extra pause for JetStream initialization
+                break
+              fi
+            fi
+            if [[ $i -eq 40 ]]; then
+              echo "❌ Fresh NATS2 failed to become ready"
+              docker logs nats2 || true
+              exit 1
+            fi
+            sleep 0.5
           done
-          sleep 2  # Extra pause for JetStream initialization
+
+          echo "=== Second remote-nats bootstrap run ==="
           cargo run -q -p demonctl -- bootstrap --profile remote-nats --ensure-stream --seed --verify 2>&1 | tee /tmp/remote2.log
-          grep -q 'seed: ok' /tmp/remote2.log
-          grep -q 'verify: ok' /tmp/remote2.log
+
+          echo "=== Verifying remote second run success ==="
+          if ! grep -q 'seed: ok' /tmp/remote2.log; then
+            echo "❌ Remote second run did not show 'seed: ok'"
+            echo "=== Remote2 log content ==="
+            cat /tmp/remote2.log
+            exit 1
+          fi
+          if ! grep -q 'verify: ok' /tmp/remote2.log; then
+            echo "❌ Remote second run did not show 'verify: ok'"
+            echo "=== Remote2 log content ==="
+            cat /tmp/remote2.log
+            exit 1
+          fi
+          echo "✓ Second remote-nats bootstrap run completed successfully"
 
       - name: Teardown NATS
         if: always()
