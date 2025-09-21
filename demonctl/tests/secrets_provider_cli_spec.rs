@@ -156,7 +156,7 @@ fn test_secrets_list_with_vault_provider() {
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Secrets (vault):"));
+    assert!(stdout.contains("Secrets (vault stub):"));
     assert!(stdout.contains("db:"));
     assert!(stdout.contains("api:"));
     assert!(stdout.contains("password: db-***")); // Should be redacted
@@ -175,7 +175,7 @@ fn test_secrets_list_with_vault_provider() {
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Secrets in scope 'db' (vault):"));
+    assert!(stdout.contains("Secrets in scope 'db' (vault stub):"));
     assert!(stdout.contains("password: db-***"));
     assert!(stdout.contains("username: ***"));
     assert!(!stdout.contains("api:"));
@@ -283,7 +283,7 @@ fn test_vault_provider_initialization_failure() {
 
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("Failed to initialize vault provider"));
+    assert!(stderr.contains("Failed to initialize Vault stub provider"));
 }
 
 #[test]
