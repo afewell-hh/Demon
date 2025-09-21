@@ -8,6 +8,23 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Check for GH_TOKEN early if gh CLI operations will be attempted
+if command -v gh >/dev/null 2>&1; then
+    if ! gh auth status >/dev/null 2>&1; then
+        if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "❌ Error: GitHub CLI is available but not authenticated."
+            echo ""
+            echo "Please export GH_TOKEN or authenticate with GitHub CLI:"
+            echo "  export GH_TOKEN=<your-github-token>"
+            echo "  # or"
+            echo "  gh auth login"
+            echo ""
+            echo "Note: GitHub operations will be skipped if authentication is not available."
+            exit 1
+        fi
+    fi
+fi
+
 echo "🧪 Testing contract bundle release logic..."
 cd "$PROJECT_ROOT"
 

@@ -66,7 +66,7 @@ jobs:
           # For scheduled/manual runs, generate bundle fresh
           echo "Generating contract bundle from HEAD..."
           mkdir -p dist/contracts/
-          demonctl contracts bundle --output dist/contracts/bundle.json --include-wit
+          cargo run -p demonctl -- contracts bundle --format json --include-wit > dist/contracts/bundle.json
 
           # Generate manifest
           GIT_SHA=$(git rev-parse HEAD)

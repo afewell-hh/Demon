@@ -41,3 +41,19 @@ audit-triage-issue:
 	@T="Review triage report — $$(date -u +%F)"; F=$$(ls -t pr-review-triage-*.md | head -n1); \
 	  gh issue create -t "$$T" -F "$$F" -l ops-audit >/dev/null || true; \
 	  echo "Created/attempted issue for $$F"
+
+bundle-contracts:
+	@echo "📦 Generating contract bundle..."
+	@mkdir -p dist/contracts
+	@$(CARGO) run -p demonctl -- contracts bundle \
+		--format json \
+		--include-wit \
+		> dist/contracts/bundle.json
+	@echo "📋 Generating manifest..."
+	@GIT_SHA=$$(git rev-parse HEAD); \
+	 TIMESTAMP=$$(date -u +"%Y-%m-%dT%H:%M:%SZ"); \
+	 BUNDLE_SHA256=$$(shasum -a 256 dist/contracts/bundle.json | cut -d' ' -f1); \
+	 REPO=$$(git config --get remote.origin.url | sed 's/.*github.com[:/]\(.*\)\.git/\1/'); \
+	 REF=$$(git symbolic-ref -q --short HEAD || git rev-parse HEAD); \
+	 echo '{"version":"1.0.0","timestamp":"'$$TIMESTAMP'","git":{"sha":"'$$GIT_SHA'","repository":"'$$REPO'","ref":"'$$REF'"},"bundle_sha256":"'$$BUNDLE_SHA256'","trigger":"local"}' | jq '.' > dist/contracts/manifest.json
+	@echo "✓ Bundle and manifest created in dist/contracts/"
