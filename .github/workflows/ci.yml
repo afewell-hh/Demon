@@ -141,7 +141,7 @@ jobs:
       - name: Smoke run (demonctl)
         run: |
           set -euo pipefail
-          OUT="$(cargo run -q -p demonctl -- run examples/rituals/echo.yaml)"
+          OUT="$(cargo run -p demonctl -- run examples/rituals/echo.yaml)"
           echo "$OUT"
           echo "$OUT" | grep -q '"event": "ritual.completed:v1"'
           echo "$OUT" | grep -q 'Hello from Demon!' || true  # printed to stdout by capsule; may be interleaved
@@ -402,24 +402,24 @@ jobs:
           RITUAL_STREAM_NAME: RITUAL_EVENTS_DEMONCTL
           RITUAL_SUBJECTS: demon.ritual.v1.>
         run: |
-          cargo run -q -p demonctl -- bootstrap --ensure-stream --seed --verify
-          cargo run -q -p demonctl -- bootstrap --ensure-stream --seed --verify
+          cargo run -p demonctl -- bootstrap --ensure-stream --seed --verify
+          cargo run -p demonctl -- bootstrap --ensure-stream --seed --verify
 
       - name: demonctl bootstrap individual flags
         env:
           RITUAL_STREAM_NAME: RITUAL_EVENTS_DEMONCTL
           RITUAL_SUBJECTS: demon.ritual.v1.>
         run: |
-          cargo run -q -p demonctl -- bootstrap --ensure-stream
-          cargo run -q -p demonctl -- bootstrap --seed --ritual-id test-ritual
-          cargo run -q -p demonctl -- bootstrap --verify
+          cargo run -p demonctl -- bootstrap --ensure-stream
+          cargo run -p demonctl -- bootstrap --seed --ritual-id test-ritual
+          cargo run -p demonctl -- bootstrap --verify
 
       - name: demonctl bootstrap with overrides
         env:
           RITUAL_STREAM_NAME: RITUAL_EVENTS_DEMONCTL
           RITUAL_SUBJECTS: demon.ritual.v1.>
         run: |
-          RITUAL_SUBJECTS="test.bootstrap.v1.>" cargo run -q -p demonctl -- bootstrap --ensure-stream --stream-name TEST_STREAM_OVERRIDE --nats-url nats://127.0.0.1:4222
+          RITUAL_SUBJECTS="test.bootstrap.v1.>" cargo run -p demonctl -- bootstrap --ensure-stream --stream-name TEST_STREAM_OVERRIDE --nats-url nats://127.0.0.1:4222
 
       - name: Teardown NATS
         if: always()
@@ -515,7 +515,7 @@ jobs:
       - name: Run local-dev bundle (twice) with idempotency asserts
         run: |
           echo "=== First bootstrap run ==="
-          RITUAL_STREAM_NAME=RITUAL_EVENTS_BUNDLES cargo run -q -p demonctl -- bootstrap --profile local-dev --ensure-stream --seed --verify 2>&1 | tee /tmp/local1.log
+          RITUAL_STREAM_NAME=RITUAL_EVENTS_BUNDLES cargo run -p demonctl -- bootstrap --profile local-dev --ensure-stream --seed --verify 2>&1 | tee /tmp/local1.log
 
           echo "=== Inspecting NATS streams before cleanup ==="
           docker exec nats1 nats stream ls || echo "No streams or command failed"
@@ -551,7 +551,7 @@ jobs:
           done
 
           echo "=== Recreating JetStream stream for fresh NATS ==="
-          RITUAL_STREAM_NAME=RITUAL_EVENTS_BUNDLES cargo run -q -p demonctl -- bootstrap --profile local-dev --ensure-stream
+          RITUAL_STREAM_NAME=RITUAL_EVENTS_BUNDLES cargo run -p demonctl -- bootstrap --profile local-dev --ensure-stream
           if [[ $? -ne 0 ]]; then
             echo "❌ Failed to recreate JetStream stream"
             exit 1
@@ -575,7 +575,7 @@ jobs:
           done
 
           echo "=== Second bootstrap run ==="
-          RITUAL_STREAM_NAME=RITUAL_EVENTS_BUNDLES cargo run -q -p demonctl -- bootstrap --profile local-dev --ensure-stream --seed --verify 2>&1 | tee /tmp/local2.log
+          RITUAL_STREAM_NAME=RITUAL_EVENTS_BUNDLES cargo run -p demonctl -- bootstrap --profile local-dev --ensure-stream --seed --verify 2>&1 | tee /tmp/local2.log
 
           echo "=== Verifying second run success ==="
           if ! grep -q 'seed: ok' /tmp/local2.log; then
@@ -597,7 +597,7 @@ jobs:
           NATS_URL: nats://127.0.0.1:4223
         run: |
           echo "=== First remote-nats bootstrap run ==="
-          RITUAL_STREAM_NAME=RITUAL_EVENTS_BUNDLES cargo run -q -p demonctl -- bootstrap --profile remote-nats --ensure-stream --seed --verify 2>&1 | tee /tmp/remote1.log
+          RITUAL_STREAM_NAME=RITUAL_EVENTS_BUNDLES cargo run -p demonctl -- bootstrap --profile remote-nats --ensure-stream --seed --verify 2>&1 | tee /tmp/remote1.log
 
           echo "=== Inspecting NATS2 streams before cleanup ==="
           docker exec nats2 nats stream ls || echo "No streams or command failed"
@@ -633,7 +633,7 @@ jobs:
           done
 
           echo "=== Recreating JetStream stream for fresh NATS2 ==="
-          RITUAL_STREAM_NAME=RITUAL_EVENTS_BUNDLES cargo run -q -p demonctl -- bootstrap --profile remote-nats --ensure-stream
+          RITUAL_STREAM_NAME=RITUAL_EVENTS_BUNDLES cargo run -p demonctl -- bootstrap --profile remote-nats --ensure-stream
           if [[ $? -ne 0 ]]; then
             echo "❌ Failed to recreate JetStream stream"
             exit 1
@@ -641,7 +641,7 @@ jobs:
           echo "✓ JetStream stream RITUAL_EVENTS_BUNDLES recreated"
 
           echo "=== Second remote-nats bootstrap run ==="
-          RITUAL_STREAM_NAME=RITUAL_EVENTS_BUNDLES cargo run -q -p demonctl -- bootstrap --profile remote-nats --ensure-stream --seed --verify 2>&1 | tee /tmp/remote2.log
+          RITUAL_STREAM_NAME=RITUAL_EVENTS_BUNDLES cargo run -p demonctl -- bootstrap --profile remote-nats --ensure-stream --seed --verify 2>&1 | tee /tmp/remote2.log
 
           echo "=== Verifying remote second run success ==="
           if ! grep -q 'seed: ok' /tmp/remote2.log; then
