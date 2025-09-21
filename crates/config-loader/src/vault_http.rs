@@ -156,7 +156,11 @@ impl VaultHttpSecretProvider {
                     // Don't retry on auth failures or client errors (including 404)
                     match &e {
                         VaultHttpError::AuthFailed { .. } => return Err(e),
-                        VaultHttpError::RequestFailed { message } if message.contains("not found") => return Err(e),
+                        VaultHttpError::RequestFailed { message }
+                            if message.contains("not found") =>
+                        {
+                            return Err(e)
+                        }
                         _ => {}
                     }
 
