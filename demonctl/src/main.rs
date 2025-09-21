@@ -197,6 +197,30 @@ enum ContractsCommands {
         #[arg(long)]
         include_wit: bool,
     },
+    /// Fetch contract bundle from GitHub releases
+    FetchBundle {
+        /// Release tag to fetch (defaults to contracts-latest)
+        #[arg(long, default_value = "contracts-latest")]
+        tag: String,
+        /// Destination directory (defaults to .demon/contracts)
+        #[arg(long, default_value = ".demon/contracts")]
+        dest: String,
+        /// Dry run mode - show what would be downloaded without downloading
+        #[arg(long)]
+        dry_run: bool,
+        /// Output format (text or json)
+        #[arg(long, default_value = "text")]
+        format: String,
+    },
+    /// List available contract bundle releases
+    ListReleases {
+        /// Limit number of releases to show
+        #[arg(long, default_value = "10")]
+        limit: usize,
+        /// Output format (table or json)
+        #[arg(long, default_value = "table")]
+        format: String,
+    },
 }
 
 #[derive(Copy, Clone, Debug, ValueEnum)]
@@ -594,6 +618,17 @@ async fn handle_contracts_command(cmd: ContractsCommands) -> Result<()> {
             include_wit,
         } => {
             export_contracts_bundle(&format, include_wit).await?;
+        }
+        ContractsCommands::FetchBundle {
+            tag,
+            dest,
+            dry_run,
+            format,
+        } => {
+            fetch_bundle(&tag, &dest, dry_run, &format).await?;
+        }
+        ContractsCommands::ListReleases { limit, format } => {
+            list_releases(limit, &format).await?;
         }
     }
     Ok(())
@@ -1188,6 +1223,273 @@ fn handle_secrets_command(cmd: SecretsCommands) -> Result<()> {
                     println!("✓ Secret {}/{} deleted from vault", scope, key);
                 }
             }
+        }
+    }
+
+    Ok(())
+}
+
+async fn fetch_bundle(tag: &str, dest: &str, dry_run: bool, format: &str) -> Result<()> {
+    use std::fs;
+    use std::path::Path;
+
+    // Get GitHub token from environment
+    let token = std::env::var("GH_TOKEN")
+        .or_else(|_| std::env::var("GITHUB_TOKEN"))
+        .ok();
+
+    let client = reqwest::Client::new();
+    let repo_owner = "afewell-hh";
+    let repo_name = "demon";
+
+    // Output initial status
+    if format == "json" {
+        println!("{{\"phase\": \"fetch\", \"dry_run\": {}}}", dry_run);
+    } else {
+        println!("Fetching contract bundle");
+        if dry_run {
+            println!("Dry run mode");
+        }
+        println!("Destination: {}", dest);
+    }
+
+    // If in dry run mode, return early
+    if dry_run {
+        if format == "json" {
+            // This is expected by the tests
+            return Ok(());
+        }
+        println!("Would fetch tag: {}", tag);
+        return Ok(());
+    }
+
+    // Check for token only when we actually need to make API calls
+    if token.is_none() {
+        if format == "json" {
+            println!("{{\"phase\": \"fetch\", \"error\": \"No GitHub token found\"}}");
+        } else {
+            eprintln!("GitHub token not found. Set GH_TOKEN or GITHUB_TOKEN environment variable.");
+        }
+        std::process::exit(1);
+    }
+
+    // Get release information
+    let release_url = format!(
+        "https://api.github.com/repos/{}/{}/releases/tags/{}",
+        repo_owner, repo_name, tag
+    );
+
+    let mut request = client.get(&release_url);
+    if let Some(ref token) = token {
+        request = request.header("Authorization", format!("token {}", token));
+    }
+
+    let response = request.send().await.map_err(|e| {
+        if format == "json" {
+            println!(
+                "{{\"phase\": \"fetch\", \"error\": \"Failed to fetch release: {}\"}}",
+                e
+            );
+        } else {
+            eprintln!("Failed to fetch release: {}", e);
+        }
+        e
+    })?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        if status == 404 {
+            if format == "json" {
+                println!("{{\"phase\": \"fetch\", \"error\": \"Release not found\"}}");
+            } else {
+                eprintln!("Release tag '{}' not found", tag);
+            }
+        } else if format == "json" {
+            println!(
+                "{{\"phase\": \"fetch\", \"error\": \"API request failed: {}\"}}",
+                status
+            );
+        } else {
+            eprintln!("Failed to fetch release: HTTP {}", status);
+        }
+        std::process::exit(1);
+    }
+
+    let release_data: serde_json::Value = response.json().await?;
+
+    // Find bundle assets
+    let assets = release_data["assets"]
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("No assets found in release"))?;
+
+    let bundle_asset = assets
+        .iter()
+        .find(|asset| asset["name"].as_str() == Some("bundle.json"))
+        .ok_or_else(|| anyhow::anyhow!("bundle.json not found in release assets"))?;
+
+    let manifest_asset = assets
+        .iter()
+        .find(|asset| asset["name"].as_str() == Some("manifest.json"));
+
+    let checksum_asset = assets
+        .iter()
+        .find(|asset| asset["name"].as_str() == Some("bundle.sha256"));
+
+    // Create destination directory
+    fs::create_dir_all(dest)?;
+
+    // Download bundle.json
+    let bundle_url = bundle_asset["browser_download_url"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("No download URL for bundle.json"))?;
+
+    let mut request = client.get(bundle_url);
+    if let Some(ref token) = token {
+        request = request.header("Authorization", format!("token {}", token));
+    }
+
+    let bundle_response = request.send().await?;
+    let bundle_content = bundle_response.bytes().await?;
+
+    let bundle_path = Path::new(dest).join("bundle.json");
+    fs::write(&bundle_path, &bundle_content)?;
+
+    // Download manifest.json if available
+    if let Some(manifest_asset) = manifest_asset {
+        if let Some(manifest_url) = manifest_asset["browser_download_url"].as_str() {
+            let mut request = client.get(manifest_url);
+            if let Some(ref token) = token {
+                request = request.header("Authorization", format!("token {}", token));
+            }
+
+            if let Ok(manifest_response) = request.send().await {
+                if let Ok(manifest_content) = manifest_response.bytes().await {
+                    let manifest_path = Path::new(dest).join("manifest.json");
+                    let _ = fs::write(&manifest_path, &manifest_content);
+                }
+            }
+        }
+    }
+
+    // Download bundle.sha256 if available
+    if let Some(checksum_asset) = checksum_asset {
+        if let Some(checksum_url) = checksum_asset["browser_download_url"].as_str() {
+            let mut request = client.get(checksum_url);
+            if let Some(ref token) = token {
+                request = request.header("Authorization", format!("token {}", token));
+            }
+
+            if let Ok(checksum_response) = request.send().await {
+                if let Ok(checksum_content) = checksum_response.bytes().await {
+                    let checksum_path = Path::new(dest).join("bundle.sha256");
+                    let _ = fs::write(&checksum_path, &checksum_content);
+                }
+            }
+        }
+    }
+
+    if format == "json" {
+        println!(
+            "{{\"phase\": \"complete\", \"bundle_path\": \"{}\"}}",
+            bundle_path.display()
+        );
+    } else {
+        println!("Bundle downloaded to: {}", bundle_path.display());
+    }
+
+    Ok(())
+}
+
+async fn list_releases(limit: usize, format: &str) -> Result<()> {
+    let token = std::env::var("GH_TOKEN")
+        .or_else(|_| std::env::var("GITHUB_TOKEN"))
+        .ok();
+
+    let client = reqwest::Client::new();
+    let repo_owner = "afewell-hh";
+    let repo_name = "demon";
+
+    let releases_url = format!(
+        "https://api.github.com/repos/{}/{}/releases?per_page={}",
+        repo_owner,
+        repo_name,
+        limit * 2 // Get more to filter for contract releases
+    );
+
+    let mut request = client.get(&releases_url);
+    if let Some(ref token) = token {
+        request = request.header("Authorization", format!("token {}", token));
+    }
+
+    let response = match request.send().await {
+        Ok(response) => response,
+        Err(e) => {
+            if format == "json" {
+                println!("[]");
+            } else {
+                eprintln!("Failed to fetch releases: {}", e);
+            }
+            return Ok(());
+        }
+    };
+
+    if !response.status().is_success() {
+        if format == "json" {
+            println!("[]");
+        } else {
+            eprintln!("Failed to fetch releases: HTTP {}", response.status());
+        }
+        return Ok(());
+    }
+
+    let releases_data: serde_json::Value = response.json().await.unwrap_or(serde_json::json!([]));
+    let empty_vec = vec![];
+    let releases = releases_data.as_array().unwrap_or(&empty_vec);
+
+    // Filter for contract releases (tags starting with "contracts-")
+    let contract_releases: Vec<_> = releases
+        .iter()
+        .filter(|release| {
+            release["tag_name"]
+                .as_str()
+                .map(|tag| tag.starts_with("contracts-"))
+                .unwrap_or(false)
+        })
+        .take(limit)
+        .collect();
+
+    if format == "json" {
+        let releases_json: Vec<serde_json::Value> = contract_releases
+            .iter()
+            .map(|release| {
+                serde_json::json!({
+                    "tag_name": release["tag_name"],
+                    "published_at": release["published_at"],
+                    "name": release["name"]
+                })
+            })
+            .collect();
+        println!("{}", serde_json::to_string(&releases_json)?);
+    } else if contract_releases.is_empty() {
+        println!("No contract releases found");
+    } else {
+        println!("Available contract releases:");
+        println!("{:<30} {:<20} Name", "Tag", "Published");
+        println!("{}", "-".repeat(70));
+
+        for release in contract_releases {
+            let tag = release["tag_name"].as_str().unwrap_or("unknown");
+            let published = release["published_at"].as_str().unwrap_or("unknown");
+            let name = release["name"].as_str().unwrap_or("unnamed");
+
+            // Format the published date to be more readable
+            let published_short = if published.len() >= 10 {
+                &published[0..10]
+            } else {
+                published
+            };
+
+            println!("{:<30} {:<20} {}", tag, published_short, name);
         }
     }
 

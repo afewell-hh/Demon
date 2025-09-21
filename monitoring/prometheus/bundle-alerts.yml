@@ -1,0 +1,143 @@
+groups:
+  - name: contract_bundle.rules
+    interval: 30s
+    rules:
+    # Bundle Status Alerts
+    - alert: ContractBundleVerificationFailed
+      expr: increase(demon_bundle_verification_failures_total[1h]) > 0
+      for: 0m
+      labels:
+        severity: critical
+        component: contracts
+      annotations:
+        summary: "Contract bundle verification failed"
+        description: |
+          Bundle SHA-256 verification has failed {{ $value }} times in the last hour.
+          This indicates bundle corruption or tampering. Check bundle integrity immediately.
+        runbook_url: "https://github.com/afewell-hh/demon/blob/main/docs/contracts/playbook.md#bundle-verification-failures"
+
+    - alert: ContractBundleStale
+      expr: demon_bundle_age_hours > 48
+      for: 5m
+      labels:
+        severity: warning
+        component: contracts
+      annotations:
+        summary: "Contract bundle is stale"
+        description: |
+          Bundle is {{ $value }} hours old. Consider updating to latest release.
+          Current bundle may be missing recent schema updates.
+        runbook_url: "https://github.com/afewell-hh/demon/blob/main/docs/contracts/playbook.md#stale-bundle-alerts"
+
+    - alert: ContractBundleDownloadError
+      expr: demon_bundle_status{state="download_error"} == 1
+      for: 1m
+      labels:
+        severity: critical
+        component: contracts
+      annotations:
+        summary: "Failed to download contract bundle"
+        description: |
+          Runtime failed to download contract bundle from GitHub releases.
+          Check network connectivity, GitHub status, and authentication.
+        runbook_url: "https://github.com/afewell-hh/demon/blob/main/docs/contracts/playbook.md#bundle-download-failures"
+
+    - alert: ContractBundleNotLoaded
+      expr: demon_bundle_status{state="loaded"} == 0
+      for: 2m
+      labels:
+        severity: critical
+        component: contracts
+      annotations:
+        summary: "Contract bundle not loaded"
+        description: |
+          Runtime has not successfully loaded a contract bundle.
+          System may be running with embedded schemas only.
+        runbook_url: "https://github.com/afewell-hh/demon/blob/main/docs/contracts/playbook.md#bundle-download-failures"
+
+    - alert: ContractBundleFallbackActive
+      expr: demon_bundle_status{state="fallback"} == 1
+      for: 30s
+      labels:
+        severity: warning
+        component: contracts
+      annotations:
+        summary: "Contract bundle fallback activated"
+        description: |
+          Runtime has fallen back to embedded schemas due to bundle loading issues.
+          Check bundle download/verification errors.
+        runbook_url: "https://github.com/afewell-hh/demon/blob/main/docs/contracts/playbook.md#bundle-download-failures"
+
+    # Bundle Operation Metrics
+    - alert: ContractBundleOperationFailures
+      expr: rate(demon_bundle_operations_total{result="failed"}[5m]) > 0.1
+      for: 2m
+      labels:
+        severity: warning
+        component: contracts
+      annotations:
+        summary: "High contract bundle operation failure rate"
+        description: |
+          Bundle operations are failing at {{ $value | humanizePercentage }} rate.
+          Check logs for specific error patterns.
+
+    - alert: ContractBundleRefreshSlow
+      expr: demon_bundle_refresh_duration_ms > 30000
+      for: 0m
+      labels:
+        severity: warning
+        component: contracts
+      annotations:
+        summary: "Contract bundle refresh taking too long"
+        description: |
+          Bundle refresh took {{ $value }}ms, which is unusually slow.
+          Check network latency and GitHub API performance.
+
+    # Release Process Alerts
+    - alert: ContractReleaseWorkflowFailed
+      expr: |
+        (
+          github_workflow_run_conclusion{workflow="Contract Bundle Release", conclusion="failure"} == 1
+        ) and on() (
+          increase(github_workflow_run_conclusion{workflow="Contract Bundle Release"}[1h]) > 0
+        )
+      for: 0m
+      labels:
+        severity: critical
+        component: contracts
+        team: platform
+      annotations:
+        summary: "Contract bundle release workflow failed"
+        description: |
+          The automated contract bundle release workflow has failed.
+          Check GitHub Actions logs and verify CI dependencies.
+        runbook_url: "https://github.com/afewell-hh/demon/blob/main/docs/contracts/playbook.md#incident-response-procedures"
+
+    - alert: ContractReleaseStuck
+      expr: |
+        (
+          time() - github_workflow_run_created_at{workflow="Contract Bundle Release", status="in_progress"}
+        ) > 3600
+      for: 0m
+      labels:
+        severity: warning
+        component: contracts
+      annotations:
+        summary: "Contract bundle release workflow stuck"
+        description: |
+          Contract release workflow has been running for over 1 hour.
+          May indicate hung build or resource constraints.
+
+    # Scheduled Release Monitoring
+    - alert: MissedScheduledRelease
+      expr: |
+        (time() - on() last_over_time(github_workflow_run_created_at{workflow="Contract Bundle Release", event="schedule"}[25h])) > 86400
+      for: 30m
+      labels:
+        severity: warning
+        component: contracts
+      annotations:
+        summary: "Scheduled contract bundle release missed"
+        description: |
+          No scheduled contract bundle release has run in the last 24+ hours.
+          Check workflow configuration and GitHub Actions status.

@@ -1,0 +1,238 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Contract Bundle Operations",
+    "tags": ["demon", "contracts", "bundles"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Bundle Status Overview",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "demon_bundle_status{state=\"loaded\"}",
+            "legendFormat": "Loaded",
+            "refId": "A"
+          },
+          {
+            "expr": "demon_bundle_status{state=\"download_error\"}",
+            "legendFormat": "Download Error",
+            "refId": "B"
+          },
+          {
+            "expr": "demon_bundle_status{state=\"verification_failed\"}",
+            "legendFormat": "Verification Failed",
+            "refId": "C"
+          },
+          {
+            "expr": "demon_bundle_status{state=\"fallback\"}",
+            "legendFormat": "Fallback Active",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Bundle Age (Hours)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "demon_bundle_age_hours",
+            "legendFormat": "Age",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "h",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 24},
+                {"color": "red", "value": 48}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Bundle Operations Rate",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(demon_bundle_operations_total{result=\"success\"}[5m])",
+            "legendFormat": "Success Rate",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(demon_bundle_operations_total{result=\"failed\"}[5m])",
+            "legendFormat": "Failure Rate",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ops",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "pointSize": 5
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Bundle Verification Failures",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "increase(demon_bundle_verification_failures_total[1h])",
+            "legendFormat": "Verification Failures (1h)",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {"mode": "palette-classic"},
+            "custom": {
+              "drawStyle": "bars",
+              "pointSize": 5
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "red", "value": 1}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 5,
+        "title": "Bundle Refresh Duration",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "demon_bundle_refresh_duration_ms",
+            "legendFormat": "Refresh Duration",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "pointSize": 5
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 10000},
+                {"color": "red", "value": 30000}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      },
+      {
+        "id": 6,
+        "title": "Contract Release Workflow Status",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "github_workflow_run_conclusion{workflow=\"Contract Bundle Release\", conclusion=\"success\"}",
+            "legendFormat": "Successful Releases",
+            "refId": "A"
+          },
+          {
+            "expr": "github_workflow_run_conclusion{workflow=\"Contract Bundle Release\", conclusion=\"failure\"}",
+            "legendFormat": "Failed Releases",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": {
+              "drawStyle": "bars",
+              "pointSize": 5
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24}
+      },
+      {
+        "id": 7,
+        "title": "Bundle Alert Summary",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "ALERTS{alertname=~\"ContractBundle.*\"}",
+            "legendFormat": "",
+            "refId": "A",
+            "format": "table"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "table"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 32}
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "name": "Contract Releases",
+          "datasource": "prometheus",
+          "expr": "github_workflow_run_conclusion{workflow=\"Contract Bundle Release\", conclusion=\"success\"}",
+          "iconColor": "green",
+          "textFormat": "Contract bundle released"
+        },
+        {
+          "name": "Release Failures",
+          "datasource": "prometheus",
+          "expr": "github_workflow_run_conclusion{workflow=\"Contract Bundle Release\", conclusion=\"failure\"}",
+          "iconColor": "red",
+          "textFormat": "Contract release failed"
+        }
+      ]
+    }
+  }
+}

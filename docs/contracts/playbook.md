@@ -6,7 +6,15 @@ This runbook provides step-by-step operational guidance for managing Demon contr
 
 Contract bundles are automatically published via CI and distributed through GitHub Releases. This playbook covers manual operations, troubleshooting, and monitoring for operators managing contract bundle infrastructure.
 
-## Manual Release Operations
+## Release Cadence & Automation
+
+### Automated Release Schedule
+
+Contract bundles are released automatically via three triggers:
+
+1. **CI-Triggered (Primary)**: Automatic release when main CI completes successfully
+2. **Scheduled**: Daily at 6 AM UTC via cron schedule
+3. **Manual**: On-demand via workflow dispatch
 
 ### Triggering a Manual Release
 
@@ -14,18 +22,50 @@ Contract bundles are automatically published via CI and distributed through GitH
 # Option 1: Via GitHub CLI (recommended)
 gh workflow run contracts-release.yml
 
-# Option 2: Via API
+# Option 2: Force release with changes detection bypass
+gh workflow run contracts-release.yml -f force_release=true
+
+# Option 3: Via API
 curl -X POST \
   -H "Authorization: token $GITHUB_TOKEN" \
   -H "Accept: application/vnd.github.v3+json" \
   https://api.github.com/repos/afewell-hh/demon/actions/workflows/contracts-release.yml/dispatches \
-  -d '{"ref":"main"}'
+  -d '{"ref":"main","inputs":{"force_release":"false"}}'
 
 # Monitor workflow progress
 gh run list --workflow=contracts-release.yml --limit 5
 ```
 
+### Scheduled Release Monitoring
+
+```bash
+# Check recent scheduled releases
+gh run list --workflow=contracts-release.yml --event=schedule --limit 5
+
+# Monitor today's scheduled release
+TODAY=$(date +%Y-%m-%d)
+gh run list --workflow=contracts-release.yml --created="$TODAY" | grep schedule || echo "No scheduled release today"
+```
+
 ### Validating a Released Bundle
+
+Use the automated validation script for comprehensive release verification:
+
+```bash
+# Validate latest release (recommended)
+./scripts/validate-release.sh
+
+# Validate specific release
+./scripts/validate-release.sh contracts-20250921-0658fb8b
+
+# Validate with verbose output
+./scripts/validate-release.sh --verbose contracts-latest
+
+# Validate using compiled binary (faster)
+DEMONCTL_BIN=./target/release/demonctl ./scripts/validate-release.sh
+```
+
+**Manual validation steps** (if script not available):
 
 ```bash
 # Download and verify latest release
@@ -169,6 +209,31 @@ curl localhost:3000/api/contracts/status | jq '.contractBundle.status'
 ```
 
 ## Monitoring and Alerting
+
+### Automated Monitoring Setup
+
+Pre-configured monitoring assets are available in the repository:
+
+- **Prometheus Alerts**: `monitoring/prometheus/bundle-alerts.yml`
+- **Grafana Dashboard**: `monitoring/grafana/contract-bundle-dashboard.json`
+- **Validation Script**: `scripts/validate-release.sh`
+
+### Deploying Monitoring
+
+```bash
+# Deploy Prometheus alert rules
+kubectl apply -f monitoring/prometheus/bundle-alerts.yml
+
+# Import Grafana dashboard
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $GRAFANA_API_KEY" \
+  -d @monitoring/grafana/contract-bundle-dashboard.json \
+  http://grafana.company.com/api/dashboards/db
+
+# Set up automated validation checks (cron example)
+echo "0 */6 * * * /path/to/demon/scripts/validate-release.sh >> /var/log/bundle-validation.log 2>&1" | crontab -
+```
 
 ### Key Metrics to Monitor
 
@@ -344,43 +409,31 @@ echo "=== Update complete ==="
 
 ## Testing and Validation
 
-### Release Validation Script
+### Automated Release Validation
+
+The comprehensive validation script is available at `scripts/validate-release.sh`:
 
 ```bash
-#!/bin/bash
-# validate-release.sh <tag>
+# Basic usage - validate latest release
+./scripts/validate-release.sh
 
-TAG=${1:-contracts-latest}
-WORKDIR=$(mktemp -d)
-cd "$WORKDIR"
+# Advanced usage examples
+./scripts/validate-release.sh contracts-20250921-0658fb8b  # Specific tag
+./scripts/validate-release.sh --verbose                    # Detailed output
+DEMONCTL_BIN=./target/release/demonctl ./scripts/validate-release.sh  # Use compiled binary
 
-echo "Validating release: $TAG"
-
-# Download release
-gh release download "$TAG" -p "*.json" -p "*.sha256"
-
-# Verify files exist
-test -f bundle.json && echo "✓ bundle.json exists"
-test -f manifest.json && echo "✓ manifest.json exists"
-test -f bundle.sha256 && echo "✓ bundle.sha256 exists"
-
-# Verify integrity
-shasum -a 256 -c bundle.sha256 && echo "✓ SHA-256 verification passed"
-
-# Validate bundle structure
-demonctl contracts validate bundle.json && echo "✓ Bundle structure valid"
-
-# Check manifest metadata
-jq -e '.version and .timestamp and .git.sha and .bundle_sha256' manifest.json > /dev/null && echo "✓ Manifest complete"
-
-# Cross-validate manifest SHA
-BUNDLE_SHA=$(shasum -a 256 bundle.json | cut -d' ' -f1)
-MANIFEST_SHA=$(jq -r '.bundle_sha256' manifest.json)
-[ "$BUNDLE_SHA" = "$MANIFEST_SHA" ] && echo "✓ Manifest SHA matches bundle"
-
-echo "Release validation complete for $TAG"
-cd - && rm -rf "$WORKDIR"
+# Integration with monitoring
+./scripts/validate-release.sh && echo "✅ Release validation passed" || echo "❌ Release validation failed"
 ```
+
+**Script features:**
+- ✅ Comprehensive file and integrity verification
+- ✅ Bundle structure validation via demonctl
+- ✅ Metadata cross-validation
+- ✅ Freshness checks with warnings
+- ✅ Colored output and progress indicators
+- ✅ Verbose mode for debugging
+- ✅ Configurable demonctl binary path
 
 ### Load Testing
 

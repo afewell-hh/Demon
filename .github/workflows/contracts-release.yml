@@ -6,12 +6,21 @@ on:
     types:
       - completed
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      force_release:
+        description: 'Force release even if no changes detected'
+        required: false
+        default: 'false'
+        type: boolean
+  schedule:
+    - cron: '0 6 * * *'  # Daily at 6 AM UTC
 
 jobs:
   publish-contracts-release:
     name: Publish contract bundle to GitHub Releases
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
     permissions:
       contents: write
       actions: read
@@ -22,13 +31,61 @@ jobs:
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
-      - name: Download contract bundle artifact
+      - name: Setup Rust toolchain (scheduled/manual runs)
+        if: github.event_name != 'workflow_run'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: nightly
+
+      - name: Cache dependencies (scheduled/manual runs)
+        if: github.event_name != 'workflow_run'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build workspace (scheduled/manual runs)
+        if: github.event_name != 'workflow_run'
+        run: cargo build --workspace --all-features
+
+      - name: Download contract bundle artifact (workflow_run)
+        if: github.event_name == 'workflow_run'
         uses: actions/download-artifact@v4
         with:
           name: contract-bundle
           path: dist/contracts/
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Build contract bundle (scheduled/manual)
+        if: github.event_name != 'workflow_run'
+        run: |
+          # For scheduled/manual runs, generate bundle fresh
+          echo "Generating contract bundle from HEAD..."
+          mkdir -p dist/contracts/
+          demonctl contracts bundle --output dist/contracts/bundle.json --include-wit
+
+          # Generate manifest
+          GIT_SHA=$(git rev-parse HEAD)
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          BUNDLE_SHA256=$(shasum -a 256 dist/contracts/bundle.json | cut -d' ' -f1)
+
+          cat > dist/contracts/manifest.json << EOF
+          {
+            "version": "1.0.0",
+            "timestamp": "$TIMESTAMP",
+            "git": {
+              "sha": "$GIT_SHA",
+              "repository": "${{ github.repository }}",
+              "ref": "${{ github.ref }}"
+            },
+            "bundle_sha256": "$BUNDLE_SHA256",
+            "trigger": "${{ github.event_name }}"
+          }
+          EOF
 
       - name: Extract manifest metadata
         id: manifest
