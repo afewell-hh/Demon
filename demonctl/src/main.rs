@@ -1426,6 +1426,7 @@ async fn handle_k8s_bootstrap_command(cmd: K8sBootstrapCommands) -> Result<()> {
                     println!(
                         "Run with --verbose to view the k3s installation plan and manifest preview."
                     );
+                    println!("Note: Health checks will run after deployment to verify runtime API and Operate UI.");
                 }
 
                 return Ok(());
@@ -1493,6 +1494,17 @@ async fn handle_k8s_bootstrap_command(cmd: K8sBootstrapCommands) -> Result<()> {
 
             // Wait for Demon pods to be ready
             wait_for_demon_pods(
+                &bootstrap_config.demon.namespace,
+                command_executor.as_ref(),
+                verbose,
+            )?;
+
+            if verbose {
+                println!("Phase 5: Running health checks");
+            }
+
+            // Run health checks
+            run_health_checks(
                 &bootstrap_config.demon.namespace,
                 command_executor.as_ref(),
                 verbose,
@@ -1614,6 +1626,182 @@ fn wait_for_demon_pods(
         "Timeout waiting for Demon pods to be ready after {}s",
         timeout_secs
     )
+}
+
+fn run_health_checks(
+    namespace: &str,
+    executor: &dyn k8s_bootstrap::CommandExecutor,
+    verbose: bool,
+) -> Result<()> {
+    if verbose {
+        println!("Running post-deployment health checks...");
+    }
+
+    // Check runtime health endpoint
+    let runtime_pod = get_pod_by_label(namespace, "app=demon-runtime", executor)?;
+    if let Some(pod_name) = runtime_pod {
+        if verbose {
+            println!("Checking runtime health endpoint for pod: {}", pod_name);
+        }
+
+        match check_runtime_health(namespace, &pod_name, executor, verbose) {
+            Ok(_) => {
+                if verbose {
+                    println!("✓ Runtime health check passed");
+                }
+            }
+            Err(e) => {
+                eprintln!("✗ Runtime health check failed: {}", e);
+                eprintln!("  To investigate, check runtime logs and port-forward to the pod:");
+                eprintln!("  kubectl logs -n {} {}", namespace, pod_name);
+                eprintln!(
+                    "  kubectl port-forward -n {} pod/{} 8080:8080",
+                    namespace, pod_name
+                );
+                return Err(e);
+            }
+        }
+    } else {
+        anyhow::bail!("No demon-runtime pod found for health checking");
+    }
+
+    // Check Operate UI health
+    let ui_pod = get_pod_by_label(namespace, "app=demon-operate-ui", executor)?;
+    if let Some(pod_name) = ui_pod {
+        if verbose {
+            println!("Checking Operate UI health endpoint for pod: {}", pod_name);
+        }
+
+        match check_ui_health(namespace, &pod_name, executor, verbose) {
+            Ok(_) => {
+                if verbose {
+                    println!("✓ Operate UI health check passed");
+                }
+            }
+            Err(e) => {
+                eprintln!("✗ Operate UI health check failed: {}", e);
+                eprintln!("  To investigate, check UI logs and port-forward to the pod:");
+                eprintln!("  kubectl logs -n {} {}", namespace, pod_name);
+                eprintln!(
+                    "  kubectl port-forward -n {} pod/{} 3000:3000",
+                    namespace, pod_name
+                );
+                return Err(e);
+            }
+        }
+    } else {
+        anyhow::bail!("No demon-operate-ui pod found for health checking");
+    }
+
+    if verbose {
+        println!("All health checks passed!");
+    }
+
+    Ok(())
+}
+
+fn get_pod_by_label(
+    namespace: &str,
+    label_selector: &str,
+    executor: &dyn k8s_bootstrap::CommandExecutor,
+) -> Result<Option<String>> {
+    let output = executor.execute(
+        "k3s",
+        &[
+            "kubectl",
+            "get",
+            "pods",
+            "-n",
+            namespace,
+            "-l",
+            label_selector,
+            "-o",
+            "jsonpath={.items[0].metadata.name}",
+        ],
+        None,
+    )?;
+
+    if output.status == 0 && !output.stdout.trim().is_empty() {
+        Ok(Some(output.stdout.trim().to_string()))
+    } else {
+        Ok(None)
+    }
+}
+
+fn check_runtime_health(
+    namespace: &str,
+    pod_name: &str,
+    executor: &dyn k8s_bootstrap::CommandExecutor,
+    verbose: bool,
+) -> Result<()> {
+    // Try to curl the health endpoint from within the pod
+    let output = executor.execute(
+        "k3s",
+        &[
+            "kubectl",
+            "exec",
+            "-n",
+            namespace,
+            pod_name,
+            "--",
+            "curl",
+            "-f",
+            "-s",
+            "http://localhost:8080/health",
+        ],
+        None,
+    )?;
+
+    if output.status == 0 {
+        if verbose {
+            println!("Runtime health response: {}", output.stdout.trim());
+        }
+        Ok(())
+    } else {
+        anyhow::bail!(
+            "Runtime health check failed - status: {}, stderr: {}",
+            output.status,
+            output.stderr
+        );
+    }
+}
+
+fn check_ui_health(
+    namespace: &str,
+    pod_name: &str,
+    executor: &dyn k8s_bootstrap::CommandExecutor,
+    verbose: bool,
+) -> Result<()> {
+    // Try to curl the health/readiness endpoint from within the pod
+    let output = executor.execute(
+        "k3s",
+        &[
+            "kubectl",
+            "exec",
+            "-n",
+            namespace,
+            pod_name,
+            "--",
+            "curl",
+            "-f",
+            "-s",
+            "http://localhost:3000/api/runs",
+        ],
+        None,
+    )?;
+
+    if output.status == 0 {
+        if verbose {
+            println!("Operate UI health response: {}", output.stdout.trim());
+        }
+        Ok(())
+    } else {
+        anyhow::bail!(
+            "Operate UI health check failed - status: {}, stderr: {}",
+            output.status,
+            output.stderr
+        );
+    }
 }
 
 // no-op: exercise replies guard

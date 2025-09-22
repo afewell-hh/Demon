@@ -163,6 +163,32 @@ demonctl k8s-bootstrap bootstrap --config <config-file> [--dry-run] [--verbose]
 - `--dry-run`: Validate configuration without executing deployment
 - `--verbose`: Show detailed configuration and deployment information
 
+### Health Checks
+
+After successful deployment, the bootstrap command automatically verifies that the Demon components are healthy:
+
+**Runtime API Health Check:**
+- Verifies the runtime service at `http://localhost:8080/health`
+- Executed via `kubectl exec` from within the runtime pod
+- Ensures the runtime API is responding correctly
+
+**Operate UI Health Check:**
+- Verifies the UI service at `http://localhost:3000/api/runs`
+- Executed via `kubectl exec` from within the UI pod
+- Ensures the UI is ready to serve requests
+
+**Health Check Failure Handling:**
+If health checks fail, the bootstrap command will:
+- Exit with a non-zero status code
+- Display actionable error messages
+- Provide troubleshooting commands for investigation:
+  ```bash
+  kubectl logs -n <namespace> <pod-name>
+  kubectl port-forward -n <namespace> pod/<pod-name> <port>:<port>
+  ```
+
+**Note:** Health checks will run after deployment unless using `--dry-run` mode.
+
 ### Examples
 
 **Dry run (concise output):**
@@ -177,6 +203,7 @@ Dry run mode - no changes will be made
 Cluster: my-k3s-cluster (namespace: demon-system)
 5 manifests will be generated.
 Run with --verbose to view the k3s installation plan and manifest preview.
+Note: Health checks will run after deployment to verify runtime API and Operate UI.
 ```
 
 **Dry run with verbose output (k3s plan + manifest preview):**
@@ -222,6 +249,7 @@ The bootstrap command now supports full Demon deployment to Kubernetes clusters.
 2. **Wait for cluster readiness** - Verifies k3s is ready to accept workloads
 3. **Generate and apply manifests** - Renders templates with your configuration and applies them via `kubectl`
 4. **Wait for pod readiness** - Monitors Demon pods until they reach Ready state (120s timeout)
+5. **Run health checks** - Verifies runtime API and Operate UI endpoints are responding correctly
 
 ### Manifest Templates
 
@@ -305,8 +333,14 @@ sudo k3s kubectl logs -n your-namespace deployment/engine
 - [x] Unit tests for add-on framework
 - [x] CLI integration tests for add-on scenarios
 
+### ✅ Completed (Story 6: Health Checks & Artifact Capture)
+- [x] Runtime API health endpoint verification
+- [x] Operate UI health endpoint verification
+- [x] Post-deployment health checks with actionable error messages
+- [x] Enhanced smoke test artifact collection
+- [x] Structured artifact organization with manifests, logs, and descriptions
+
 ### 🚧 Future Implementation
-- [ ] Health checks and verification
 - [ ] Rollback capabilities
 - [ ] Additional built-in add-ons (logging, service mesh, etc.)
 
@@ -386,12 +420,16 @@ The `scripts/tests/smoke-k8s-bootstrap.sh` script provides comprehensive end-to-
 - Built demonctl binary (`cargo build -p demonctl`)
 
 **Artifacts:**
-All test artifacts are captured in `dist/bootstrapper-smoke/<timestamp>/`:
+All test artifacts are captured in `dist/bootstrapper-smoke/<timestamp>/` with organized subdirectories:
 - `kubeconfig` - Cluster access configuration
 - `bootstrap-output.txt` - Bootstrap command output
-- `final-state.txt` - Final cluster state
-- `logs-*.txt` - Pod logs
-- `dry-run-output.txt` - Dry-run validation output
+- `manifests/` - YAML exports of all deployed resources
+- `logs/` - Pod logs (current and previous if available)
+- `descriptions/` - Detailed Kubernetes resource descriptions
+- `runtime-health.txt` & `ui-health.txt` - Health check responses
+- `events.txt` - Kubernetes events in the demon namespace
+- `final-state.txt` - Final cluster state summary
+- `dry-run-output.txt` - Dry-run validation output (dry-run mode only)
 
 The script validates:
 ✓ Configuration parsing and validation
@@ -399,7 +437,8 @@ The script validates:
 ✓ k3s cluster installation and readiness
 ✓ Demon pod deployment and readiness
 ✓ Secret creation and availability
-✓ Service accessibility (where applicable)
+✓ Runtime API health endpoint verification
+✓ Operate UI health endpoint verification
 
 ## Schema Development
 
@@ -433,6 +472,22 @@ The JSON schema is automatically enforced at runtime. To update the schema:
 **"Failed to load config"**
 - Check that the config file exists and is valid YAML
 - Verify file permissions allow reading
+
+### Health Check Issues
+
+**"Runtime health check failed"**
+- Check runtime pod logs: `kubectl logs -n <namespace> deployment/demon-runtime`
+- Verify runtime is listening on port 8080: `kubectl port-forward -n <namespace> pod/<runtime-pod> 8080:8080`
+- Ensure the runtime has a `/health` endpoint implemented
+
+**"Operate UI health check failed"**
+- Check UI pod logs: `kubectl logs -n <namespace> deployment/demon-operate-ui`
+- Verify UI is listening on port 3000: `kubectl port-forward -n <namespace> pod/<ui-pod> 3000:3000`
+- Ensure the UI has `/api/runs` endpoint available
+
+**"No demon-runtime pod found for health checking"**
+- Verify pod deployment: `kubectl get pods -n <namespace> -l app=demon-runtime`
+- Check pod status: `kubectl describe pods -n <namespace> -l app=demon-runtime`
 
 For more help, run:
 ```bash
