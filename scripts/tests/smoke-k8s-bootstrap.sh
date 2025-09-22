@@ -57,6 +57,7 @@ OPTIONS:
     --verbose           Enable verbose output
     --config FILE       Use custom config file (default: scripts/tests/fixtures/config.e2e.yaml)
     --timeout SECONDS   Pod readiness timeout in seconds (default: 300)
+    --artifacts-dir DIR Custom directory for artifacts (default: dist/bootstrapper-smoke/<timestamp>)
     --help              Show this help message
 
 ENVIRONMENT VARIABLES:
@@ -319,26 +320,59 @@ validate_deployment() {
     log "Checking services..."
     kubectl get services -n "${namespace}" > "${ARTIFACTS_DIR}/services.txt" 2>&1
 
-    # Try to port-forward and check health (if demon-runtime has a health endpoint)
+    # Run integrated health checks
+    run_health_checks "${namespace}"
+}
+
+run_health_checks() {
+    local namespace="$1"
+    log "Running health checks..."
+
+    # Check runtime health endpoint
     local runtime_pod
     runtime_pod=$(kubectl get pods -n "${namespace}" -l app=demon-runtime -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
     if [[ -n "${runtime_pod}" ]]; then
-        log "Checking runtime health via port-forward..."
-        timeout 10s kubectl port-forward -n "${namespace}" "pod/${runtime_pod}" 8080:8080 &
-        local pf_pid=$!
-        sleep 2
+        log "Checking runtime health endpoint for pod: ${runtime_pod}"
 
-        # Try to reach health endpoint
-        if curl -s -f "http://localhost:8080/health" > "${ARTIFACTS_DIR}/runtime-health.txt" 2>&1; then
+        if kubectl exec -n "${namespace}" "${runtime_pod}" -- curl -f -s "http://localhost:8080/health" > "${ARTIFACTS_DIR}/runtime-health.txt" 2>&1; then
             success "Runtime health check passed"
+            if [[ "${VERBOSE}" == "true" ]]; then
+                log "Runtime health response: $(cat "${ARTIFACTS_DIR}/runtime-health.txt")"
+            fi
         else
-            warn "Runtime health check failed (may not be implemented yet)"
+            error "Runtime health check failed"
+            log "Health check output saved to: ${ARTIFACTS_DIR}/runtime-health.txt"
+            kubectl logs -n "${namespace}" "${runtime_pod}" > "${ARTIFACTS_DIR}/runtime-health-logs.txt" 2>&1 || true
+            return 1
         fi
-
-        kill ${pf_pid} 2>/dev/null || true
-        wait ${pf_pid} 2>/dev/null || true
+    else
+        warn "No demon-runtime pod found for health checking"
     fi
+
+    # Check Operate UI health endpoint
+    local ui_pod
+    ui_pod=$(kubectl get pods -n "${namespace}" -l app=demon-operate-ui -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+    if [[ -n "${ui_pod}" ]]; then
+        log "Checking Operate UI health endpoint for pod: ${ui_pod}"
+
+        if kubectl exec -n "${namespace}" "${ui_pod}" -- curl -f -s "http://localhost:3000/api/runs" > "${ARTIFACTS_DIR}/ui-health.txt" 2>&1; then
+            success "Operate UI health check passed"
+            if [[ "${VERBOSE}" == "true" ]]; then
+                log "UI health response: $(cat "${ARTIFACTS_DIR}/ui-health.txt")"
+            fi
+        else
+            error "Operate UI health check failed"
+            log "Health check output saved to: ${ARTIFACTS_DIR}/ui-health.txt"
+            kubectl logs -n "${namespace}" "${ui_pod}" > "${ARTIFACTS_DIR}/ui-health-logs.txt" 2>&1 || true
+            return 1
+        fi
+    else
+        warn "No demon-operate-ui pod found for health checking"
+    fi
+
+    success "All health checks passed!"
 }
 
 capture_logs() {
@@ -352,30 +386,69 @@ capture_logs() {
     export KUBECONFIG="${ARTIFACTS_DIR}/kubeconfig"
     local namespace="demon-system"
 
-    # Capture pod descriptions
-    kubectl describe pods -n "${namespace}" > "${ARTIFACTS_DIR}/pods-describe.txt" 2>&1 || true
+    # Create artifacts subdirectory structure
+    mkdir -p "${ARTIFACTS_DIR}/manifests"
+    mkdir -p "${ARTIFACTS_DIR}/logs"
+    mkdir -p "${ARTIFACTS_DIR}/descriptions"
 
-    # Capture service descriptions
-    kubectl describe services -n "${namespace}" > "${ARTIFACTS_DIR}/services-describe.txt" 2>&1 || true
+    # Capture all resources in the namespace
+    log "Capturing resource manifests..."
+    kubectl get all -n "${namespace}" -o yaml > "${ARTIFACTS_DIR}/manifests/all-resources.yaml" 2>&1 || true
+    kubectl get pods -n "${namespace}" -o yaml > "${ARTIFACTS_DIR}/manifests/pods.yaml" 2>&1 || true
+    kubectl get services -n "${namespace}" -o yaml > "${ARTIFACTS_DIR}/manifests/services.yaml" 2>&1 || true
+    kubectl get secrets -n "${namespace}" -o yaml > "${ARTIFACTS_DIR}/manifests/secrets.yaml" 2>&1 || true
+    kubectl get configmaps -n "${namespace}" -o yaml > "${ARTIFACTS_DIR}/manifests/configmaps.yaml" 2>&1 || true
+
+    # Capture ingress if enabled
+    if kubectl get ingress -n "${namespace}" --no-headers 2>/dev/null | grep -q .; then
+        kubectl get ingress -n "${namespace}" -o yaml > "${ARTIFACTS_DIR}/manifests/ingress.yaml" 2>&1 || true
+    fi
+
+    # Capture pod descriptions
+    log "Capturing resource descriptions..."
+    kubectl describe pods -n "${namespace}" > "${ARTIFACTS_DIR}/descriptions/pods-describe.txt" 2>&1 || true
+    kubectl describe services -n "${namespace}" > "${ARTIFACTS_DIR}/descriptions/services-describe.txt" 2>&1 || true
+    kubectl describe secrets -n "${namespace}" > "${ARTIFACTS_DIR}/descriptions/secrets-describe.txt" 2>&1 || true
 
     # Capture logs from each pod
+    log "Capturing pod logs..."
     local pods
     pods=$(kubectl get pods -n "${namespace}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
 
     if [[ -n "${pods}" ]]; then
         for pod in ${pods}; do
             log "Capturing logs for pod: ${pod}"
-            kubectl logs -n "${namespace}" "${pod}" > "${ARTIFACTS_DIR}/logs-${pod}.txt" 2>&1 || true
+            kubectl logs -n "${namespace}" "${pod}" > "${ARTIFACTS_DIR}/logs/${pod}.txt" 2>&1 || true
+
+            # Capture previous logs if pod has restarted
+            if kubectl logs -n "${namespace}" "${pod}" --previous >/dev/null 2>&1; then
+                kubectl logs -n "${namespace}" "${pod}" --previous > "${ARTIFACTS_DIR}/logs/${pod}-previous.txt" 2>&1 || true
+            fi
         done
     fi
 
     # Capture cluster events
+    log "Capturing cluster events..."
     kubectl get events -n "${namespace}" --sort-by='.lastTimestamp' > "${ARTIFACTS_DIR}/events.txt" 2>&1 || true
+    kubectl get events --all-namespaces --sort-by='.lastTimestamp' > "${ARTIFACTS_DIR}/events-all-namespaces.txt" 2>&1 || true
 
-    # Final cluster state
+    # Final cluster state summary
+    log "Capturing final cluster state..."
     kubectl get all -n "${namespace}" -o wide > "${ARTIFACTS_DIR}/final-state.txt" 2>&1 || true
+    kubectl get nodes -o wide > "${ARTIFACTS_DIR}/nodes-final.txt" 2>&1 || true
 
-    success "Logs and state captured to ${ARTIFACTS_DIR}"
+    # Capture cluster info for CI/automation
+    log "Capturing cluster information..."
+    kubectl version --output=yaml > "${ARTIFACTS_DIR}/cluster-version.txt" 2>&1 || true
+    kubectl cluster-info dump --namespaces="${namespace}" --output-directory="${ARTIFACTS_DIR}/cluster-dump" 2>&1 || true
+
+    success "Comprehensive artifacts collected in ${ARTIFACTS_DIR}"
+    log "Artifact structure:"
+    log "  - manifests/: YAML exports of all resources"
+    log "  - logs/: Pod logs (current and previous if available)"
+    log "  - descriptions/: Detailed resource descriptions"
+    log "  - events.txt: Kubernetes events in target namespace"
+    log "  - final-state.txt: Final resource summary"
 }
 
 cleanup_cluster() {
@@ -424,7 +497,8 @@ print_summary() {
         echo "✓ Cluster provisioning completed"
         echo "✓ Bootstrap deployment completed"
         echo "✓ Pod readiness verified"
-        echo "✓ Logs and state captured"
+        echo "✓ Health checks passed"
+        echo "✓ Comprehensive artifacts captured"
         if [[ "${CLEANUP}" == "true" ]]; then
             echo "✓ Cluster cleanup completed"
         else
@@ -442,8 +516,11 @@ print_summary() {
     else
         echo "  - ${ARTIFACTS_DIR}/kubeconfig"
         echo "  - ${ARTIFACTS_DIR}/bootstrap-output.txt"
+        echo "  - ${ARTIFACTS_DIR}/manifests/ (resource YAML exports)"
+        echo "  - ${ARTIFACTS_DIR}/logs/ (pod logs)"
+        echo "  - ${ARTIFACTS_DIR}/descriptions/ (detailed resource info)"
+        echo "  - ${ARTIFACTS_DIR}/runtime-health.txt & ui-health.txt"
         echo "  - ${ARTIFACTS_DIR}/final-state.txt"
-        echo "  - ${ARTIFACTS_DIR}/logs-*.txt"
     fi
     echo "=================================================================="
 }
@@ -470,6 +547,10 @@ main() {
                 ;;
             --timeout)
                 TIMEOUT_SECONDS="$2"
+                shift 2
+                ;;
+            --artifacts-dir)
+                ARTIFACTS_DIR="$2"
                 shift 2
                 ;;
             --help)
