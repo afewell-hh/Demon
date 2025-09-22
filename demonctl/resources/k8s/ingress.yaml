@@ -1,0 +1,44 @@
+{{- if .networking.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demon-ingress
+  namespace: {{ .namespace }}
+  labels:
+    app.kubernetes.io/name: demon
+    app.kubernetes.io/component: ingress
+spec:
+  {{- if .networking.ingress.ingressClass }}
+  ingressClassName: {{ .networking.ingress.ingressClass }}
+  {{- end }}
+  {{- if .networking.ingress.tls.enabled }}
+  tls:
+  - hosts:
+    - {{ .networking.ingress.hostname }}
+    {{- if .networking.ingress.tls.secretName }}
+    secretName: {{ .networking.ingress.tls.secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+  {{- if .networking.ingress.hostname }}
+  - host: {{ .networking.ingress.hostname }}
+    http:
+  {{- else }}
+  - http:
+  {{- end }}
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: operate-ui
+            port:
+              number: 3000
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: demon-runtime
+            port:
+              number: 8080
+{{- end }}
