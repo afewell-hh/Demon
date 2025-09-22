@@ -1315,6 +1315,13 @@ async fn handle_k8s_bootstrap_command(cmd: K8sBootstrapCommands) -> Result<()> {
                 manifests = format!("{}\n---\n{}", secret_manifest, manifests);
             }
 
+            // Process add-ons
+            let addon_manifests =
+                k8s_bootstrap::addons::process_addons(&bootstrap_config, dry_run, verbose)?;
+            if !addon_manifests.is_empty() {
+                manifests = format!("{}\n---\n{}", manifests, addon_manifests.join("\n---\n"));
+            }
+
             if dry_run {
                 println!("✓ Configuration is valid");
                 println!("Dry run mode - no changes will be made");
@@ -1322,8 +1329,15 @@ async fn handle_k8s_bootstrap_command(cmd: K8sBootstrapCommands) -> Result<()> {
                     "Cluster: {} (namespace: {})",
                     bootstrap_config.cluster.name, bootstrap_config.demon.namespace
                 );
-                let manifest_count =
-                    MANIFEST_FILES.len() + if secret_manifest.is_empty() { 0 } else { 1 };
+                let addon_manifest_count = addon_manifests.len();
+                let manifest_count = MANIFEST_FILES.len()
+                    + if secret_manifest.is_empty() { 0 } else { 1 }
+                    + if bootstrap_config.networking.ingress.enabled {
+                        1
+                    } else {
+                        0
+                    }
+                    + addon_manifest_count;
                 println!(
                     "{} manifest{} will be generated.",
                     manifest_count,
@@ -1362,6 +1376,30 @@ async fn handle_k8s_bootstrap_command(cmd: K8sBootstrapCommands) -> Result<()> {
                         println!("  Secrets: none configured");
                     }
 
+                    // Show networking configuration
+                    println!("  Networking:");
+                    let ingress = &bootstrap_config.networking.ingress;
+                    if ingress.enabled {
+                        let hostname_str = ingress.hostname.as_deref().unwrap_or("no hostname");
+                        let tls_str = if ingress.tls.enabled {
+                            match &ingress.tls.secret_name {
+                                Some(secret) => format!("TLS: {}", secret),
+                                None => "TLS: enabled (no secret)".to_string(),
+                            }
+                        } else {
+                            "TLS: disabled".to_string()
+                        };
+                        println!("    Ingress: enabled (host: {}, {})", hostname_str, tls_str);
+                    } else {
+                        println!("    Ingress: disabled");
+                    }
+                    let mesh = &bootstrap_config.networking.service_mesh;
+                    if mesh.enabled {
+                        println!("    Service mesh: enabled");
+                    } else {
+                        println!("    Service mesh: disabled");
+                    }
+
                     println!();
                     let k3s_installer = k8s_bootstrap::k3s::K3sInstaller::new(
                         bootstrap_config.cluster.k3s.clone(),
@@ -1375,6 +1413,9 @@ async fn handle_k8s_bootstrap_command(cmd: K8sBootstrapCommands) -> Result<()> {
                     }
                     for file in MANIFEST_FILES.iter() {
                         println!("  - {}", file);
+                    }
+                    if !addon_manifests.is_empty() {
+                        println!("  - {} add-on manifest(s)", addon_manifests.len());
                     }
 
                     println!();

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-use crate::k8s_bootstrap::{DemonConfig, K8sBootstrapConfig};
+use crate::k8s_bootstrap::{DemonConfig, K8sBootstrapConfig, NetworkingConfig};
 
 pub struct TemplateRenderer {
     templates_dir: String,
@@ -21,13 +21,18 @@ impl TemplateRenderer {
         let template_context = self.build_template_context(config)?;
         let mut rendered_manifests = Vec::new();
 
-        let manifest_files = vec![
+        let mut manifest_files = vec![
             "namespace.yaml",
             "nats.yaml",
             "runtime.yaml",
             "engine.yaml",
             "operate-ui.yaml",
         ];
+
+        // Add ingress manifest if enabled
+        if config.networking.ingress.enabled {
+            manifest_files.push("ingress.yaml");
+        }
 
         for file in manifest_files {
             let template_path = Path::new(&self.templates_dir).join(file);
@@ -90,7 +95,79 @@ impl TemplateRenderer {
         );
         context.insert("persistence".to_string(), Value::Object(persistence_obj));
 
+        // Add networking context
+        let networking_context = self.build_networking_context(&config.networking)?;
+        context.insert("networking".to_string(), Value::Object(networking_context));
+
         Ok(context)
+    }
+
+    fn build_networking_context(
+        &self,
+        networking: &NetworkingConfig,
+    ) -> Result<serde_json::Map<String, Value>> {
+        let mut networking_obj = serde_json::Map::new();
+
+        // Build ingress context
+        let mut ingress_obj = serde_json::Map::new();
+        ingress_obj.insert(
+            "enabled".to_string(),
+            Value::Bool(networking.ingress.enabled),
+        );
+
+        if let Some(hostname) = &networking.ingress.hostname {
+            ingress_obj.insert("hostname".to_string(), Value::String(hostname.clone()));
+        }
+
+        if let Some(ingress_class) = &networking.ingress.ingress_class {
+            ingress_obj.insert(
+                "ingressClass".to_string(),
+                Value::String(ingress_class.clone()),
+            );
+        }
+
+        if let Some(annotations) = &networking.ingress.annotations {
+            let annotations_obj = annotations
+                .iter()
+                .map(|(k, v)| (k.clone(), Value::String(v.clone())))
+                .collect();
+            ingress_obj.insert("annotations".to_string(), Value::Object(annotations_obj));
+        }
+
+        // Build TLS context
+        let mut tls_obj = serde_json::Map::new();
+        tls_obj.insert(
+            "enabled".to_string(),
+            Value::Bool(networking.ingress.tls.enabled),
+        );
+        if let Some(secret_name) = &networking.ingress.tls.secret_name {
+            tls_obj.insert("secretName".to_string(), Value::String(secret_name.clone()));
+        }
+        ingress_obj.insert("tls".to_string(), Value::Object(tls_obj));
+
+        networking_obj.insert("ingress".to_string(), Value::Object(ingress_obj));
+
+        // Build service mesh context
+        let mut service_mesh_obj = serde_json::Map::new();
+        service_mesh_obj.insert(
+            "enabled".to_string(),
+            Value::Bool(networking.service_mesh.enabled),
+        );
+
+        let mesh_annotations_obj = networking
+            .service_mesh
+            .annotations
+            .iter()
+            .map(|(k, v)| (k.clone(), Value::String(v.clone())))
+            .collect();
+        service_mesh_obj.insert(
+            "annotations".to_string(),
+            Value::Object(mesh_annotations_obj),
+        );
+
+        networking_obj.insert("serviceMesh".to_string(), Value::Object(service_mesh_obj));
+
+        Ok(networking_obj)
     }
 
     fn build_nats_url(&self, demon_config: &DemonConfig) -> String {
@@ -152,6 +229,7 @@ impl TemplateRenderer {
     ) -> Result<String> {
         let mut result = template.to_string();
 
+        // Handle persistence conditionals
         if let Some(Value::Object(persistence_obj)) = context.get("persistence") {
             let enabled = persistence_obj
                 .get("enabled")
@@ -162,6 +240,37 @@ impl TemplateRenderer {
                 result = self.process_conditional_block(&result, "persistence.enabled", true)?;
             } else {
                 result = self.process_conditional_block(&result, "persistence.enabled", false)?;
+            }
+        }
+
+        // Handle networking conditionals
+        if let Some(Value::Object(networking_obj)) = context.get("networking") {
+            // Handle ingress conditionals
+            if let Some(Value::Object(ingress_obj)) = networking_obj.get("ingress") {
+                let ingress_enabled = ingress_obj
+                    .get("enabled")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+
+                result = self.process_conditional_block(
+                    &result,
+                    "networking.ingress.enabled",
+                    ingress_enabled,
+                )?;
+            }
+
+            // Handle service mesh conditionals
+            if let Some(Value::Object(service_mesh_obj)) = networking_obj.get("serviceMesh") {
+                let mesh_enabled = service_mesh_obj
+                    .get("enabled")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+
+                result = self.process_conditional_block(
+                    &result,
+                    "networking.serviceMesh.enabled",
+                    mesh_enabled,
+                )?;
             }
         }
 
@@ -270,9 +379,17 @@ mod tests {
                 ingress: crate::k8s_bootstrap::IngressConfig {
                     enabled: false,
                     hostname: None,
-                    tls_secret_name: None,
+                    ingress_class: None,
+                    annotations: None,
+                    tls: crate::k8s_bootstrap::TlsConfig {
+                        enabled: false,
+                        secret_name: None,
+                    },
                 },
-                service_mesh: crate::k8s_bootstrap::ServiceMeshConfig { enabled: false },
+                service_mesh: crate::k8s_bootstrap::ServiceMeshConfig {
+                    enabled: false,
+                    annotations: crate::k8s_bootstrap::default_mesh_annotations(),
+                },
             },
         };
 
@@ -537,9 +654,17 @@ volumes:
                 ingress: crate::k8s_bootstrap::IngressConfig {
                     enabled: false,
                     hostname: None,
-                    tls_secret_name: None,
+                    ingress_class: None,
+                    annotations: None,
+                    tls: crate::k8s_bootstrap::TlsConfig {
+                        enabled: false,
+                        secret_name: None,
+                    },
                 },
-                service_mesh: crate::k8s_bootstrap::ServiceMeshConfig { enabled: false },
+                service_mesh: crate::k8s_bootstrap::ServiceMeshConfig {
+                    enabled: false,
+                    annotations: crate::k8s_bootstrap::default_mesh_annotations(),
+                },
             },
         };
 
@@ -607,5 +732,136 @@ nested: true
             .unwrap();
         assert!(result.contains("outer: true"));
         assert!(result.contains("{{- if .nested.condition }}"));
+    }
+
+    #[test]
+    fn test_build_networking_context_ingress_disabled() {
+        let renderer = TemplateRenderer::new("test");
+        let networking = crate::k8s_bootstrap::NetworkingConfig {
+            ingress: crate::k8s_bootstrap::IngressConfig {
+                enabled: false,
+                hostname: None,
+                ingress_class: None,
+                annotations: None,
+                tls: crate::k8s_bootstrap::TlsConfig {
+                    enabled: false,
+                    secret_name: None,
+                },
+            },
+            service_mesh: crate::k8s_bootstrap::ServiceMeshConfig {
+                enabled: false,
+                annotations: crate::k8s_bootstrap::default_mesh_annotations(),
+            },
+        };
+
+        let context = renderer.build_networking_context(&networking).unwrap();
+
+        let ingress = context.get("ingress").unwrap().as_object().unwrap();
+        assert_eq!(ingress.get("enabled").unwrap(), &Value::Bool(false));
+        assert!(!ingress.contains_key("hostname"));
+
+        let tls = ingress.get("tls").unwrap().as_object().unwrap();
+        assert_eq!(tls.get("enabled").unwrap(), &Value::Bool(false));
+
+        let service_mesh = context.get("serviceMesh").unwrap().as_object().unwrap();
+        assert_eq!(service_mesh.get("enabled").unwrap(), &Value::Bool(false));
+    }
+
+    #[test]
+    fn test_build_networking_context_ingress_enabled_with_tls() {
+        let renderer = TemplateRenderer::new("test");
+        let networking = crate::k8s_bootstrap::NetworkingConfig {
+            ingress: crate::k8s_bootstrap::IngressConfig {
+                enabled: true,
+                hostname: Some("ui.example.com".to_string()),
+                ingress_class: Some("nginx".to_string()),
+                annotations: None,
+                tls: crate::k8s_bootstrap::TlsConfig {
+                    enabled: true,
+                    secret_name: Some("demon-tls".to_string()),
+                },
+            },
+            service_mesh: crate::k8s_bootstrap::ServiceMeshConfig {
+                enabled: true,
+                annotations: crate::k8s_bootstrap::default_mesh_annotations(),
+            },
+        };
+
+        let context = renderer.build_networking_context(&networking).unwrap();
+
+        let ingress = context.get("ingress").unwrap().as_object().unwrap();
+        assert_eq!(ingress.get("enabled").unwrap(), &Value::Bool(true));
+        assert_eq!(
+            ingress.get("hostname").unwrap(),
+            &Value::String("ui.example.com".to_string())
+        );
+        assert_eq!(
+            ingress.get("ingressClass").unwrap(),
+            &Value::String("nginx".to_string())
+        );
+
+        let tls = ingress.get("tls").unwrap().as_object().unwrap();
+        assert_eq!(tls.get("enabled").unwrap(), &Value::Bool(true));
+        assert_eq!(
+            tls.get("secretName").unwrap(),
+            &Value::String("demon-tls".to_string())
+        );
+
+        let service_mesh = context.get("serviceMesh").unwrap().as_object().unwrap();
+        assert_eq!(service_mesh.get("enabled").unwrap(), &Value::Bool(true));
+
+        let mesh_annotations = service_mesh
+            .get("annotations")
+            .unwrap()
+            .as_object()
+            .unwrap();
+        assert_eq!(
+            mesh_annotations.get("sidecar.istio.io/inject").unwrap(),
+            &Value::String("true".to_string())
+        );
+    }
+
+    #[test]
+    fn test_networking_conditionals_in_handle_conditionals() {
+        let renderer = TemplateRenderer::new("test");
+        let mut context = HashMap::new();
+
+        // Build networking context for testing
+        let networking = crate::k8s_bootstrap::NetworkingConfig {
+            ingress: crate::k8s_bootstrap::IngressConfig {
+                enabled: true,
+                hostname: Some("test.example.com".to_string()),
+                ingress_class: None,
+                annotations: None,
+                tls: crate::k8s_bootstrap::TlsConfig {
+                    enabled: false,
+                    secret_name: None,
+                },
+            },
+            service_mesh: crate::k8s_bootstrap::ServiceMeshConfig {
+                enabled: true,
+                annotations: crate::k8s_bootstrap::default_mesh_annotations(),
+            },
+        };
+        let networking_context = renderer.build_networking_context(&networking).unwrap();
+        context.insert("networking".to_string(), Value::Object(networking_context));
+
+        let template = r#"{{- if .networking.ingress.enabled }}
+ingress: enabled
+{{- else }}
+ingress: disabled
+{{- end }}
+{{- if .networking.serviceMesh.enabled }}
+mesh: enabled
+{{- else }}
+mesh: disabled
+{{- end }}"#;
+
+        let result = renderer.handle_conditionals(template, &context).unwrap();
+
+        assert!(result.contains("ingress: enabled"));
+        assert!(result.contains("mesh: enabled"));
+        assert!(!result.contains("ingress: disabled"));
+        assert!(!result.contains("mesh: disabled"));
     }
 }
