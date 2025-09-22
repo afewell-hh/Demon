@@ -108,14 +108,36 @@ Required environment variables:
 In dry-run mode, the bootstrapper validates the Vault configuration without fetching secrets.
 
 #### Add-ons
+The bootstrapper supports an extensible add-on system for optional components like monitoring and observability tools.
+
 ```yaml
 addons:
-  - name: prometheus
+  # Monitoring stack (Prometheus + Grafana)
+  - name: monitoring
     enabled: true
-    values:
-      retention: "7d"
-      storage: "5Gi"
+    config:
+      prometheusRetention: "15d"        # Metrics retention period
+      prometheusStorageSize: "10Gi"     # Storage size for Prometheus
+      grafanaAdminPassword: "admin"     # Grafana admin password
 ```
+
+**Available Add-ons:**
+
+- **monitoring**: Deploys Prometheus and Grafana for cluster monitoring and observability
+  - `prometheusRetention`: How long to retain metrics (default: "15d")
+  - `prometheusStorageSize`: Storage size for Prometheus data (default: "10Gi")
+  - `grafanaAdminPassword`: Admin password for Grafana (default: "admin")
+
+**Add-on Manifest Generation:**
+- Add-ons are processed after core Demon components
+- Each enabled add-on generates multiple Kubernetes manifests
+- Manifests include services, deployments, configmaps, and RBAC rules
+- Add-on manifests respect the configured namespace
+
+**Security Considerations:**
+- Default passwords should be changed in production environments
+- Add-ons don't expose sensitive configuration in dry-run output
+- RBAC rules are scoped to the Demon namespace
 
 #### Networking
 ```yaml
@@ -210,6 +232,10 @@ The deployment uses templates located in `demonctl/resources/k8s/`:
 - `engine.yaml` - Deploys the Demon engine
 - `operate-ui.yaml` - Deploys the Operate UI
 
+**Add-on Templates** (located in `demonctl/resources/addons/`):
+- `monitoring/prometheus-*.yaml` - Prometheus configuration, deployment, and service
+- `monitoring/grafana-*.yaml` - Grafana configuration, deployment, and service
+
 Templates support conditional logic for persistence settings:
 ```yaml
 {{- if .persistence.enabled }}
@@ -270,10 +296,19 @@ sudo k3s kubectl logs -n your-namespace deployment/engine
 - [x] Unit tests for secret collection and rendering
 - [x] CLI integration tests for secret scenarios
 
+### ✅ Completed (Story 5: Add-on Plugin System)
+- [x] Add-on trait and registry system
+- [x] Monitoring add-on with Prometheus and Grafana
+- [x] Template-based manifest generation for add-ons
+- [x] Configuration validation for add-ons
+- [x] Integration with bootstrap flow (dry-run and apply modes)
+- [x] Unit tests for add-on framework
+- [x] CLI integration tests for add-on scenarios
+
 ### 🚧 Future Implementation
-- [ ] Add-on plugin system
 - [ ] Health checks and verification
 - [ ] Rollback capabilities
+- [ ] Additional built-in add-ons (logging, service mesh, etc.)
 
 ## Validation
 
@@ -298,7 +333,73 @@ cargo test -p demonctl k8s_bootstrap
 
 # CLI integration tests
 cargo test -p demonctl k8s_bootstrap_cli
+
+# End-to-end smoke test (requires k3d or kind)
+make bootstrap-smoke
+
+# Dry-run smoke test only
+make bootstrap-smoke ARGS="--dry-run-only"
+
+# Full smoke test with cleanup
+make bootstrap-smoke ARGS="--cleanup"
 ```
+
+### Smoke Test
+
+The `scripts/tests/smoke-k8s-bootstrap.sh` script provides comprehensive end-to-end testing of the bootstrapper:
+
+**Features:**
+- Automatic cluster provisioning (k3d preferred, kind fallback)
+- Bootstrap configuration validation and deployment
+- Pod readiness verification with timeout
+- Service health checks
+- Comprehensive logging and artifact capture
+- Optional cleanup with `--cleanup` flag
+
+**Usage:**
+```bash
+# Full smoke test with cluster provisioning
+./scripts/tests/smoke-k8s-bootstrap.sh
+
+# Dry-run validation only (no cluster creation)
+./scripts/tests/smoke-k8s-bootstrap.sh --dry-run-only
+
+# With cleanup after completion
+./scripts/tests/smoke-k8s-bootstrap.sh --cleanup
+
+# With verbose output
+./scripts/tests/smoke-k8s-bootstrap.sh --verbose
+
+# Custom configuration
+./scripts/tests/smoke-k8s-bootstrap.sh --config ./my-config.yaml
+```
+
+**Environment Variables:**
+- `DRY_RUN=1` - Same as `--dry-run-only`
+- `CLEANUP=1` - Same as `--cleanup`
+- `VERBOSE=1` - Same as `--verbose`
+
+**Requirements:**
+- k3d (preferred) or kind installed
+- kubectl installed
+- Docker or Podman runtime
+- Built demonctl binary (`cargo build -p demonctl`)
+
+**Artifacts:**
+All test artifacts are captured in `dist/bootstrapper-smoke/<timestamp>/`:
+- `kubeconfig` - Cluster access configuration
+- `bootstrap-output.txt` - Bootstrap command output
+- `final-state.txt` - Final cluster state
+- `logs-*.txt` - Pod logs
+- `dry-run-output.txt` - Dry-run validation output
+
+The script validates:
+✓ Configuration parsing and validation
+✓ Template rendering and manifest generation
+✓ k3s cluster installation and readiness
+✓ Demon pod deployment and readiness
+✓ Secret creation and availability
+✓ Service accessibility (where applicable)
 
 ## Schema Development
 
