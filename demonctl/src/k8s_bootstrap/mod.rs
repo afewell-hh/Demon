@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::process::Command;
 
+pub mod addons;
 pub mod k3s;
 pub mod secrets;
 pub mod templates;
@@ -207,13 +208,31 @@ pub struct NetworkingConfig {
 pub struct IngressConfig {
     pub enabled: bool,
     pub hostname: Option<String>,
-    #[serde(rename = "tlsSecretName")]
-    pub tls_secret_name: Option<String>,
+    #[serde(rename = "ingressClass")]
+    pub ingress_class: Option<String>,
+    pub annotations: Option<HashMap<String, String>>,
+    pub tls: TlsConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TlsConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(rename = "secretName")]
+    pub secret_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceMeshConfig {
     pub enabled: bool,
+    #[serde(default = "default_mesh_annotations")]
+    pub annotations: HashMap<String, String>,
+}
+
+fn default_mesh_annotations() -> HashMap<String, String> {
+    let mut annotations = HashMap::new();
+    annotations.insert("sidecar.istio.io/inject".to_string(), "true".to_string());
+    annotations
 }
 
 pub fn load_config(config_path: &str) -> Result<K8sBootstrapConfig> {
@@ -241,6 +260,42 @@ pub fn validate_config(config: &K8sBootstrapConfig) -> Result<()> {
 
     if config.demon.subjects.is_empty() {
         anyhow::bail!("At least one subject must be specified");
+    }
+
+    validate_networking_config(&config.networking)?;
+
+    Ok(())
+}
+
+pub fn validate_networking_config(networking: &NetworkingConfig) -> Result<()> {
+    let ingress = &networking.ingress;
+
+    if ingress.enabled {
+        if let Some(hostname) = &ingress.hostname {
+            if hostname.is_empty() {
+                anyhow::bail!("Ingress hostname cannot be empty when specified");
+            }
+
+            // Basic hostname validation
+            if !hostname.contains('.') && hostname != "localhost" {
+                anyhow::bail!(
+                    "Ingress hostname '{}' appears to be invalid (should contain domain)",
+                    hostname
+                );
+            }
+        }
+
+        if ingress.tls.enabled {
+            if ingress.hostname.is_none() {
+                anyhow::bail!("TLS requires a hostname to be specified");
+            }
+
+            if ingress.tls.secret_name.is_none() {
+                eprintln!(
+                    "Warning: TLS enabled but no secret name specified - ingress will be HTTP-only"
+                );
+            }
+        }
     }
 
     Ok(())
