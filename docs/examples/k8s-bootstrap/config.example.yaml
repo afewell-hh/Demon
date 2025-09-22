@@ -1,0 +1,105 @@
+# Example Kubernetes Bootstrap Configuration
+# This file demonstrates how to configure a Demon Kubernetes deployment
+
+apiVersion: demon.io/v1
+kind: BootstrapConfig
+metadata:
+  name: my-demon-cluster
+
+# Kubernetes cluster configuration
+cluster:
+  name: my-k3s-cluster
+  version: "v1.28.2+k3s1"  # K3s version to install
+  dataDir: /var/lib/rancher/k3s  # K3s data directory
+  nodeName: demon-node-1  # Name for the cluster node
+  extraArgs:
+    - "--disable=traefik"  # Disable default traefik ingress
+    - "--disable=servicelb"  # Disable service load balancer
+
+# Demon system configuration
+demon:
+  # NATS connection settings
+  natsUrl: "nats://nats.demon-system.svc.cluster.local:4222"
+  streamName: "RITUAL_EVENTS"
+  subjects:
+    - "ritual.>"
+    - "approval.>"
+  dedupeWindowSecs: 60
+
+  # UI configuration
+  uiUrl: "http://operate-ui.demon-system.svc.cluster.local:3000"
+
+  # Kubernetes namespace for Demon components
+  namespace: demon-system
+
+  # Persistent storage configuration
+  persistence:
+    enabled: true
+    storageClass: local-path  # Default k3s storage class
+    size: 10Gi
+
+  # Optional: use a pre-built bundle for advanced configuration
+  # bundle: "lib://demon-stack/v1.0.0"
+
+# Secret management configuration
+secrets:
+  provider: env  # Options: vault, env, file
+
+  # For environment variable provider
+  env:
+    GITHUB_TOKEN: GITHUB_TOKEN
+    ADMIN_TOKEN: ADMIN_TOKEN
+    DATABASE_URL: DATABASE_URL
+
+  # For Vault provider (uncomment and configure if using vault)
+  # vault:
+  #   address: "https://vault.example.com:8200"
+  #   role: "demon-bootstrap"
+  #   path: "secret/demon"
+
+# Optional add-ons (commented out examples)
+addons:
+  - name: prometheus
+    enabled: false
+    values:
+      retention: 7d
+      storage: 5Gi
+
+  - name: grafana
+    enabled: false
+    values:
+      adminPassword: "admin123"
+      persistence:
+        enabled: true
+        size: 1Gi
+
+# Networking configuration
+networking:
+  # Ingress configuration (optional)
+  ingress:
+    enabled: false
+    hostname: demon.local
+    tlsSecretName: demon-tls
+
+  # Service mesh configuration (optional)
+  serviceMesh:
+    enabled: false
+
+---
+# Alternative minimal configuration example
+apiVersion: demon.io/v1
+kind: BootstrapConfig
+metadata:
+  name: minimal-demon
+
+cluster:
+  name: minimal-cluster
+
+demon:
+  natsUrl: "nats://nats.demon-system.svc.cluster.local:4222"
+  streamName: "RITUAL_EVENTS"
+  subjects: ["ritual.>"]
+  uiUrl: "http://operate-ui.demon-system.svc.cluster.local:3000"
+  namespace: demon-system
+
+# All other settings will use defaults
