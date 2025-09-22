@@ -183,3 +183,24 @@ The implementation is ready for code review and subsequent merge. The test fix a
 **Branch**: `feat/k8s-bootstrapper-secrets`
 **Timestamp**: 2025-09-22 23:00 UTC
 **Duration**: ~30 minutes comprehensive validation
+
+---
+
+## CI Automation Update (2025-09-22)
+
+**CI Integration Completed**: Following this QA validation, automated CI coverage has been added to ensure continuous validation of the bootstrapper:
+
+### Added CI Coverage:
+1. **Dry-Run CI Job**: `k8s-bootstrapper-smoke-dryrun` in main CI workflow
+   - Triggers on k8s-bootstrap related changes
+   - Validates configuration parsing and template rendering
+   - Uploads artifacts for investigation
+
+2. **Scheduled Full Testing**: `.github/workflows/bootstrapper-smoke.yml`
+   - Daily execution at 02:00 UTC
+   - Full k3d cluster provisioning and deployment testing
+   - Comprehensive artifact capture
+
+3. **Documentation Updated**: Added CI coverage section to `docs/examples/k8s-bootstrap/README.md`
+
+This ensures that the quality standards validated in this QA report are maintained automatically going forward, catching regressions before they reach production.
