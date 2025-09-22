@@ -6,6 +6,53 @@ use tracing_subscriber::{fmt, EnvFilter};
 
 mod k8s_bootstrap;
 
+const MANIFEST_FILES: [&str; 5] = [
+    "namespace.yaml",
+    "nats.yaml",
+    "runtime.yaml",
+    "engine.yaml",
+    "operate-ui.yaml",
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BootstrapExecutionMode {
+    Full,
+    ApplyOnly,
+}
+
+impl BootstrapExecutionMode {
+    fn from_env() -> Self {
+        match std::env::var("DEMONCTL_K8S_BOOTSTRAP_EXECUTION")
+            .unwrap_or_default()
+            .as_str()
+        {
+            "apply-only" => Self::ApplyOnly,
+            _ => Self::Full,
+        }
+    }
+
+    fn is_apply_only(self) -> bool {
+        matches!(self, Self::ApplyOnly)
+    }
+}
+
+fn resolve_command_executor() -> Box<dyn k8s_bootstrap::CommandExecutor> {
+    let mode = std::env::var("DEMONCTL_K8S_EXECUTOR").unwrap_or_default();
+    match mode.as_str() {
+        "simulate-success" => {
+            let stdout = std::env::var("DEMONCTL_K8S_EXECUTOR_STDOUT")
+                .unwrap_or_else(|_| "kubectl apply - simulated success".to_string());
+            Box::new(k8s_bootstrap::SimulatedCommandExecutor::success(stdout))
+        }
+        "simulate-failure" => {
+            let stderr = std::env::var("DEMONCTL_K8S_EXECUTOR_STDERR")
+                .unwrap_or_else(|_| "kubectl apply failed - simulated".to_string());
+            Box::new(k8s_bootstrap::SimulatedCommandExecutor::failure(stderr))
+        }
+        _ => Box::new(k8s_bootstrap::SystemCommandExecutor),
+    }
+}
+
 #[derive(ValueEnum, Clone, Debug)]
 enum ProviderType {
     /// Environment file provider (default)
@@ -1245,40 +1292,287 @@ async fn handle_k8s_bootstrap_command(cmd: K8sBootstrapCommands) -> Result<()> {
                 println!("Configuration validation passed");
             }
 
+            // Collect secrets
+            let secret_material =
+                k8s_bootstrap::secrets::collect_secrets(&bootstrap_config.secrets, dry_run)?;
+
+            // Render secret manifest
+            let secret_manifest = k8s_bootstrap::secrets::render_secret_manifest(
+                &bootstrap_config.demon.namespace,
+                None, // Use default name "demon-secrets"
+                &secret_material,
+            )?;
+
+            // Initialize template renderer
+            let templates_dir = format!("{}/resources/k8s", env!("CARGO_MANIFEST_DIR"));
+            let template_renderer = k8s_bootstrap::templates::TemplateRenderer::new(&templates_dir);
+
+            // Render manifests
+            let mut manifests = template_renderer.render_manifests(&bootstrap_config)?;
+
+            // Prepend secret manifest if we have secrets
+            if !secret_manifest.is_empty() {
+                manifests = format!("{}\n---\n{}", secret_manifest, manifests);
+            }
+
             if dry_run {
                 println!("✓ Configuration is valid");
                 println!("Dry run mode - no changes will be made");
-                println!();
-                println!("Configuration summary:");
                 println!(
-                    "  Cluster: {} ({})",
-                    bootstrap_config.cluster.name, bootstrap_config.cluster.version
+                    "Cluster: {} (namespace: {})",
+                    bootstrap_config.cluster.name, bootstrap_config.demon.namespace
                 );
-                println!("  Namespace: {}", bootstrap_config.demon.namespace);
-                println!("  NATS URL: {}", bootstrap_config.demon.nats_url);
-                println!("  Stream: {}", bootstrap_config.demon.stream_name);
-                println!("  UI URL: {}", bootstrap_config.demon.ui_url);
-                if !bootstrap_config.addons.is_empty() {
-                    println!("  Add-ons: {}", bootstrap_config.addons.len());
-                    for addon in &bootstrap_config.addons {
-                        println!("    - {} (enabled: {})", addon.name, addon.enabled);
+                let manifest_count =
+                    MANIFEST_FILES.len() + if secret_manifest.is_empty() { 0 } else { 1 };
+                println!(
+                    "{} manifest{} will be generated.",
+                    manifest_count,
+                    if manifest_count == 1 { "" } else { "s" }
+                );
+
+                if verbose {
+                    println!();
+                    println!("Configuration summary:");
+                    println!(
+                        "  Cluster: {} ({})",
+                        bootstrap_config.cluster.name, bootstrap_config.cluster.k3s.version
+                    );
+                    println!("  Runtime: {}", bootstrap_config.cluster.runtime);
+                    println!("  Namespace: {}", bootstrap_config.demon.namespace);
+                    println!("  NATS URL: {}", bootstrap_config.demon.nats_url);
+                    println!("  Stream: {}", bootstrap_config.demon.stream_name);
+                    println!("  UI URL: {}", bootstrap_config.demon.ui_url);
+                    if !bootstrap_config.addons.is_empty() {
+                        println!("  Add-ons: {}", bootstrap_config.addons.len());
+                        for addon in &bootstrap_config.addons {
+                            println!("    - {} (enabled: {})", addon.name, addon.enabled);
+                        }
                     }
+
+                    // Show secrets information from collected material
+                    if !secret_material.provider_used.is_empty() {
+                        println!("  Secrets: {}", secret_material.provider_used);
+                        if !secret_material.data.is_empty() {
+                            println!(
+                                "    - Keys to be configured: {:?}",
+                                secret_material.data.keys().cloned().collect::<Vec<_>>()
+                            );
+                        }
+                    } else {
+                        println!("  Secrets: none configured");
+                    }
+
+                    println!();
+                    let k3s_installer = k8s_bootstrap::k3s::K3sInstaller::new(
+                        bootstrap_config.cluster.k3s.clone(),
+                        dry_run,
+                    );
+                    k3s_installer.install_k3s()?;
+
+                    println!("Manifests to be applied:");
+                    if !secret_manifest.is_empty() {
+                        println!("  - demon-secrets (Secret)");
+                    }
+                    for file in MANIFEST_FILES.iter() {
+                        println!("  - {}", file);
+                    }
+
+                    println!();
+                    println!("Generated manifests:");
+                    println!("---");
+                    println!("{}", manifests);
+                } else {
+                    println!(
+                        "Run with --verbose to view the k3s installation plan and manifest preview."
+                    );
                 }
+
+                return Ok(());
+            }
+
+            let execution_mode = BootstrapExecutionMode::from_env();
+
+            if execution_mode.is_apply_only() {
+                println!("🚀 Starting K8s bootstrap process (manifests only)...");
+                if verbose {
+                    println!("Phase 3: Deploying Demon components");
+                }
+
+                let command_executor = resolve_command_executor();
+                apply_manifests(&manifests, command_executor.as_ref(), verbose)?;
+
+                if verbose {
+                    println!("✓ Demon components deployed");
+                }
+
+                println!("🎯 Manifest application simulation complete");
                 return Ok(());
             }
 
             println!("🚀 Starting K8s bootstrap process...");
-            println!("This feature is currently in development.");
-            println!("The following phases would be executed:");
-            println!("  1. Install k3s cluster");
-            println!("  2. Deploy Demon components");
-            println!("  3. Configure networking");
-            println!("  4. Install add-ons");
-            println!("  5. Verify deployment");
+
+            if verbose {
+                println!("Phase 1: Installing k3s cluster");
+            }
+
+            let k3s_installer = k8s_bootstrap::k3s::K3sInstaller::new(
+                bootstrap_config.cluster.k3s.clone(),
+                dry_run,
+            );
+
+            k3s_installer.install_k3s()?;
+
+            if verbose {
+                println!("✓ k3s cluster installation completed");
+            }
+
+            // Wait for k3s to be ready
+            if verbose {
+                println!("Phase 2: Waiting for k3s cluster to be ready");
+            }
+
+            let k3s_ready = k3s_installer.is_k3s_ready()?;
+            if !k3s_ready {
+                anyhow::bail!("k3s cluster is not ready after installation");
+            }
+
+            if verbose {
+                println!("✓ k3s cluster is ready");
+                println!("Phase 3: Deploying Demon components");
+            }
+
+            // Apply manifests to cluster
+            let command_executor = resolve_command_executor();
+            apply_manifests(&manifests, command_executor.as_ref(), verbose)?;
+
+            if verbose {
+                println!("✓ Demon components deployed");
+                println!("Phase 4: Waiting for pods to be ready");
+            }
+
+            // Wait for Demon pods to be ready
+            wait_for_demon_pods(
+                &bootstrap_config.demon.namespace,
+                command_executor.as_ref(),
+                verbose,
+            )?;
+
+            println!("🎉 Demon deployment completed successfully!");
+            println!("You can now use kubectl to interact with your cluster:");
+            println!("  sudo k3s kubectl get nodes");
+            println!(
+                "  sudo k3s kubectl get pods -n {}",
+                bootstrap_config.demon.namespace
+            );
+            println!(
+                "  sudo k3s kubectl get services -n {}",
+                bootstrap_config.demon.namespace
+            );
 
             Ok(())
         }
     }
+}
+
+fn apply_manifests(
+    manifests: &str,
+    executor: &dyn k8s_bootstrap::CommandExecutor,
+    verbose: bool,
+) -> Result<()> {
+    if verbose {
+        println!("Applying manifests to cluster...");
+    }
+
+    let output = executor.execute("k3s", &["kubectl", "apply", "-f", "-"], Some(manifests))?;
+
+    if output.status != 0 {
+        eprintln!("Failed to apply manifests:");
+        eprintln!("stdout: {}", output.stdout);
+        eprintln!("stderr: {}", output.stderr);
+        anyhow::bail!("kubectl apply failed with exit code {}", output.status);
+    }
+
+    if verbose {
+        println!("Manifests applied successfully:");
+        println!("{}", output.stdout);
+    }
+
+    Ok(())
+}
+
+fn wait_for_demon_pods(
+    namespace: &str,
+    executor: &dyn k8s_bootstrap::CommandExecutor,
+    verbose: bool,
+) -> Result<()> {
+    let timeout_secs = 120;
+    let check_interval_secs = 5;
+    let mut elapsed = 0;
+
+    if verbose {
+        println!(
+            "Waiting for Demon pods to be ready (timeout: {}s)...",
+            timeout_secs
+        );
+    }
+
+    while elapsed < timeout_secs {
+        let output = executor.execute(
+            "k3s",
+            &["kubectl", "get", "pods", "-n", namespace, "--no-headers"],
+            None,
+        )?;
+
+        if output.status == 0 {
+            let lines: Vec<&str> = output
+                .stdout
+                .lines()
+                .filter(|line| !line.trim().is_empty())
+                .collect();
+            if lines.is_empty() {
+                if verbose {
+                    println!("No pods found yet, waiting...");
+                }
+            } else {
+                let total_pods = lines.len();
+                let ready_pods = lines
+                    .iter()
+                    .filter(|line| {
+                        let parts: Vec<&str> = line.split_whitespace().collect();
+                        if parts.len() >= 3 {
+                            let ready_status = parts[1];
+                            let status = parts[2];
+                            status == "Running" && ready_status.contains("/") && {
+                                let ready_parts: Vec<&str> = ready_status.split('/').collect();
+                                ready_parts.len() == 2 && ready_parts[0] == ready_parts[1]
+                            }
+                        } else {
+                            false
+                        }
+                    })
+                    .count();
+
+                if verbose {
+                    println!("Pods ready: {}/{}", ready_pods, total_pods);
+                }
+
+                if ready_pods == total_pods && total_pods > 0 {
+                    if verbose {
+                        println!("All Demon pods are ready!");
+                    }
+                    return Ok(());
+                }
+            }
+        }
+
+        std::thread::sleep(std::time::Duration::from_secs(check_interval_secs));
+        elapsed += check_interval_secs;
+    }
+
+    anyhow::bail!(
+        "Timeout waiting for Demon pods to be ready after {}s",
+        timeout_secs
+    )
 }
 
 // no-op: exercise replies guard

@@ -9,12 +9,17 @@ metadata:
 # Kubernetes cluster configuration
 cluster:
   name: my-k3s-cluster
-  version: "v1.28.2+k3s1"  # K3s version to install
-  dataDir: /var/lib/rancher/k3s  # K3s data directory
-  nodeName: demon-node-1  # Name for the cluster node
-  extraArgs:
-    - "--disable=traefik"  # Disable default traefik ingress
-    - "--disable=servicelb"  # Disable service load balancer
+  runtime: k3s
+  k3s:
+    version: "v1.28.2+k3s1"  # K3s version to install
+    install:
+      channel: stable
+      disable: []
+    dataDir: /var/lib/rancher/k3s  # K3s data directory
+    nodeName: demon-node-1  # Name for the cluster node
+    extraArgs:
+      - "--disable=traefik"  # Disable default traefik ingress
+      - "--disable=servicelb"  # Disable service load balancer
 
 # Demon system configuration
 demon:
@@ -43,19 +48,24 @@ demon:
 
 # Secret management configuration
 secrets:
-  provider: env  # Options: vault, env, file
+  provider: env  # Options: 'env' or 'vault'
 
-  # For environment variable provider
+  # Environment variable provider configuration
+  # Maps secret keys (as they'll appear in the K8s Secret) to environment variable names
   env:
-    GITHUB_TOKEN: GITHUB_TOKEN
-    ADMIN_TOKEN: ADMIN_TOKEN
-    DATABASE_URL: DATABASE_URL
+    github_token: GITHUB_TOKEN         # Will read from $GITHUB_TOKEN env var
+    admin_token: ADMIN_TOKEN           # Will read from $ADMIN_TOKEN env var
+    database_url: DATABASE_URL         # Will read from $DATABASE_URL env var
+    nats_password: NATS_PASSWORD       # Will read from $NATS_PASSWORD env var
+    jwt_secret: JWT_SECRET             # Will read from $JWT_SECRET env var
 
-  # For Vault provider (uncomment and configure if using vault)
+  # Vault provider configuration (uncomment and configure if using vault)
   # vault:
-  #   address: "https://vault.example.com:8200"
-  #   role: "demon-bootstrap"
-  #   path: "secret/demon"
+  #   address: "https://vault.example.com:8200"  # Optional, defaults to $VAULT_ADDR
+  #   role: "demon-bootstrap"                    # Optional, for Kubernetes auth
+  #   path: "secret/demon/config"                # Path to secrets in Vault
+  #   authMethod: "token"                        # Options: 'token' (default), 'kubernetes'
+  # Note: When using token auth, set VAULT_TOKEN environment variable
 
 # Optional add-ons (commented out examples)
 addons:
@@ -85,21 +95,3 @@ networking:
   serviceMesh:
     enabled: false
 
----
-# Alternative minimal configuration example
-apiVersion: demon.io/v1
-kind: BootstrapConfig
-metadata:
-  name: minimal-demon
-
-cluster:
-  name: minimal-cluster
-
-demon:
-  natsUrl: "nats://nats.demon-system.svc.cluster.local:4222"
-  streamName: "RITUAL_EVENTS"
-  subjects: ["ritual.>"]
-  uiUrl: "http://operate-ui.demon-system.svc.cluster.local:3000"
-  namespace: demon-system
-
-# All other settings will use defaults

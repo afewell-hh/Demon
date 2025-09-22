@@ -38,7 +38,7 @@ secrets:
 demonctl k8s-bootstrap bootstrap --config config.yaml --dry-run
 ```
 
-3. **Deploy to Kubernetes** (future implementation):
+3. **Deploy to Kubernetes**:
 ```bash
 demonctl k8s-bootstrap bootstrap --config config.yaml
 ```
@@ -71,31 +71,41 @@ demonctl k8s-bootstrap bootstrap --config config.yaml
 - `demon.persistence.size`: Storage size (default: `10Gi`)
 
 #### Secret Management
-Supports three providers:
+The bootstrapper generates a Kubernetes Secret manifest with your configured secrets, which is applied before other Demon components. The secret is named `demon-secrets` by default.
 
-**Environment Variables** (default):
+**Environment Variables Provider** (default):
+Maps secret keys to environment variable names. The bootstrapper reads these environment variables and creates a Kubernetes Secret.
+
 ```yaml
 secrets:
   provider: env
   env:
-    VAR_NAME: ENV_VAR_NAME
+    # key_in_secret: ENV_VAR_NAME
+    github_token: GITHUB_TOKEN     # Reads from $GITHUB_TOKEN
+    admin_token: ADMIN_TOKEN       # Reads from $ADMIN_TOKEN
+    database_url: DATABASE_URL     # Reads from $DATABASE_URL
 ```
 
-**HashiCorp Vault**:
+In dry-run mode, the bootstrapper validates that all environment variables exist without exposing their values.
+
+**HashiCorp Vault Provider**:
+Fetches secrets from a Vault server. Currently supports token authentication.
+
 ```yaml
 secrets:
   provider: vault
   vault:
-    address: "https://vault.example.com"
-    role: "demon-bootstrap"
-    path: "secret/demon"
+    address: "https://vault.example.com:8200"  # Optional, defaults to $VAULT_ADDR
+    role: "demon-bootstrap"                    # Optional, for Kubernetes auth
+    path: "secret/demon/config"                # Path to secrets in Vault
+    authMethod: "token"                        # Default: token
 ```
 
-**File Provider**:
-```yaml
-secrets:
-  provider: file
-```
+Required environment variables:
+- `VAULT_ADDR` (if not specified in config)
+- `VAULT_TOKEN` (for token auth method)
+
+In dry-run mode, the bootstrapper validates the Vault configuration without fetching secrets.
 
 #### Add-ons
 ```yaml
@@ -133,14 +143,103 @@ demonctl k8s-bootstrap bootstrap --config <config-file> [--dry-run] [--verbose]
 
 ### Examples
 
-**Dry run with verbose output:**
+**Dry run (concise output):**
+```bash
+demonctl k8s-bootstrap bootstrap --config config.yaml --dry-run
+```
+
+Sample output:
+```text
+✓ Configuration is valid
+Dry run mode - no changes will be made
+Cluster: my-k3s-cluster (namespace: demon-system)
+5 manifests will be generated.
+Run with --verbose to view the k3s installation plan and manifest preview.
+```
+
+**Dry run with verbose output (k3s plan + manifest preview):**
 ```bash
 demonctl k8s-bootstrap bootstrap --config config.yaml --dry-run --verbose
+```
+
+Sample excerpt:
+```text
+Configuration summary:
+  Cluster: my-k3s-cluster (v1.28.2+k3s1)
+  Add-ons: 2
+  Secrets: env (3 keys)
+    - Keys to be configured: ["github_token", "admin_token", "database_url"]
+
+📋 k3s Installation Plan:
+  Version: v1.28.2+k3s1
+  Channel: stable
+  Data Directory: /var/lib/rancher/k3s
+
+Manifests to be applied:
+  - demon-secrets (Secret)
+  - namespace.yaml
+  - nats.yaml
+  - runtime.yaml
+  - engine.yaml
+  - operate-ui.yaml
+
+Generated manifests:
+  (full YAML is printed below this list so you can diff before applying)
 ```
 
 **Full deployment:**
 ```bash
 demonctl k8s-bootstrap bootstrap --config config.yaml
+```
+
+## Deploy Demon
+
+The bootstrap command now supports full Demon deployment to Kubernetes clusters. When not using `--dry-run`, the CLI will:
+
+1. **Install k3s cluster** - Validates configuration and installs k3s with the specified version
+2. **Wait for cluster readiness** - Verifies k3s is ready to accept workloads
+3. **Generate and apply manifests** - Renders templates with your configuration and applies them via `kubectl`
+4. **Wait for pod readiness** - Monitors Demon pods until they reach Ready state (120s timeout)
+
+### Manifest Templates
+
+The deployment uses templates located in `demonctl/resources/k8s/`:
+- `namespace.yaml` - Creates the Demon namespace
+- `nats.yaml` - Deploys NATS server with JetStream
+- `runtime.yaml` - Deploys the Demon runtime service
+- `engine.yaml` - Deploys the Demon engine
+- `operate-ui.yaml` - Deploys the Operate UI
+
+Templates support conditional logic for persistence settings:
+```yaml
+{{- if .persistence.enabled }}
+volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      storageClassName: {{ .storageClass }}
+{{- else }}
+volumes:
+  - name: data
+    emptyDir: {}
+{{- end }}
+```
+
+### Verification Commands
+
+After deployment, verify your cluster:
+```bash
+# Check cluster nodes
+sudo k3s kubectl get nodes
+
+# Check Demon pods
+sudo k3s kubectl get pods -n your-namespace
+
+# Check services
+sudo k3s kubectl get services -n your-namespace
+
+# View logs
+sudo k3s kubectl logs -n your-namespace deployment/engine
 ```
 
 ## Implementation Status
@@ -154,10 +253,24 @@ demonctl k8s-bootstrap bootstrap --config config.yaml
 - [x] Unit tests for config parsing and validation
 - [x] CLI integration tests with assert_cmd
 
+### ✅ Completed (Story 2: Demon Deployment)
+- [x] Template rendering engine for Kubernetes manifests
+- [x] Manifest generation from configuration
+- [x] kubectl integration for manifest application
+- [x] Pod readiness verification with timeout
+- [x] Dry-run manifest preview with --verbose flag
+- [x] Command executor abstraction for testable deployment
+
+### ✅ Completed (Story 3: Secret Management)
+- [x] Environment variable secret provider
+- [x] Vault secret provider integration
+- [x] Secret manifest generation with base64 encoding
+- [x] Dry-run mode security (no secret exposure)
+- [x] Secret manifest applied before other components
+- [x] Unit tests for secret collection and rendering
+- [x] CLI integration tests for secret scenarios
+
 ### 🚧 Future Implementation
-- [ ] K3s installation and management
-- [ ] Kubernetes manifest deployment
-- [ ] Secret injection (Vault, env, file)
 - [ ] Add-on plugin system
 - [ ] Health checks and verification
 - [ ] Rollback capabilities

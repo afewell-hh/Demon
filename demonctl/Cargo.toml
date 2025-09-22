@@ -19,6 +19,7 @@ serde = { workspace = true }
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
 config-loader = { path = "../crates/config-loader" }
 serde_yaml = { workspace = true }
+base64 = "0.22.1"
 
 [dev-dependencies]
 assert_cmd = "2.0"
