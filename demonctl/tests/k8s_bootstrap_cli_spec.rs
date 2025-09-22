@@ -45,7 +45,11 @@ networking:
   ingress:
     enabled: false
     hostname: null
-    tlsSecretName: null
+    ingressClass: null
+    annotations: null
+    tls:
+      enabled: false
+      secretName: null
   serviceMesh:
     enabled: false
 "#;
@@ -89,7 +93,11 @@ networking:
   ingress:
     enabled: false
     hostname: null
-    tlsSecretName: null
+    ingressClass: null
+    annotations: null
+    tls:
+      enabled: false
+      secretName: null
   serviceMesh:
     enabled: false
 "#;
@@ -129,7 +137,11 @@ networking:
   ingress:
     enabled: false
     hostname: null
-    tlsSecretName: null
+    ingressClass: null
+    annotations: null
+    tls:
+      enabled: false
+      secretName: null
   serviceMesh:
     enabled: false
 "#;
@@ -392,6 +404,12 @@ addons: []
 networking:
   ingress:
     enabled: false
+    hostname: null
+    ingressClass: null
+    annotations: null
+    tls:
+      enabled: false
+      secretName: null
   serviceMesh:
     enabled: false
 "#;
@@ -425,6 +443,10 @@ networking:
 
 #[test]
 fn given_vault_secrets_configured_when_dry_run_then_validates_config() {
+    // Clean up env vars to ensure test isolation
+    std::env::remove_var("VAULT_ADDR");
+    std::env::remove_var("VAULT_TOKEN");
+
     let file = write_config(VAULT_CONFIG);
 
     let mut cmd = Command::cargo_bin("demonctl").unwrap();
@@ -436,9 +458,9 @@ fn given_vault_secrets_configured_when_dry_run_then_validates_config() {
         .arg("--verbose");
 
     // Without VAULT_ADDR and VAULT_TOKEN, validation should fail
-    cmd.assert()
-        .failure()
-        .stderr(predicate::str::contains("VAULT_TOKEN environment variable required"));
+    cmd.assert().failure().stderr(predicate::str::contains(
+        "VAULT_TOKEN environment variable required",
+    ));
 }
 
 #[test]
@@ -504,6 +526,12 @@ addons: []
 networking:
   ingress:
     enabled: false
+    hostname: null
+    ingressClass: null
+    annotations: null
+    tls:
+      enabled: false
+      secretName: null
   serviceMesh:
     enabled: false
 "#;
@@ -561,6 +589,12 @@ addons: []
 networking:
   ingress:
     enabled: false
+    hostname: null
+    ingressClass: null
+    annotations: null
+    tls:
+      enabled: false
+      secretName: null
   serviceMesh:
     enabled: false
 "#;
@@ -589,4 +623,397 @@ networking:
 
     // Clean up env var
     std::env::remove_var("TEST_SECRET_VALUE");
+}
+
+const MONITORING_ADDON_CONFIG: &str = r#"
+apiVersion: demon.io/v1
+kind: BootstrapConfig
+metadata:
+  name: test-cluster
+cluster:
+  name: test-cluster
+  runtime: k3s
+  k3s:
+    version: "v1.28.2+k3s1"
+    install:
+      channel: stable
+      disable: []
+    dataDir: "/var/lib/rancher/k3s"
+    nodeName: "test-node"
+    extraArgs: []
+demon:
+  natsUrl: "nats://localhost:4222"
+  streamName: "TEST_EVENTS"
+  subjects:
+    - "test.>"
+  dedupeWindowSecs: 30
+  uiUrl: "http://localhost:3000"
+  namespace: "test-system"
+  persistence:
+    enabled: true
+    storageClass: "local-path"
+    size: "10Gi"
+secrets:
+  provider: env
+  env: {}
+addons:
+  - name: monitoring
+    enabled: true
+    config:
+      prometheusRetention: "30d"
+      prometheusStorageSize: "20Gi"
+      grafanaAdminPassword: "admin123"
+networking:
+  ingress:
+    enabled: false
+    hostname: null
+    ingressClass: null
+    annotations: null
+    tls:
+      enabled: false
+      secretName: null
+  serviceMesh:
+    enabled: false
+"#;
+
+#[test]
+fn given_monitoring_addon_enabled_when_dry_run_verbose_then_shows_addon_info() {
+    let file = write_config(MONITORING_ADDON_CONFIG);
+
+    let mut cmd = Command::cargo_bin("demonctl").unwrap();
+    cmd.arg("k8s-bootstrap")
+        .arg("bootstrap")
+        .arg("--config")
+        .arg(file.path())
+        .arg("--dry-run")
+        .arg("--verbose");
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Add-ons enabled (1):"))
+        .stdout(predicate::str::contains(
+            "- monitoring (Prometheus and Grafana for monitoring and observability)",
+        ))
+        .stdout(predicate::str::contains("Processing add-on: monitoring"));
+}
+
+#[test]
+fn given_monitoring_addon_enabled_when_dry_run_then_includes_addon_manifest_count() {
+    let file = write_config(MONITORING_ADDON_CONFIG);
+
+    let mut cmd = Command::cargo_bin("demonctl").unwrap();
+    cmd.arg("k8s-bootstrap")
+        .arg("bootstrap")
+        .arg("--config")
+        .arg(file.path())
+        .arg("--dry-run");
+
+    // Add-ons don't generate manifests in dry-run mode, so count stays the same
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("5 manifests will be generated."));
+}
+
+#[test]
+fn given_monitoring_addon_disabled_when_dry_run_then_no_addon_manifests() {
+    let config = MONITORING_ADDON_CONFIG.replace("enabled: true", "enabled: false");
+    let file = write_config(&config);
+
+    let mut cmd = Command::cargo_bin("demonctl").unwrap();
+    cmd.arg("k8s-bootstrap")
+        .arg("bootstrap")
+        .arg("--config")
+        .arg(file.path())
+        .arg("--dry-run");
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("5 manifests will be generated."));
+}
+
+#[test]
+fn given_unknown_addon_when_bootstrap_then_fails() {
+    let config = MONITORING_ADDON_CONFIG.replace("monitoring", "unknown-addon");
+    let file = write_config(&config);
+
+    let mut cmd = Command::cargo_bin("demonctl").unwrap();
+    cmd.arg("k8s-bootstrap")
+        .arg("bootstrap")
+        .arg("--config")
+        .arg(file.path())
+        .arg("--dry-run");
+
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("Unknown add-on: unknown-addon"));
+}
+
+#[test]
+fn given_monitoring_addon_with_invalid_storage_size_when_bootstrap_then_fails() {
+    let config = MONITORING_ADDON_CONFIG.replace("20Gi", "20GB");
+    let file = write_config(&config);
+
+    let mut cmd = Command::cargo_bin("demonctl").unwrap();
+    cmd.arg("k8s-bootstrap")
+        .arg("bootstrap")
+        .arg("--config")
+        .arg(file.path())
+        .arg("--dry-run");
+
+    cmd.assert().failure().stderr(predicate::str::contains(
+        "Invalid storage size format '20GB'. Must end with Gi, Mi, or Ti",
+    ));
+}
+
+#[test]
+fn given_monitoring_addon_enabled_when_apply_then_manifests_include_prometheus_and_grafana() {
+    let file = write_config(MONITORING_ADDON_CONFIG);
+
+    let mut cmd = Command::cargo_bin("demonctl").unwrap();
+    cmd.arg("k8s-bootstrap")
+        .arg("bootstrap")
+        .arg("--config")
+        .arg(file.path())
+        .arg("--verbose");
+    cmd.env("DEMONCTL_K8S_BOOTSTRAP_EXECUTION", "apply-only");
+    cmd.env("DEMONCTL_K8S_EXECUTOR", "simulate-success");
+    cmd.env(
+        "DEMONCTL_K8S_EXECUTOR_STDOUT",
+        "configmap/prometheus-config created\ndeployment.apps/prometheus created\nservice/prometheus created\nconfigmap/grafana-datasources created\ndeployment.apps/grafana created\nservice/grafana created\n",
+    );
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Processing add-on: monitoring"))
+        .stdout(predicate::str::contains(
+            "configmap/prometheus-config created",
+        ))
+        .stdout(predicate::str::contains(
+            "deployment.apps/prometheus created",
+        ))
+        .stdout(predicate::str::contains("service/prometheus created"))
+        .stdout(predicate::str::contains(
+            "configmap/grafana-datasources created",
+        ))
+        .stdout(predicate::str::contains("deployment.apps/grafana created"))
+        .stdout(predicate::str::contains("service/grafana created"));
+}
+
+const INGRESS_ENABLED_CONFIG: &str = r#"
+apiVersion: demon.io/v1
+kind: BootstrapConfig
+metadata:
+  name: ingress-cluster
+cluster:
+  name: ingress-cluster
+  runtime: k3s
+  k3s:
+    version: "v1.28.2+k3s1"
+    install:
+      channel: stable
+      disable: []
+    dataDir: "/var/lib/rancher/k3s"
+    nodeName: "ingress-node"
+    extraArgs: []
+demon:
+  natsUrl: "nats://localhost:4222"
+  streamName: "TEST_EVENTS"
+  subjects:
+    - "test.>"
+  dedupeWindowSecs: 30
+  uiUrl: "http://localhost:3000"
+  namespace: "test-system"
+  persistence:
+    enabled: true
+    storageClass: "local-path"
+    size: "10Gi"
+secrets:
+  provider: env
+  env: {}
+addons: []
+networking:
+  ingress:
+    enabled: true
+    hostname: ui.example.com
+    ingressClass: nginx
+    tls:
+      enabled: true
+      secretName: demon-tls
+  serviceMesh:
+    enabled: false
+"#;
+
+const SERVICE_MESH_ENABLED_CONFIG: &str = r#"
+apiVersion: demon.io/v1
+kind: BootstrapConfig
+metadata:
+  name: mesh-cluster
+cluster:
+  name: mesh-cluster
+  runtime: k3s
+  k3s:
+    version: "v1.28.2+k3s1"
+    install:
+      channel: stable
+      disable: []
+    dataDir: "/var/lib/rancher/k3s"
+    nodeName: "mesh-node"
+    extraArgs: []
+demon:
+  natsUrl: "nats://localhost:4222"
+  streamName: "TEST_EVENTS"
+  subjects:
+    - "test.>"
+  dedupeWindowSecs: 30
+  uiUrl: "http://localhost:3000"
+  namespace: "test-system"
+  persistence:
+    enabled: true
+    storageClass: "local-path"
+    size: "10Gi"
+secrets:
+  provider: env
+  env: {}
+addons: []
+networking:
+  ingress:
+    enabled: false
+    hostname: null
+    ingressClass: null
+    annotations: null
+    tls:
+      enabled: false
+      secretName: null
+  serviceMesh:
+    enabled: true
+"#;
+
+#[test]
+fn given_ingress_enabled_when_dry_run_verbose_then_shows_networking_plan() {
+    let file = write_config(INGRESS_ENABLED_CONFIG);
+
+    let mut cmd = Command::cargo_bin("demonctl").unwrap();
+    cmd.arg("k8s-bootstrap")
+        .arg("bootstrap")
+        .arg("--config")
+        .arg(file.path())
+        .arg("--dry-run")
+        .arg("--verbose");
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Networking:"))
+        .stdout(predicate::str::contains(
+            "Ingress: enabled (host: ui.example.com, TLS: demon-tls)",
+        ))
+        .stdout(predicate::str::contains("Service mesh: disabled"));
+}
+
+#[test]
+fn given_ingress_enabled_when_dry_run_then_includes_ingress_manifest_count() {
+    let file = write_config(INGRESS_ENABLED_CONFIG);
+
+    let mut cmd = Command::cargo_bin("demonctl").unwrap();
+    cmd.arg("k8s-bootstrap")
+        .arg("bootstrap")
+        .arg("--config")
+        .arg(file.path())
+        .arg("--dry-run");
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("6 manifests will be generated."));
+}
+
+#[test]
+fn given_service_mesh_enabled_when_dry_run_verbose_then_shows_mesh_plan() {
+    let file = write_config(SERVICE_MESH_ENABLED_CONFIG);
+
+    let mut cmd = Command::cargo_bin("demonctl").unwrap();
+    cmd.arg("k8s-bootstrap")
+        .arg("bootstrap")
+        .arg("--config")
+        .arg(file.path())
+        .arg("--dry-run")
+        .arg("--verbose");
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Networking:"))
+        .stdout(predicate::str::contains("Ingress: disabled"))
+        .stdout(predicate::str::contains("Service mesh: enabled"));
+}
+
+#[test]
+fn given_ingress_enabled_when_apply_then_ingress_manifest_applied() {
+    let file = write_config(INGRESS_ENABLED_CONFIG);
+
+    let mut cmd = Command::cargo_bin("demonctl").unwrap();
+    cmd.arg("k8s-bootstrap")
+        .arg("bootstrap")
+        .arg("--config")
+        .arg(file.path())
+        .arg("--verbose");
+    cmd.env("DEMONCTL_K8S_BOOTSTRAP_EXECUTION", "apply-only");
+    cmd.env("DEMONCTL_K8S_EXECUTOR", "simulate-success");
+    cmd.env(
+        "DEMONCTL_K8S_EXECUTOR_STDOUT",
+        "namespace/test-system created\ningress.networking.k8s.io/demon-ingress created\nservice/operate-ui created\n",
+    );
+
+    cmd.assert().success().stdout(predicate::str::contains(
+        "ingress.networking.k8s.io/demon-ingress created",
+    ));
+}
+
+#[test]
+fn given_ingress_enabled_without_hostname_when_validate_then_fails() {
+    let config = INGRESS_ENABLED_CONFIG.replace("hostname: ui.example.com", "hostname: null");
+    let file = write_config(&config);
+
+    let mut cmd = Command::cargo_bin("demonctl").unwrap();
+    cmd.arg("k8s-bootstrap")
+        .arg("bootstrap")
+        .arg("--config")
+        .arg(file.path())
+        .arg("--dry-run");
+
+    cmd.assert().failure().stderr(predicate::str::contains(
+        "TLS requires a hostname to be specified",
+    ));
+}
+
+#[test]
+fn given_ingress_with_invalid_hostname_when_validate_then_fails() {
+    let config = INGRESS_ENABLED_CONFIG.replace("ui.example.com", "invalid-hostname");
+    let file = write_config(&config);
+
+    let mut cmd = Command::cargo_bin("demonctl").unwrap();
+    cmd.arg("k8s-bootstrap")
+        .arg("bootstrap")
+        .arg("--config")
+        .arg(file.path())
+        .arg("--dry-run");
+
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("appears to be invalid"));
+}
+
+#[test]
+fn given_service_mesh_enabled_when_apply_then_manifests_include_mesh_annotations() {
+    let file = write_config(SERVICE_MESH_ENABLED_CONFIG);
+
+    let mut cmd = Command::cargo_bin("demonctl").unwrap();
+    cmd.arg("k8s-bootstrap")
+        .arg("bootstrap")
+        .arg("--config")
+        .arg(file.path())
+        .arg("--verbose");
+    cmd.env("DEMONCTL_K8S_BOOTSTRAP_EXECUTION", "apply-only");
+    cmd.env("DEMONCTL_K8S_EXECUTOR", "simulate-success");
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Applying manifests to cluster"));
 }
