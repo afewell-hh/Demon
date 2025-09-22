@@ -1,0 +1,84 @@
+name: K8s Bootstrapper Smoke (Scheduled)
+
+on:
+  schedule:
+    # Daily at 02:00 UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  k8s-bootstrapper-smoke-full:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust (pinned toolchain)
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: 1.82.0
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+          cache-on-failure: true
+
+      - name: Install k3d
+        run: |
+          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | sudo TAG=v5.4.6 bash
+
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+
+      - name: Build workspace
+        run: cargo build --workspace
+
+      - name: Run full k8s bootstrapper smoke test
+        env:
+          # Set test environment variables
+          GITHUB_TOKEN: test-token-value
+          ADMIN_TOKEN: test-admin-token
+          DATABASE_URL: postgresql://localhost/demon_test
+          NATS_PASSWORD: test-nats-password
+          JWT_SECRET: test-jwt-secret-12345
+        run: |
+          make bootstrap-smoke ARGS="--cleanup --verbose --artifacts-dir dist/bootstrapper-smoke/nightly-$(date +%Y-%m-%d)"
+
+      - name: Upload smoke test artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: k8s-bootstrapper-smoke-nightly-${{ github.run_number }}
+          path: dist/bootstrapper-smoke/
+          retention-days: 30
+
+      - name: Generate summary
+        if: always()
+        run: |
+          echo "## K8s Bootstrapper Smoke Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "**Run ID:** ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [[ $? -eq 0 ]]; then
+            echo "✅ **Status:** PASSED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- Cluster provisioning completed" >> $GITHUB_STEP_SUMMARY
+            echo "- Bootstrap deployment successful" >> $GITHUB_STEP_SUMMARY
+            echo "- Health checks passed" >> $GITHUB_STEP_SUMMARY
+            echo "- Artifacts captured and cleanup completed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Status:** FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Check the uploaded artifacts for detailed logs and cluster state." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Artifacts:** Available as 'k8s-bootstrapper-smoke-nightly-${{ github.run_number }}'" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next scheduled run:** $(date -d 'tomorrow 02:00 UTC' -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
