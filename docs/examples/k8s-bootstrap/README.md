@@ -2,6 +2,8 @@
 
 This directory contains documentation and examples for the Demon Kubernetes Bootstrap feature.
 
+> 📋 **Release Status**: The Kubernetes bootstrapper is ready for MVP Alpha integration. See [Release Notes (RC1)](../../releases/bootstrapper-rc1.md) for complete feature overview, validation results, and integration guidance.
+
 ## Overview
 
 The `demonctl k8s-bootstrap` command provides a streamlined way to deploy Demon on Kubernetes clusters. It handles k3s installation, Demon deployment, secret management, and optional add-ons through a single YAML configuration file.
@@ -377,6 +379,41 @@ make bootstrap-smoke ARGS="--dry-run-only"
 # Full smoke test with cleanup
 make bootstrap-smoke ARGS="--cleanup"
 ```
+
+## CI Coverage
+
+The bootstrapper has automated CI coverage to catch regressions and ensure quality:
+
+### PR/Push Smoke Testing
+- **Job**: `k8s-bootstrapper-smoke-dryrun` in the main CI workflow
+- **Trigger**: Runs on PRs/pushes that contain "k8s-bootstrap" in commit messages or titles, or affect related files
+- **Scope**: Dry-run validation only (no cluster provisioning)
+- **Artifacts**: Configuration validation output and rendered manifests
+- **Purpose**: Fast feedback on configuration parsing, template rendering, and validation logic
+
+### Scheduled Full Testing
+- **Workflow**: `.github/workflows/bootstrapper-smoke.yml`
+- **Schedule**: Daily at 02:00 UTC
+- **Scope**: Full end-to-end test with k3d cluster provisioning
+- **Artifacts**: Complete cluster state, logs, and health check results
+- **Purpose**: Detect integration issues and infrastructure drift
+
+### CI Test Coverage
+The automated tests validate:
+- ✅ Configuration file parsing and schema validation
+- ✅ Template rendering with various configuration options
+- ✅ Manifest generation and structure
+- ✅ Command-line argument parsing
+- ✅ Dry-run mode output formatting
+- ✅ Error handling and validation messages
+- ✅ (Scheduled only) k3d cluster provisioning and deployment
+- ✅ (Scheduled only) Pod readiness verification
+- ✅ (Scheduled only) Runtime and UI health checks
+
+### Viewing CI Results
+- **Dry-run artifacts**: Available on PR checks as `k8s-bootstrapper-dryrun-artifacts`
+- **Full test artifacts**: Available on scheduled runs as `k8s-bootstrapper-smoke-nightly-<run-number>`
+- **Summary**: GitHub Actions provides a test summary with status and next scheduled run time
 
 ### Smoke Test
 
