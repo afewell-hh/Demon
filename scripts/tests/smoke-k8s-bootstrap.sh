@@ -3,13 +3,14 @@
 # End-to-End Smoke Test for Kubernetes Bootstrapper
 # Automates cluster provisioning, bootstrap deployment, and verification
 #
-# TEMPORARY NOTE: This script currently uses placeholder container images (nginx:alpine)
-# instead of the actual Demon components (ghcr.io/demon-project/*:latest) because the
-# Docker infrastructure and image build process has not yet been implemented.
-# The smoke test validates the bootstrap infrastructure without requiring the actual
-# Demon runtime functionality.
+# AUTOMATIC PLACEHOLDER DETECTION: This script automatically detects whether the cluster
+# is using placeholder container images (nginx:alpine) or actual Demon components
+# (ghcr.io/demon-project/*:latest) and adjusts health checks accordingly.
 #
-# TODO: Replace placeholder images once Docker infrastructure is implemented
+# - Placeholder mode: Validates that containers are running and logs are being generated
+# - Production mode: Performs actual HTTP health checks against service endpoints
+#
+# The script seamlessly handles both scenarios without configuration changes.
 #
 set -euo pipefail
 
@@ -336,31 +337,57 @@ run_health_checks() {
     local namespace="$1"
     log "Running health checks..."
 
-    # TEMPORARY: Using placeholder containers, so we just verify they're running
-    # TODO: Restore proper health endpoint checks once Docker infrastructure is implemented
+    # Detect if we're using placeholder images
+    local placeholder_mode=false
+    local test_pod
+    test_pod=$(kubectl get pods -n "${namespace}" -l app.kubernetes.io/name=demon-runtime -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+    if [[ -n "${test_pod}" ]]; then
+        local image_name
+        image_name=$(kubectl get pod -n "${namespace}" "${test_pod}" -o jsonpath='{.spec.containers[0].image}' 2>/dev/null || echo "")
+        if [[ "${image_name}" == "nginx:alpine" ]]; then
+            placeholder_mode=true
+            log "Detected placeholder mode (nginx:alpine images)"
+        fi
+    fi
 
     # Check runtime pod is running
     local runtime_pod
     runtime_pod=$(kubectl get pods -n "${namespace}" -l app.kubernetes.io/name=demon-runtime -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
     if [[ -n "${runtime_pod}" ]]; then
-        log "Checking runtime placeholder pod: ${runtime_pod}"
+        if [[ "${placeholder_mode}" == "true" ]]; then
+            log "Checking runtime placeholder pod: ${runtime_pod}"
 
-        # Verify pod is running (placeholder health check)
-        local pod_status
-        pod_status=$(kubectl get pod -n "${namespace}" "${runtime_pod}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+            # Verify pod is running (placeholder health check)
+            local pod_status
+            pod_status=$(kubectl get pod -n "${namespace}" "${runtime_pod}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
 
-        if [[ "${pod_status}" == "Running" ]]; then
-            success "Runtime placeholder pod is running"
-            # Capture placeholder logs for verification
-            kubectl logs -n "${namespace}" "${runtime_pod}" --tail=5 > "${ARTIFACTS_DIR}/runtime-health.txt" 2>&1 || true
+            if [[ "${pod_status}" == "Running" ]]; then
+                success "Runtime placeholder pod is running"
+                # Capture placeholder logs for verification
+                kubectl logs -n "${namespace}" "${runtime_pod}" --tail=5 > "${ARTIFACTS_DIR}/runtime-health.txt" 2>&1 || true
+            else
+                error "Runtime placeholder pod not running (status: ${pod_status})"
+                kubectl logs -n "${namespace}" "${runtime_pod}" > "${ARTIFACTS_DIR}/runtime-health-logs.txt" 2>&1 || true
+                return 1
+            fi
         else
-            error "Runtime placeholder pod not running (status: ${pod_status})"
-            kubectl logs -n "${namespace}" "${runtime_pod}" > "${ARTIFACTS_DIR}/runtime-health-logs.txt" 2>&1 || true
-            return 1
+            log "Checking runtime health endpoint: ${runtime_pod}"
+
+            # Real health check for actual runtime service
+            if kubectl exec -n "${namespace}" "${runtime_pod}" -- wget -q -O- http://localhost:8080/health >/dev/null 2>&1; then
+                success "Runtime health check passed"
+                kubectl exec -n "${namespace}" "${runtime_pod}" -- wget -q -O- http://localhost:8080/health > "${ARTIFACTS_DIR}/runtime-health.txt" 2>&1 || true
+            else
+                error "Runtime health check failed"
+                kubectl logs -n "${namespace}" "${runtime_pod}" > "${ARTIFACTS_DIR}/runtime-health-logs.txt" 2>&1 || true
+                return 1
+            fi
         fi
     else
-        warn "No demon-runtime pod found for health checking"
+        error "No demon-runtime pod found for health checking"
+        return 1
     fi
 
     # Check Operate UI pod is running
@@ -368,23 +395,38 @@ run_health_checks() {
     ui_pod=$(kubectl get pods -n "${namespace}" -l app.kubernetes.io/name=operate-ui -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
     if [[ -n "${ui_pod}" ]]; then
-        log "Checking Operate UI placeholder pod: ${ui_pod}"
+        if [[ "${placeholder_mode}" == "true" ]]; then
+            log "Checking Operate UI placeholder pod: ${ui_pod}"
 
-        # Verify pod is running (placeholder health check)
-        local pod_status
-        pod_status=$(kubectl get pod -n "${namespace}" "${ui_pod}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+            # Verify pod is running (placeholder health check)
+            local pod_status
+            pod_status=$(kubectl get pod -n "${namespace}" "${ui_pod}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
 
-        if [[ "${pod_status}" == "Running" ]]; then
-            success "Operate UI placeholder pod is running"
-            # Capture placeholder logs for verification
-            kubectl logs -n "${namespace}" "${ui_pod}" --tail=5 > "${ARTIFACTS_DIR}/ui-health.txt" 2>&1 || true
+            if [[ "${pod_status}" == "Running" ]]; then
+                success "Operate UI placeholder pod is running"
+                # Capture placeholder logs for verification
+                kubectl logs -n "${namespace}" "${ui_pod}" --tail=5 > "${ARTIFACTS_DIR}/ui-health.txt" 2>&1 || true
+            else
+                error "Operate UI placeholder pod not running (status: ${pod_status})"
+                kubectl logs -n "${namespace}" "${ui_pod}" > "${ARTIFACTS_DIR}/ui-health-logs.txt" 2>&1 || true
+                return 1
+            fi
         else
-            error "Operate UI placeholder pod not running (status: ${pod_status})"
-            kubectl logs -n "${namespace}" "${ui_pod}" > "${ARTIFACTS_DIR}/ui-health-logs.txt" 2>&1 || true
-            return 1
+            log "Checking Operate UI health endpoint: ${ui_pod}"
+
+            # Real health check for actual UI service
+            if kubectl exec -n "${namespace}" "${ui_pod}" -- wget -q -O- http://localhost:3000/api/runs >/dev/null 2>&1; then
+                success "Operate UI health check passed"
+                kubectl exec -n "${namespace}" "${ui_pod}" -- wget -q -O- http://localhost:3000/api/runs > "${ARTIFACTS_DIR}/ui-health.txt" 2>&1 || true
+            else
+                error "Operate UI health check failed"
+                kubectl logs -n "${namespace}" "${ui_pod}" > "${ARTIFACTS_DIR}/ui-health-logs.txt" 2>&1 || true
+                return 1
+            fi
         fi
     else
-        warn "No operate-ui pod found for health checking"
+        error "No operate-ui pod found for health checking"
+        return 1
     fi
 
     # Check Engine pod is running
@@ -392,26 +434,45 @@ run_health_checks() {
     engine_pod=$(kubectl get pods -n "${namespace}" -l app.kubernetes.io/name=demon-engine -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
     if [[ -n "${engine_pod}" ]]; then
-        log "Checking Engine placeholder pod: ${engine_pod}"
+        if [[ "${placeholder_mode}" == "true" ]]; then
+            log "Checking Engine placeholder pod: ${engine_pod}"
 
-        # Verify pod is running (placeholder health check)
-        local pod_status
-        pod_status=$(kubectl get pod -n "${namespace}" "${engine_pod}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+            # Verify pod is running (placeholder health check)
+            local pod_status
+            pod_status=$(kubectl get pod -n "${namespace}" "${engine_pod}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
 
-        if [[ "${pod_status}" == "Running" ]]; then
-            success "Engine placeholder pod is running"
-            # Capture placeholder logs for verification
-            kubectl logs -n "${namespace}" "${engine_pod}" --tail=5 > "${ARTIFACTS_DIR}/engine-health.txt" 2>&1 || true
+            if [[ "${pod_status}" == "Running" ]]; then
+                success "Engine placeholder pod is running"
+                # Capture placeholder logs for verification
+                kubectl logs -n "${namespace}" "${engine_pod}" --tail=5 > "${ARTIFACTS_DIR}/engine-health.txt" 2>&1 || true
+            else
+                error "Engine placeholder pod not running (status: ${pod_status})"
+                kubectl logs -n "${namespace}" "${engine_pod}" > "${ARTIFACTS_DIR}/engine-health-logs.txt" 2>&1 || true
+                return 1
+            fi
         else
-            error "Engine placeholder pod not running (status: ${pod_status})"
-            kubectl logs -n "${namespace}" "${engine_pod}" > "${ARTIFACTS_DIR}/engine-health-logs.txt" 2>&1 || true
-            return 1
+            log "Checking Engine health endpoint: ${engine_pod}"
+
+            # Real health check for actual engine service
+            if kubectl exec -n "${namespace}" "${engine_pod}" -- wget -q -O- http://localhost:8081/health >/dev/null 2>&1; then
+                success "Engine health check passed"
+                kubectl exec -n "${namespace}" "${engine_pod}" -- wget -q -O- http://localhost:8081/health > "${ARTIFACTS_DIR}/engine-health.txt" 2>&1 || true
+            else
+                error "Engine health check failed"
+                kubectl logs -n "${namespace}" "${engine_pod}" > "${ARTIFACTS_DIR}/engine-health-logs.txt" 2>&1 || true
+                return 1
+            fi
         fi
     else
-        warn "No demon-engine pod found for health checking"
+        error "No demon-engine pod found for health checking"
+        return 1
     fi
 
-    success "All placeholder health checks passed!"
+    if [[ "${placeholder_mode}" == "true" ]]; then
+        success "All placeholder health checks passed!"
+    else
+        success "All health checks passed!"
+    fi
 }
 
 capture_logs() {
