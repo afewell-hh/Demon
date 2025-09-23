@@ -57,7 +57,10 @@ OPTIONS:
     --verbose           Enable verbose output
     --config FILE       Use custom config file (default: scripts/tests/fixtures/config.e2e.yaml)
     --timeout SECONDS   Pod readiness timeout in seconds (default: 300)
+<<<<<<< HEAD
     --artifacts-dir DIR Custom directory for artifacts (default: dist/bootstrapper-smoke/<timestamp>)
+=======
+>>>>>>> origin/main
     --help              Show this help message
 
 ENVIRONMENT VARIABLES:
@@ -320,6 +323,7 @@ validate_deployment() {
     log "Checking services..."
     kubectl get services -n "${namespace}" > "${ARTIFACTS_DIR}/services.txt" 2>&1
 
+<<<<<<< HEAD
     # Run integrated health checks
     run_health_checks "${namespace}"
 }
@@ -329,10 +333,14 @@ run_health_checks() {
     log "Running health checks..."
 
     # Check runtime health endpoint
+=======
+    # Try to port-forward and check health (if demon-runtime has a health endpoint)
+>>>>>>> origin/main
     local runtime_pod
     runtime_pod=$(kubectl get pods -n "${namespace}" -l app=demon-runtime -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
     if [[ -n "${runtime_pod}" ]]; then
+<<<<<<< HEAD
         log "Checking runtime health endpoint for pod: ${runtime_pod}"
 
         if kubectl exec -n "${namespace}" "${runtime_pod}" -- curl -f -s "http://localhost:8080/health" > "${ARTIFACTS_DIR}/runtime-health.txt" 2>&1; then
@@ -373,6 +381,23 @@ run_health_checks() {
     fi
 
     success "All health checks passed!"
+=======
+        log "Checking runtime health via port-forward..."
+        timeout 10s kubectl port-forward -n "${namespace}" "pod/${runtime_pod}" 8080:8080 &
+        local pf_pid=$!
+        sleep 2
+
+        # Try to reach health endpoint
+        if curl -s -f "http://localhost:8080/health" > "${ARTIFACTS_DIR}/runtime-health.txt" 2>&1; then
+            success "Runtime health check passed"
+        else
+            warn "Runtime health check failed (may not be implemented yet)"
+        fi
+
+        kill ${pf_pid} 2>/dev/null || true
+        wait ${pf_pid} 2>/dev/null || true
+    fi
+>>>>>>> origin/main
 }
 
 capture_logs() {
@@ -386,6 +411,7 @@ capture_logs() {
     export KUBECONFIG="${ARTIFACTS_DIR}/kubeconfig"
     local namespace="demon-system"
 
+<<<<<<< HEAD
     # Create artifacts subdirectory structure
     mkdir -p "${ARTIFACTS_DIR}/manifests"
     mkdir -p "${ARTIFACTS_DIR}/logs"
@@ -412,22 +438,36 @@ capture_logs() {
 
     # Capture logs from each pod
     log "Capturing pod logs..."
+=======
+    # Capture pod descriptions
+    kubectl describe pods -n "${namespace}" > "${ARTIFACTS_DIR}/pods-describe.txt" 2>&1 || true
+
+    # Capture service descriptions
+    kubectl describe services -n "${namespace}" > "${ARTIFACTS_DIR}/services-describe.txt" 2>&1 || true
+
+    # Capture logs from each pod
+>>>>>>> origin/main
     local pods
     pods=$(kubectl get pods -n "${namespace}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
 
     if [[ -n "${pods}" ]]; then
         for pod in ${pods}; do
             log "Capturing logs for pod: ${pod}"
+<<<<<<< HEAD
             kubectl logs -n "${namespace}" "${pod}" > "${ARTIFACTS_DIR}/logs/${pod}.txt" 2>&1 || true
 
             # Capture previous logs if pod has restarted
             if kubectl logs -n "${namespace}" "${pod}" --previous >/dev/null 2>&1; then
                 kubectl logs -n "${namespace}" "${pod}" --previous > "${ARTIFACTS_DIR}/logs/${pod}-previous.txt" 2>&1 || true
             fi
+=======
+            kubectl logs -n "${namespace}" "${pod}" > "${ARTIFACTS_DIR}/logs-${pod}.txt" 2>&1 || true
+>>>>>>> origin/main
         done
     fi
 
     # Capture cluster events
+<<<<<<< HEAD
     log "Capturing cluster events..."
     kubectl get events -n "${namespace}" --sort-by='.lastTimestamp' > "${ARTIFACTS_DIR}/events.txt" 2>&1 || true
     kubectl get events --all-namespaces --sort-by='.lastTimestamp' > "${ARTIFACTS_DIR}/events-all-namespaces.txt" 2>&1 || true
@@ -449,6 +489,14 @@ capture_logs() {
     log "  - descriptions/: Detailed resource descriptions"
     log "  - events.txt: Kubernetes events in target namespace"
     log "  - final-state.txt: Final resource summary"
+=======
+    kubectl get events -n "${namespace}" --sort-by='.lastTimestamp' > "${ARTIFACTS_DIR}/events.txt" 2>&1 || true
+
+    # Final cluster state
+    kubectl get all -n "${namespace}" -o wide > "${ARTIFACTS_DIR}/final-state.txt" 2>&1 || true
+
+    success "Logs and state captured to ${ARTIFACTS_DIR}"
+>>>>>>> origin/main
 }
 
 cleanup_cluster() {
@@ -497,8 +545,12 @@ print_summary() {
         echo "✓ Cluster provisioning completed"
         echo "✓ Bootstrap deployment completed"
         echo "✓ Pod readiness verified"
+<<<<<<< HEAD
         echo "✓ Health checks passed"
         echo "✓ Comprehensive artifacts captured"
+=======
+        echo "✓ Logs and state captured"
+>>>>>>> origin/main
         if [[ "${CLEANUP}" == "true" ]]; then
             echo "✓ Cluster cleanup completed"
         else
@@ -516,11 +568,16 @@ print_summary() {
     else
         echo "  - ${ARTIFACTS_DIR}/kubeconfig"
         echo "  - ${ARTIFACTS_DIR}/bootstrap-output.txt"
+<<<<<<< HEAD
         echo "  - ${ARTIFACTS_DIR}/manifests/ (resource YAML exports)"
         echo "  - ${ARTIFACTS_DIR}/logs/ (pod logs)"
         echo "  - ${ARTIFACTS_DIR}/descriptions/ (detailed resource info)"
         echo "  - ${ARTIFACTS_DIR}/runtime-health.txt & ui-health.txt"
         echo "  - ${ARTIFACTS_DIR}/final-state.txt"
+=======
+        echo "  - ${ARTIFACTS_DIR}/final-state.txt"
+        echo "  - ${ARTIFACTS_DIR}/logs-*.txt"
+>>>>>>> origin/main
     fi
     echo "=================================================================="
 }
@@ -549,10 +606,13 @@ main() {
                 TIMEOUT_SECONDS="$2"
                 shift 2
                 ;;
+<<<<<<< HEAD
             --artifacts-dir)
                 ARTIFACTS_DIR="$2"
                 shift 2
                 ;;
+=======
+>>>>>>> origin/main
             --help)
                 usage
                 exit 0

@@ -1508,8 +1508,8 @@ async fn handle_k8s_bootstrap_command(cmd: K8sBootstrapCommands) -> Result<()> {
                 &bootstrap_config.demon.namespace,
                 command_executor.as_ref(),
                 verbose,
-            )?;
-
+            )?
+;
             println!("🎉 Demon deployment completed successfully!");
             println!("You can now use kubectl to interact with your cluster:");
             println!("  sudo k3s kubectl get nodes");
@@ -1803,5 +1803,4 @@ fn check_ui_health(
         );
     }
 }
-
 // no-op: exercise replies guard
