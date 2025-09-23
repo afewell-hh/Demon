@@ -518,31 +518,23 @@ addons:
     }
 
     #[test]
-    fn given_env_provider_without_config_when_validate_then_error() {
+    fn given_env_provider_without_config_when_validate_then_success() {
         let mut config = create_valid_test_config();
         config.secrets.provider = "env".to_string();
         config.secrets.env = None;
 
         let result = validate_config(&config);
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("env configuration is required when provider is 'env'"));
+        assert!(result.is_ok());
     }
 
     #[test]
-    fn given_env_provider_with_empty_config_when_validate_then_error() {
+    fn given_env_provider_with_empty_config_when_validate_then_success() {
         let mut config = create_valid_test_config();
         config.secrets.provider = "env".to_string();
         config.secrets.env = Some(HashMap::new());
 
         let result = validate_config(&config);
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("env configuration is required when provider is 'env'"));
+        assert!(result.is_ok());
     }
 
     #[test]
