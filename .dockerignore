@@ -1,0 +1,80 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts
+target/
+dist/
+.cargo/
+
+# Dependencies
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test results
+test-results/
+.pytest_cache/
+
+# Local environment
+.env
+.env.local
+.env.*.local
+
+# Documentation
+docs/
+*.md
+CHANGELOG.md
+CONTRIBUTING.md
+README.md
+
+# Scripts and tools
+scripts/
+tooling/
+audit-*.sh
+
+# Temporary files
+temp.md
+tmux-*.log
+assistant_*
+
+# CI/CD
+.github/
+.ci-nudge
+
+# Runtime data
+.demon/
+k8s-bootstrapper-smoke-*/
+
+# Package lock files (we copy these explicitly when needed)
+package-lock.json
+yarn.lock
+
+# Examples and tests that aren't needed for builds
+examples/
+**/tests/
+**/test/
+
+# Build configuration files we don't need
+deny.toml
+Makefile
+PR_*.txt
+
+# Large directories we don't need for builds
+dist/
+target/
+.demon/
+k8s-bootstrapper-smoke-*/
+20250923-*/
