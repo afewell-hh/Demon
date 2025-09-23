@@ -25,6 +25,10 @@ fmt:
 lint:
 	$(CARGO) clippy --workspace --all-targets -- -D warnings || true
 
+bootstrap-smoke:
+	@echo "Running Kubernetes bootstrapper smoke test..."
+	@./scripts/tests/smoke-k8s-bootstrap.sh $(ARGS)
+
 deploy-ci-hardening:
 	@GIT_USER_EMAIL=$${GIT_USER_EMAIL:-ops@example.com} \
 	 GIT_USER_NAME=$${GIT_USER_NAME:-demon-ci-ops} \

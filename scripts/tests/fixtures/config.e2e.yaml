@@ -1,0 +1,85 @@
+# End-to-End Smoke Test Configuration
+# This configuration exercises all major bootstrapper features
+# for automated testing and validation
+
+apiVersion: demon.io/v1
+kind: BootstrapConfig
+metadata:
+  name: demon-smoke-test-cluster
+
+# Kubernetes cluster configuration
+cluster:
+  name: demon-smoke-test
+  runtime: k3s
+  k3s:
+    version: "v1.28.2+k3s1"
+    install:
+      channel: stable
+      disable: []
+    dataDir: /var/lib/rancher/k3s
+    nodeName: demon-smoke-node
+    extraArgs:
+      - "--disable=traefik"      # Disable default traefik for testing
+      - "--disable=servicelb"    # Disable service load balancer
+
+# Demon system configuration
+demon:
+  # NATS connection settings (using cluster DNS names for testing)
+  natsUrl: "nats://nats.demon-system.svc.cluster.local:4222"
+  streamName: "RITUAL_EVENTS"
+  subjects:
+    - "ritual.>"
+    - "approval.>"
+    - "smoke-test.>"
+  dedupeWindowSecs: 30
+
+  # UI configuration
+  uiUrl: "http://operate-ui.demon-system.svc.cluster.local:3000"
+
+  # Kubernetes namespace for Demon components
+  namespace: demon-system
+
+  # Persistent storage configuration
+  persistence:
+    enabled: true
+    storageClass: local-path  # Default k3s storage class
+    size: 5Gi                # Smaller size for testing
+
+# Secret management configuration (uses environment variables)
+secrets:
+  provider: env
+
+  # Environment variable provider configuration
+  # The smoke test script will set these environment variables
+  env:
+    github_token: GITHUB_TOKEN       # Test token for GitHub integration
+    admin_token: ADMIN_TOKEN         # Test admin token for Operate UI
+    database_url: DATABASE_URL       # Test database connection string
+    nats_password: NATS_PASSWORD     # Test NATS password
+    jwt_secret: JWT_SECRET           # Test JWT signing secret
+
+# Add-ons configuration (testing monitoring stack)
+addons:
+  # Monitoring stack with Prometheus and Grafana
+  - name: monitoring
+    enabled: true
+    config:
+      # Reduced settings for testing environment
+      prometheusRetention: "1d"          # Short retention for testing
+      prometheusStorageSize: "2Gi"       # Smaller storage for testing
+      grafanaAdminPassword: "smoke-test" # Test password (not for production!)
+
+# Networking configuration (disabled for safety in testing)
+networking:
+  # Ingress configuration - disabled by default for safety
+  ingress:
+    enabled: false                     # Disabled to avoid external exposure
+    hostname: demon-smoke.local        # Test hostname
+    ingressClass: nginx                # Would use nginx if enabled
+    tls:
+      enabled: false                   # No TLS in test environment
+      secretName: demon-test-tls       # Test TLS secret name
+
+  # Service mesh configuration - disabled for testing
+  serviceMesh:
+    enabled: false                     # Disabled to keep test simple

@@ -1,0 +1,73 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demon-runtime
+  namespace: {{ .namespace }}
+  labels:
+    app.kubernetes.io/name: demon-runtime
+    app.kubernetes.io/component: runtime
+    app.kubernetes.io/part-of: demon
+spec:
+  selector:
+    app.kubernetes.io/name: demon-runtime
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demon-runtime
+  namespace: {{ .namespace }}
+  labels:
+    app.kubernetes.io/name: demon-runtime
+    app.kubernetes.io/component: runtime
+    app.kubernetes.io/part-of: demon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: demon-runtime
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: demon-runtime
+        app.kubernetes.io/component: runtime
+        app.kubernetes.io/part-of: demon
+      {{- if .networking.serviceMesh.enabled }}
+      annotations:
+        sidecar.istio.io/inject: "true"
+      {{- end }}
+    spec:
+      containers:
+      - name: runtime
+        image: ghcr.io/demon-project/runtime:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: NATS_URL
+          value: "{{ .natsUrl }}"
+        - name: STREAM_NAME
+          value: "{{ .streamName }}"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
