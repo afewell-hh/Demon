@@ -43,7 +43,10 @@ spec:
     spec:
       containers:
       - name: engine
-        image: ghcr.io/demon-project/engine:latest
+        # TEMPORARY: Using nginx as placeholder until GHCR images are built
+        # TODO: Replace with ghcr.io/demon-project/engine:latest once Docker infrastructure is implemented
+        image: nginx:alpine
+        command: ["/bin/sh", "-c", "while true; do echo 'Engine placeholder running'; sleep 30; done"]
         ports:
         - containerPort: 8081
           name: http
@@ -56,18 +59,19 @@ spec:
           value: "{{ .subjects | join "," }}"
         - name: DEDUPE_WINDOW_SECS
           value: "{{ .dedupeWindowSecs }}"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8081
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /ready
-            port: 8081
-          initialDelaySeconds: 5
-          periodSeconds: 5
+        # TEMPORARY: Disabled health checks for placeholder image
+        # livenessProbe:
+        #   httpGet:
+        #     path: /health
+        #     port: 8081
+        #   initialDelaySeconds: 30
+        #   periodSeconds: 10
+        # readinessProbe:
+        #   httpGet:
+        #     path: /ready
+        #     port: 8081
+        #   initialDelaySeconds: 5
+        #   periodSeconds: 5
         resources:
           requests:
             memory: "256Mi"

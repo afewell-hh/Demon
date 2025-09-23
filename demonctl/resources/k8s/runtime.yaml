@@ -43,7 +43,10 @@ spec:
     spec:
       containers:
       - name: runtime
-        image: ghcr.io/demon-project/runtime:latest
+        # TEMPORARY: Using nginx as placeholder until GHCR images are built
+        # TODO: Replace with ghcr.io/demon-project/runtime:latest once Docker infrastructure is implemented
+        image: nginx:alpine
+        command: ["/bin/sh", "-c", "while true; do echo 'Runtime placeholder running'; sleep 30; done"]
         ports:
         - containerPort: 8080
           name: http
@@ -52,18 +55,19 @@ spec:
           value: "{{ .natsUrl }}"
         - name: STREAM_NAME
           value: "{{ .streamName }}"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8080
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /ready
-            port: 8080
-          initialDelaySeconds: 5
-          periodSeconds: 5
+        # TEMPORARY: Disabled health checks for placeholder image
+        # livenessProbe:
+        #   httpGet:
+        #     path: /health
+        #     port: 8080
+        #   initialDelaySeconds: 30
+        #   periodSeconds: 10
+        # readinessProbe:
+        #   httpGet:
+        #     path: /ready
+        #     port: 8080
+        #   initialDelaySeconds: 5
+        #   periodSeconds: 5
         resources:
           requests:
             memory: "256Mi"
