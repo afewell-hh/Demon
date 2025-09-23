@@ -4,6 +4,8 @@ use std::path::PathBuf;
 use tracing::{info, Level};
 use tracing_subscriber::{fmt, EnvFilter};
 
+mod k8s_bootstrap;
+
 #[derive(ValueEnum, Clone, Debug)]
 enum ProviderType {
     /// Environment file provider (default)
@@ -81,8 +83,29 @@ enum Commands {
         #[arg(long, action = ArgAction::SetTrue)]
         verify_only: bool,
     },
+    /// Kubernetes bootstrapper commands
+    K8sBootstrap {
+        #[command(subcommand)]
+        cmd: K8sBootstrapCommands,
+    },
     /// Print version and exit
     Version,
+}
+
+#[derive(Subcommand)]
+enum K8sBootstrapCommands {
+    /// Bootstrap a Kubernetes cluster with Demon
+    Bootstrap {
+        /// Path to bootstrap configuration YAML file
+        #[arg(long, short, value_name = "FILE")]
+        config: String,
+        /// Perform validation only, don't execute
+        #[arg(long)]
+        dry_run: bool,
+        /// Enable verbose output
+        #[arg(long, short)]
+        verbose: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -295,6 +318,9 @@ async fn main() -> Result<()> {
         }
         Commands::Contracts { cmd } => {
             handle_contracts_command(cmd).await?;
+        }
+        Commands::K8sBootstrap { cmd } => {
+            handle_k8s_bootstrap_command(cmd).await?;
         }
         Commands::Secrets { cmd } => {
             handle_secrets_command(cmd)?;
@@ -1192,6 +1218,67 @@ fn handle_secrets_command(cmd: SecretsCommands) -> Result<()> {
     }
 
     Ok(())
+}
+
+async fn handle_k8s_bootstrap_command(cmd: K8sBootstrapCommands) -> Result<()> {
+    match cmd {
+        K8sBootstrapCommands::Bootstrap {
+            config,
+            dry_run,
+            verbose,
+        } => {
+            if verbose {
+                println!("Loading K8s bootstrap configuration from: {}", config);
+            }
+
+            let bootstrap_config = k8s_bootstrap::load_config(&config)?;
+
+            if verbose {
+                println!("Configuration loaded successfully");
+                println!("Cluster: {}", bootstrap_config.cluster.name);
+                println!("Namespace: {}", bootstrap_config.demon.namespace);
+            }
+
+            k8s_bootstrap::validate_config(&bootstrap_config)?;
+
+            if verbose {
+                println!("Configuration validation passed");
+            }
+
+            if dry_run {
+                println!("✓ Configuration is valid");
+                println!("Dry run mode - no changes will be made");
+                println!();
+                println!("Configuration summary:");
+                println!(
+                    "  Cluster: {} ({})",
+                    bootstrap_config.cluster.name, bootstrap_config.cluster.version
+                );
+                println!("  Namespace: {}", bootstrap_config.demon.namespace);
+                println!("  NATS URL: {}", bootstrap_config.demon.nats_url);
+                println!("  Stream: {}", bootstrap_config.demon.stream_name);
+                println!("  UI URL: {}", bootstrap_config.demon.ui_url);
+                if !bootstrap_config.addons.is_empty() {
+                    println!("  Add-ons: {}", bootstrap_config.addons.len());
+                    for addon in &bootstrap_config.addons {
+                        println!("    - {} (enabled: {})", addon.name, addon.enabled);
+                    }
+                }
+                return Ok(());
+            }
+
+            println!("🚀 Starting K8s bootstrap process...");
+            println!("This feature is currently in development.");
+            println!("The following phases would be executed:");
+            println!("  1. Install k3s cluster");
+            println!("  2. Deploy Demon components");
+            println!("  3. Configure networking");
+            println!("  4. Install add-ons");
+            println!("  5. Verify deployment");
+
+            Ok(())
+        }
+    }
 }
 
 // no-op: exercise replies guard

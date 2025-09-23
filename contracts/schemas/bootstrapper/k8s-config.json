@@ -1,0 +1,300 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://demon.io/schemas/bootstrapper/k8s-config.json",
+  "title": "Demon Kubernetes Bootstrap Configuration",
+  "description": "Configuration schema for bootstrapping Demon on Kubernetes clusters",
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "description": "API version for the configuration schema",
+      "const": "demon.io/v1"
+    },
+    "kind": {
+      "type": "string",
+      "description": "Configuration kind",
+      "const": "BootstrapConfig"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Configuration metadata",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the bootstrap configuration",
+          "minLength": 1
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "cluster": {
+      "type": "object",
+      "description": "Kubernetes cluster configuration",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the cluster",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "description": "K3s version to install",
+          "default": "v1.28.2+k3s1",
+          "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+\\+k3s[0-9]+$"
+        },
+        "dataDir": {
+          "type": "string",
+          "description": "K3s data directory (must be absolute path)",
+          "default": "/var/lib/rancher/k3s",
+          "pattern": "^/"
+        },
+        "nodeName": {
+          "type": "string",
+          "description": "Name of the cluster node",
+          "default": "demon-node"
+        },
+        "extraArgs": {
+          "type": "array",
+          "description": "Additional arguments to pass to k3s",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "demon": {
+      "type": "object",
+      "description": "Demon service configuration",
+      "properties": {
+        "natsUrl": {
+          "type": "string",
+          "description": "NATS server URL",
+          "default": "nats://nats.demon-system.svc.cluster.local:4222",
+          "format": "uri"
+        },
+        "streamName": {
+          "type": "string",
+          "description": "NATS JetStream stream name",
+          "default": "RITUAL_EVENTS",
+          "minLength": 1
+        },
+        "subjects": {
+          "type": "array",
+          "description": "NATS subjects to subscribe to",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": ["ritual.>", "approval.>"],
+          "minItems": 1
+        },
+        "dedupeWindowSecs": {
+          "type": "integer",
+          "description": "Event deduplication window in seconds",
+          "default": 60,
+          "minimum": 1,
+          "maximum": 86400
+        },
+        "uiUrl": {
+          "type": "string",
+          "description": "Operate UI URL",
+          "default": "http://operate-ui.demon-system.svc.cluster.local:3000",
+          "format": "uri"
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Kubernetes namespace for Demon components",
+          "default": "demon-system",
+          "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
+        },
+        "persistence": {
+          "type": "object",
+          "description": "Persistence configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable persistent storage",
+              "default": true
+            },
+            "storageClass": {
+              "type": "string",
+              "description": "Kubernetes storage class",
+              "default": "local-path"
+            },
+            "size": {
+              "type": "string",
+              "description": "Storage size",
+              "default": "10Gi",
+              "pattern": "^[0-9]+[KMGT]i?$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "bundle": {
+          "type": "string",
+          "description": "Optional bundle URI for advanced configuration"
+        }
+      },
+      "required": ["natsUrl", "streamName", "subjects", "uiUrl", "namespace"],
+      "additionalProperties": false
+    },
+    "secrets": {
+      "type": "object",
+      "description": "Secret management configuration",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "Secret provider type",
+          "enum": ["vault", "env", "file"],
+          "default": "env"
+        },
+        "vault": {
+          "type": "object",
+          "description": "Vault configuration (required when provider is 'vault')",
+          "properties": {
+            "address": {
+              "type": "string",
+              "description": "Vault server address",
+              "format": "uri"
+            },
+            "role": {
+              "type": "string",
+              "description": "Vault role for authentication",
+              "minLength": 1
+            },
+            "path": {
+              "type": "string",
+              "description": "Vault secret path",
+              "minLength": 1
+            }
+          },
+          "required": ["address", "role", "path"],
+          "additionalProperties": false
+        },
+        "env": {
+          "type": "object",
+          "description": "Environment variable mappings (required when provider is 'env')",
+          "patternProperties": {
+            "^[A-Z_][A-Z0-9_]*$": {
+              "type": "string",
+              "description": "Environment variable name"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "addons": {
+      "type": "array",
+      "description": "Additional applications to install",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Add-on name",
+            "minLength": 1
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the add-on is enabled",
+            "default": false
+          },
+          "values": {
+            "type": "object",
+            "description": "Add-on configuration values",
+            "additionalProperties": true
+          }
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      },
+      "default": []
+    },
+    "networking": {
+      "type": "object",
+      "description": "Networking configuration",
+      "properties": {
+        "ingress": {
+          "type": "object",
+          "description": "Ingress configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable ingress",
+              "default": false
+            },
+            "hostname": {
+              "type": "string",
+              "description": "Ingress hostname",
+              "format": "hostname"
+            },
+            "tlsSecretName": {
+              "type": "string",
+              "description": "TLS secret name for HTTPS"
+            }
+          },
+          "additionalProperties": false
+        },
+        "serviceMesh": {
+          "type": "object",
+          "description": "Service mesh configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable service mesh",
+              "default": false
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["apiVersion", "kind", "metadata", "cluster", "demon"],
+  "additionalProperties": false,
+  "if": {
+    "properties": {
+      "secrets": {
+        "properties": {
+          "provider": {
+            "const": "vault"
+          }
+        }
+      }
+    }
+  },
+  "then": {
+    "properties": {
+      "secrets": {
+        "required": ["vault"]
+      }
+    }
+  },
+  "else": {
+    "if": {
+      "properties": {
+        "secrets": {
+          "properties": {
+            "provider": {
+              "const": "env"
+            }
+          }
+        }
+      }
+    },
+    "then": {
+      "properties": {
+        "secrets": {
+          "required": ["env"]
+        }
+      }
+    }
+  }
+}
