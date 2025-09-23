@@ -215,9 +215,11 @@ impl TemplateRenderer {
         let mut result = template.to_string();
 
         // Handle nested object access patterns like {{ .persistence.storageClass }}
+        // and deeper nesting like {{ .networking.ingress.ingressClass }}
         for (top_key, top_value) in context {
             if let Value::Object(obj) = top_value {
                 for (nested_key, nested_value) in obj {
+                    // Handle two-level nesting like {{ .persistence.storageClass }}
                     let placeholder = format!("{{{{ .{}.{} }}}}", top_key, nested_key);
                     if result.contains(&placeholder) {
                         let replacement = match nested_value {
@@ -234,6 +236,59 @@ impl TemplateRenderer {
                             }
                         };
                         result = result.replace(&placeholder, &replacement);
+                    }
+
+                    // Handle three-level nesting like {{ .networking.ingress.ingressClass }}
+                    if let Value::Object(deep_obj) = nested_value {
+                        for (deep_key, deep_value) in deep_obj {
+                            let deep_placeholder =
+                                format!("{{{{ .{}.{}.{} }}}}", top_key, nested_key, deep_key);
+                            if result.contains(&deep_placeholder) {
+                                let replacement = match deep_value {
+                                    Value::String(s) => s.clone(),
+                                    Value::Number(n) => n.to_string(),
+                                    Value::Bool(b) => b.to_string(),
+                                    Value::Null => String::new(),
+                                    _ => {
+                                        return Err(anyhow::anyhow!(
+                                            "Unsupported deep nested value type for {}.{}.{}",
+                                            top_key,
+                                            nested_key,
+                                            deep_key
+                                        ))
+                                    }
+                                };
+                                result = result.replace(&deep_placeholder, &replacement);
+                            }
+
+                            // Handle four-level nesting like {{ .networking.ingress.tls.secretName }}
+                            if let Value::Object(deeper_obj) = deep_value {
+                                for (deeper_key, deeper_value) in deeper_obj {
+                                    let deeper_placeholder = format!(
+                                        "{{{{ .{}.{}.{}.{} }}}}",
+                                        top_key, nested_key, deep_key, deeper_key
+                                    );
+                                    if result.contains(&deeper_placeholder) {
+                                        let replacement = match deeper_value {
+                                            Value::String(s) => s.clone(),
+                                            Value::Number(n) => n.to_string(),
+                                            Value::Bool(b) => b.to_string(),
+                                            Value::Null => String::new(),
+                                            _ => {
+                                                return Err(anyhow::anyhow!(
+                                                    "Unsupported deeper nested value type for {}.{}.{}.{}",
+                                                    top_key,
+                                                    nested_key,
+                                                    deep_key,
+                                                    deeper_key
+                                                ))
+                                            }
+                                        };
+                                        result = result.replace(&deeper_placeholder, &replacement);
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -331,6 +386,44 @@ impl TemplateRenderer {
                     &result,
                     "networking.ingress.enabled",
                     ingress_enabled,
+                )?;
+
+                // Handle ingress class conditionals
+                let has_ingress_class = ingress_obj.contains_key("ingressClass");
+                result = self.process_conditional_block(
+                    &result,
+                    "networking.ingress.ingressClass",
+                    has_ingress_class,
+                )?;
+
+                // Handle TLS conditionals
+                if let Some(Value::Object(tls_obj)) = ingress_obj.get("tls") {
+                    let tls_enabled = tls_obj
+                        .get("enabled")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+
+                    result = self.process_conditional_block(
+                        &result,
+                        "networking.ingress.tls.enabled",
+                        tls_enabled,
+                    )?;
+
+                    // Handle TLS secret name conditionals
+                    let has_secret_name = tls_obj.contains_key("secretName");
+                    result = self.process_conditional_block(
+                        &result,
+                        "networking.ingress.tls.secretName",
+                        has_secret_name,
+                    )?;
+                }
+
+                // Handle hostname conditionals
+                let has_hostname = ingress_obj.contains_key("hostname");
+                result = self.process_conditional_block(
+                    &result,
+                    "networking.ingress.hostname",
+                    has_hostname,
                 )?;
             }
 
@@ -1126,5 +1219,52 @@ mesh: disabled
         assert!(result.contains("mesh: enabled"));
         assert!(!result.contains("ingress: disabled"));
         assert!(!result.contains("mesh: disabled"));
+    }
+
+    #[test]
+    fn test_ingress_class_conditionals() {
+        let renderer = TemplateRenderer::new("test");
+        let mut context = HashMap::new();
+        context.insert(
+            "namespace".to_string(),
+            Value::String("test-ns".to_string()),
+        );
+
+        // Test with ingressClass present
+        let networking = crate::k8s_bootstrap::NetworkingConfig {
+            ingress: crate::k8s_bootstrap::IngressConfig {
+                enabled: true,
+                hostname: Some("test.example.com".to_string()),
+                ingress_class: Some("nginx".to_string()),
+                annotations: None,
+                tls: crate::k8s_bootstrap::TlsConfig {
+                    enabled: false,
+                    secret_name: None,
+                },
+            },
+            service_mesh: crate::k8s_bootstrap::ServiceMeshConfig {
+                enabled: false,
+                annotations: crate::k8s_bootstrap::default_mesh_annotations(),
+            },
+        };
+        let networking_context = renderer.build_networking_context(&networking).unwrap();
+        context.insert("networking".to_string(), Value::Object(networking_context));
+
+        let template = r#"{{- if .networking.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demon-ingress
+  namespace: {{ .namespace }}
+spec:
+  {{- if .networking.ingress.ingressClass }}
+  ingressClassName: {{ .networking.ingress.ingressClass }}
+  {{- end }}
+{{- end }}"#;
+
+        let result = renderer.substitute_variables(template, &context).unwrap();
+
+        assert!(result.contains("ingressClassName: nginx"));
+        assert!(!result.contains("{{ .networking.ingress.ingressClass }}"));
     }
 }
