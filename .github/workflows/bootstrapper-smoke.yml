@@ -46,7 +46,7 @@ jobs:
           NATS_PASSWORD: test-nats-password
           JWT_SECRET: test-jwt-secret-12345
         run: |
-          make bootstrap-smoke ARGS="--cleanup --verbose --artifacts-dir dist/bootstrapper-smoke/nightly-$(date +%Y-%m-%d)"
+          make bootstrap-smoke ARGS="--cleanup --verbose"
 
       - name: Upload smoke test artifacts
         uses: actions/upload-artifact@v4

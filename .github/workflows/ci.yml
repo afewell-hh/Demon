@@ -817,7 +817,7 @@ jobs:
 
       - name: Run bootstrapper smoke test (dry-run only)
         run: |
-          make bootstrap-smoke ARGS="--dry-run-only --verbose --artifacts-dir dist/bootstrapper-smoke/ci-$(date +%Y%m%d-%H%M%S)"
+          make bootstrap-smoke ARGS="--dry-run-only --verbose"
 
       - name: Upload dry-run artifacts
         uses: actions/upload-artifact@v4
