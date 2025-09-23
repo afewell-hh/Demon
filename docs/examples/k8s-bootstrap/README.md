@@ -2,6 +2,8 @@
 
 This directory contains documentation and examples for the Demon Kubernetes Bootstrap feature.
 
+> 📋 **Release Status**: The Kubernetes bootstrapper is ready for MVP Alpha integration. See [Release Notes (RC1)](../../releases/bootstrapper-rc1.md) for complete feature overview, validation results, and integration guidance.
+
 ## Overview
 
 The `demonctl k8s-bootstrap` command provides a streamlined way to deploy Demon on Kubernetes clusters. It handles k3s installation, Demon deployment, secret management, and optional add-ons through a single YAML configuration file.
