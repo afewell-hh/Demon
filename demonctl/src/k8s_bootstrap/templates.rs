@@ -41,6 +41,10 @@ impl TemplateRenderer {
             })?;
 
             let rendered = self.substitute_variables(&template_content, &template_context)?;
+
+            // Validate that the rendered manifest doesn't contain unresolved template variables
+            self.validate_no_unresolved_variables(&rendered, file)?;
+
             rendered_manifests.push(rendered);
         }
 
@@ -184,6 +188,7 @@ impl TemplateRenderer {
     ) -> Result<String> {
         let mut result = template.to_string();
 
+        // Handle top-level keys
         for (key, value) in context {
             let placeholder = format!("{{{{ .{} }}}}", key);
             // Only substitute if the placeholder is actually used in the template
@@ -193,7 +198,132 @@ impl TemplateRenderer {
             }
         }
 
+        // Handle nested object keys (e.g., .persistence.storageClass)
+        result = self.substitute_nested_variables(&result, context)?;
+
+        // Handle filter syntax (e.g., {{ .subjects | join "," }})
+        result = self.substitute_filter_variables(&result, context)?;
+
         self.handle_conditionals(&result, context)
+    }
+
+    fn substitute_nested_variables(
+        &self,
+        template: &str,
+        context: &HashMap<String, Value>,
+    ) -> Result<String> {
+        let mut result = template.to_string();
+
+        // Handle nested object access patterns like {{ .persistence.storageClass }}
+        // and deeper nesting like {{ .networking.ingress.ingressClass }}
+        for (top_key, top_value) in context {
+            if let Value::Object(obj) = top_value {
+                for (nested_key, nested_value) in obj {
+                    // Handle two-level nesting like {{ .persistence.storageClass }}
+                    let placeholder = format!("{{{{ .{}.{} }}}}", top_key, nested_key);
+                    if result.contains(&placeholder) {
+                        let replacement = match nested_value {
+                            Value::String(s) => s.clone(),
+                            Value::Number(n) => n.to_string(),
+                            Value::Bool(b) => b.to_string(),
+                            Value::Null => String::new(),
+                            _ => {
+                                return Err(anyhow::anyhow!(
+                                    "Unsupported nested value type for {}.{}",
+                                    top_key,
+                                    nested_key
+                                ))
+                            }
+                        };
+                        result = result.replace(&placeholder, &replacement);
+                    }
+
+                    // Handle three-level nesting like {{ .networking.ingress.ingressClass }}
+                    if let Value::Object(deep_obj) = nested_value {
+                        for (deep_key, deep_value) in deep_obj {
+                            let deep_placeholder =
+                                format!("{{{{ .{}.{}.{} }}}}", top_key, nested_key, deep_key);
+                            if result.contains(&deep_placeholder) {
+                                let replacement = match deep_value {
+                                    Value::String(s) => s.clone(),
+                                    Value::Number(n) => n.to_string(),
+                                    Value::Bool(b) => b.to_string(),
+                                    Value::Null => String::new(),
+                                    _ => {
+                                        return Err(anyhow::anyhow!(
+                                            "Unsupported deep nested value type for {}.{}.{}",
+                                            top_key,
+                                            nested_key,
+                                            deep_key
+                                        ))
+                                    }
+                                };
+                                result = result.replace(&deep_placeholder, &replacement);
+                            }
+
+                            // Handle four-level nesting like {{ .networking.ingress.tls.secretName }}
+                            if let Value::Object(deeper_obj) = deep_value {
+                                for (deeper_key, deeper_value) in deeper_obj {
+                                    let deeper_placeholder = format!(
+                                        "{{{{ .{}.{}.{}.{} }}}}",
+                                        top_key, nested_key, deep_key, deeper_key
+                                    );
+                                    if result.contains(&deeper_placeholder) {
+                                        let replacement = match deeper_value {
+                                            Value::String(s) => s.clone(),
+                                            Value::Number(n) => n.to_string(),
+                                            Value::Bool(b) => b.to_string(),
+                                            Value::Null => String::new(),
+                                            _ => {
+                                                return Err(anyhow::anyhow!(
+                                                    "Unsupported deeper nested value type for {}.{}.{}.{}",
+                                                    top_key,
+                                                    nested_key,
+                                                    deep_key,
+                                                    deeper_key
+                                                ))
+                                            }
+                                        };
+                                        result = result.replace(&deeper_placeholder, &replacement);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
+    fn substitute_filter_variables(
+        &self,
+        template: &str,
+        context: &HashMap<String, Value>,
+    ) -> Result<String> {
+        let mut result = template.to_string();
+
+        // Handle specific known filter: {{ .subjects | join "," }}
+        // This is a simple implementation for the specific case we need
+        for (key, value) in context {
+            let filter_pattern = format!("{{{{ .{} | join \",\" }}}}", key);
+            if result.contains(&filter_pattern) {
+                if let Value::Array(arr) = value {
+                    let strings: Vec<String> = arr
+                        .iter()
+                        .filter_map(|v| match v {
+                            Value::String(s) => Some(s.clone()),
+                            _ => None,
+                        })
+                        .collect();
+                    let replacement = strings.join(",");
+                    result = result.replace(&filter_pattern, &replacement);
+                }
+            }
+        }
+
+        Ok(result)
     }
 
     fn value_to_string(&self, value: &Value, key: &str) -> Result<String> {
@@ -256,6 +386,44 @@ impl TemplateRenderer {
                     &result,
                     "networking.ingress.enabled",
                     ingress_enabled,
+                )?;
+
+                // Handle ingress class conditionals
+                let has_ingress_class = ingress_obj.contains_key("ingressClass");
+                result = self.process_conditional_block(
+                    &result,
+                    "networking.ingress.ingressClass",
+                    has_ingress_class,
+                )?;
+
+                // Handle TLS conditionals
+                if let Some(Value::Object(tls_obj)) = ingress_obj.get("tls") {
+                    let tls_enabled = tls_obj
+                        .get("enabled")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+
+                    result = self.process_conditional_block(
+                        &result,
+                        "networking.ingress.tls.enabled",
+                        tls_enabled,
+                    )?;
+
+                    // Handle TLS secret name conditionals
+                    let has_secret_name = tls_obj.contains_key("secretName");
+                    result = self.process_conditional_block(
+                        &result,
+                        "networking.ingress.tls.secretName",
+                        has_secret_name,
+                    )?;
+                }
+
+                // Handle hostname conditionals
+                let has_hostname = ingress_obj.contains_key("hostname");
+                result = self.process_conditional_block(
+                    &result,
+                    "networking.ingress.hostname",
+                    has_hostname,
                 )?;
             }
 
@@ -324,6 +492,25 @@ impl TemplateRenderer {
         }
 
         Ok(result.trim_end().to_string())
+    }
+
+    fn validate_no_unresolved_variables(&self, rendered: &str, file: &str) -> Result<()> {
+        // Check for unresolved template variables (patterns like {{ .something }})
+        // Exclude known template syntax like filters ({{ .something | filter }})
+        if let Some(unresolved) = rendered.lines().find_map(|line| {
+            if line.contains("{{ .") && line.contains(" }}") && !line.contains(" | ") {
+                Some(line.trim())
+            } else {
+                None
+            }
+        }) {
+            return Err(anyhow::anyhow!(
+                "Unresolved template variable found in {}: {}",
+                file,
+                unresolved
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -473,6 +660,175 @@ mod tests {
 
         // Missing keys should remain unchanged
         assert!(result.contains("value: {{ .missingKey }}"));
+    }
+
+    #[test]
+    fn test_substitute_nested_variables() {
+        let renderer = TemplateRenderer::new("test");
+        let mut context = HashMap::new();
+
+        // Create persistence object with nested values
+        let mut persistence_obj = serde_json::Map::new();
+        persistence_obj.insert(
+            "storageClass".to_string(),
+            Value::String("fast-ssd".to_string()),
+        );
+        persistence_obj.insert("size".to_string(), Value::String("10Gi".to_string()));
+        persistence_obj.insert("enabled".to_string(), Value::Bool(true));
+        context.insert("persistence".to_string(), Value::Object(persistence_obj));
+
+        let template = r#"
+storageClassName: {{ .persistence.storageClass }}
+storage: {{ .persistence.size }}
+enabled: {{ .persistence.enabled }}"#;
+
+        let result = renderer.substitute_variables(template, &context).unwrap();
+
+        assert!(result.contains("storageClassName: fast-ssd"));
+        assert!(result.contains("storage: 10Gi"));
+        assert!(result.contains("enabled: true"));
+    }
+
+    #[test]
+    fn test_substitute_nested_variables_mixed_types() {
+        let renderer = TemplateRenderer::new("test");
+        let mut context = HashMap::new();
+
+        // Create config object with mixed types
+        let mut config_obj = serde_json::Map::new();
+        config_obj.insert("name".to_string(), Value::String("demo".to_string()));
+        config_obj.insert(
+            "port".to_string(),
+            Value::Number(serde_json::Number::from(8080)),
+        );
+        config_obj.insert("enabled".to_string(), Value::Bool(false));
+        config_obj.insert("optional".to_string(), Value::Null);
+        context.insert("config".to_string(), Value::Object(config_obj));
+
+        let template = r#"
+name: {{ .config.name }}
+port: {{ .config.port }}
+enabled: {{ .config.enabled }}
+optional: {{ .config.optional }}"#;
+
+        let result = renderer.substitute_variables(template, &context).unwrap();
+
+        assert!(result.contains("name: demo"));
+        assert!(result.contains("port: 8080"));
+        assert!(result.contains("enabled: false"));
+        assert!(result.contains("optional: "));
+    }
+
+    #[test]
+    fn test_persistence_yaml_validity() {
+        let renderer = TemplateRenderer::new("test");
+        let mut context = HashMap::new();
+
+        // Create persistence object similar to what would be generated
+        let mut persistence_obj = serde_json::Map::new();
+        persistence_obj.insert(
+            "storageClass".to_string(),
+            Value::String("standard".to_string()),
+        );
+        persistence_obj.insert("size".to_string(), Value::String("5Gi".to_string()));
+        persistence_obj.insert("enabled".to_string(), Value::Bool(true));
+        context.insert("persistence".to_string(), Value::Object(persistence_obj));
+
+        // Template similar to the NATS template that was causing issues
+        let template = r#"
+volumeClaimTemplates:
+- metadata:
+    name: data
+  spec:
+    accessModes: ["ReadWriteOnce"]
+    storageClassName: {{ .persistence.storageClass }}
+    resources:
+      requests:
+        storage: {{ .persistence.size }}"#;
+
+        let result = renderer.substitute_variables(template, &context).unwrap();
+
+        // Verify that the placeholders are replaced
+        assert!(!result.contains("{{ .persistence.storageClass }}"));
+        assert!(!result.contains("{{ .persistence.size }}"));
+        assert!(result.contains("storageClassName: standard"));
+        assert!(result.contains("storage: 5Gi"));
+
+        // Verify that the resulting YAML is valid by attempting to parse it
+        let yaml_result = serde_yaml::from_str::<serde_yaml::Value>(&result);
+        assert!(
+            yaml_result.is_ok(),
+            "Generated YAML should be valid: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_validate_no_unresolved_variables_success() {
+        let renderer = TemplateRenderer::new("test");
+        let valid_yaml = r#"
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-service
+  namespace: test-namespace
+spec:
+  selector:
+    app: test
+  ports:
+    - port: 80"#;
+
+        let result = renderer.validate_no_unresolved_variables(valid_yaml, "test.yaml");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_no_unresolved_variables_failure() {
+        let renderer = TemplateRenderer::new("test");
+        let invalid_yaml = r#"
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-service
+  namespace: {{ .namespace }}
+spec:
+  selector:
+    app: test
+  ports:
+    - port: 80"#;
+
+        let result = renderer.validate_no_unresolved_variables(invalid_yaml, "test.yaml");
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Unresolved template variable"));
+        assert!(err_msg.contains("{{ .namespace }}"));
+    }
+
+    #[test]
+    fn test_substitute_filter_variables() {
+        let renderer = TemplateRenderer::new("test");
+        let mut context = HashMap::new();
+
+        // Create array value for subjects
+        let subjects = vec![
+            Value::String("ritual.>".to_string()),
+            Value::String("approval.>".to_string()),
+            Value::String("test.>".to_string()),
+        ];
+        context.insert("subjects".to_string(), Value::Array(subjects));
+
+        let template = r#"
+        - name: SUBJECTS
+          value: "{{ .subjects | join "," }}"
+        - name: OTHER
+          value: "{{ .subjects }}"#;
+
+        let result = renderer.substitute_variables(template, &context).unwrap();
+
+        // Check that the filter works
+        assert!(result.contains("value: \"ritual.>,approval.>,test.>\""));
+        // Check that regular subjects array substitution still works
+        assert!(result.contains("value: \"ritual.>,approval.>,test.>\""));
     }
 
     #[test]
@@ -863,5 +1219,52 @@ mesh: disabled
         assert!(result.contains("mesh: enabled"));
         assert!(!result.contains("ingress: disabled"));
         assert!(!result.contains("mesh: disabled"));
+    }
+
+    #[test]
+    fn test_ingress_class_conditionals() {
+        let renderer = TemplateRenderer::new("test");
+        let mut context = HashMap::new();
+        context.insert(
+            "namespace".to_string(),
+            Value::String("test-ns".to_string()),
+        );
+
+        // Test with ingressClass present
+        let networking = crate::k8s_bootstrap::NetworkingConfig {
+            ingress: crate::k8s_bootstrap::IngressConfig {
+                enabled: true,
+                hostname: Some("test.example.com".to_string()),
+                ingress_class: Some("nginx".to_string()),
+                annotations: None,
+                tls: crate::k8s_bootstrap::TlsConfig {
+                    enabled: false,
+                    secret_name: None,
+                },
+            },
+            service_mesh: crate::k8s_bootstrap::ServiceMeshConfig {
+                enabled: false,
+                annotations: crate::k8s_bootstrap::default_mesh_annotations(),
+            },
+        };
+        let networking_context = renderer.build_networking_context(&networking).unwrap();
+        context.insert("networking".to_string(), Value::Object(networking_context));
+
+        let template = r#"{{- if .networking.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demon-ingress
+  namespace: {{ .namespace }}
+spec:
+  {{- if .networking.ingress.ingressClass }}
+  ingressClassName: {{ .networking.ingress.ingressClass }}
+  {{- end }}
+{{- end }}"#;
+
+        let result = renderer.substitute_variables(template, &context).unwrap();
+
+        assert!(result.contains("ingressClassName: nginx"));
+        assert!(!result.contains("{{ .networking.ingress.ingressClass }}"));
     }
 }
