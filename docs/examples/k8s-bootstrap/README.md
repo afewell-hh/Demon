@@ -250,7 +250,7 @@ The bootstrap command now supports full Demon deployment to Kubernetes clusters.
 1. **Install k3s cluster** - Validates configuration and installs k3s with the specified version
 2. **Wait for cluster readiness** - Verifies k3s is ready to accept workloads
 3. **Generate and apply manifests** - Renders templates with your configuration and applies them via `kubectl`
-4. **Wait for pod readiness** - Monitors Demon pods until they reach Ready state (120s timeout)
+4. **Wait for pod readiness** - Monitors Demon pods until they reach Ready state (240s timeout, configurable via `K8S_POD_TIMEOUT`)
 5. **Run health checks** - Verifies runtime API and Operate UI endpoints are responding correctly
 
 ### Manifest Templates
@@ -461,6 +461,7 @@ The `scripts/tests/smoke-k8s-bootstrap.sh` script provides comprehensive end-to-
 - `DRY_RUN=1` - Same as `--dry-run-only`
 - `CLEANUP=1` - Same as `--cleanup`
 - `VERBOSE=1` - Same as `--verbose`
+- `K8S_POD_TIMEOUT` - Pod readiness timeout in seconds (default: 240)
 
 **Requirements:**
 - k3d (preferred) or kind installed
@@ -521,6 +522,31 @@ The JSON schema is automatically enforced at runtime. To update the schema:
 **"Failed to load config"**
 - Check that the config file exists and is valid YAML
 - Verify file permissions allow reading
+
+### Pod Readiness Issues
+
+**"Timeout waiting for Demon pods to be ready after 240s"**
+- The bootstrapper waits for all Demon pods to reach Ready state before proceeding to health checks
+- Default timeout is 240 seconds, configurable via `K8S_POD_TIMEOUT` environment variable
+- When a timeout occurs, the bootstrapper automatically captures diagnostic information:
+  - Current pod status with `kubectl get pods -o wide`
+  - Recent namespace events sorted by timestamp
+- To increase timeout for slower environments:
+  ```bash
+  export K8S_POD_TIMEOUT=600  # 10 minutes
+  demonctl k8s-bootstrap bootstrap --config config.yaml
+  ```
+- Common causes of pod readiness delays:
+  - Resource constraints (insufficient CPU/memory)
+  - Image pull delays on slow networks
+  - Storage provisioning delays
+  - Dependency issues (e.g., NATS not ready before other pods)
+
+**Diagnostic Information:**
+When pod readiness times out, the error message includes:
+- **Pod status details**: Shows current state, restarts, and resource usage
+- **Recent events**: Displays Kubernetes events that may explain delays or failures
+- Use this information to identify the root cause before retrying
 
 ### Health Check Issues
 
