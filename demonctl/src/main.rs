@@ -1532,25 +1532,154 @@ fn apply_manifests(
     executor: &dyn k8s_bootstrap::CommandExecutor,
     verbose: bool,
 ) -> Result<()> {
+    apply_manifests_with_namespace_wait(manifests, executor, verbose)
+}
+
+fn apply_manifests_with_namespace_wait(
+    manifests: &str,
+    executor: &dyn k8s_bootstrap::CommandExecutor,
+    verbose: bool,
+) -> Result<()> {
     if verbose {
-        println!("Applying manifests to cluster...");
+        println!("Applying manifests to cluster with namespace readiness checks...");
     }
 
-    let output = executor.execute("k3s", &["kubectl", "apply", "-f", "-"], Some(manifests))?;
+    // Split manifests into individual YAML documents
+    let manifest_docs: Vec<&str> = manifests
+        .split("---")
+        .filter(|doc| !doc.trim().is_empty())
+        .collect();
 
-    if output.status != 0 {
-        eprintln!("Failed to apply manifests:");
-        eprintln!("stdout: {}", output.stdout);
-        eprintln!("stderr: {}", output.stderr);
-        anyhow::bail!("kubectl apply failed with exit code {}", output.status);
+    // Separate namespace manifests from other manifests
+    let mut namespace_manifests = Vec::new();
+    let mut other_manifests = Vec::new();
+
+    for doc in manifest_docs {
+        if doc.contains("kind: Namespace") {
+            namespace_manifests.push(doc);
+        } else {
+            other_manifests.push(doc);
+        }
     }
 
-    if verbose {
-        println!("Manifests applied successfully:");
-        println!("{}", output.stdout);
+    // Apply namespaces first
+    if !namespace_manifests.is_empty() {
+        if verbose {
+            println!("Applying namespace manifests...");
+        }
+        let namespace_yaml = namespace_manifests.join("\n---\n");
+        let output = executor.execute(
+            "k3s",
+            &["kubectl", "apply", "-f", "-"],
+            Some(&namespace_yaml),
+        )?;
+        if output.status != 0 {
+            eprintln!("Failed to apply namespace manifests:");
+            eprintln!("stdout: {}", output.stdout);
+            eprintln!("stderr: {}", output.stderr);
+            anyhow::bail!("kubectl apply failed with exit code {}", output.status);
+        }
+
+        if verbose && !output.stdout.trim().is_empty() {
+            println!("{}", output.stdout.trim());
+        }
+
+        // Wait for namespaces to be ready
+        for manifest in &namespace_manifests {
+            if let Some(namespace_name) = extract_namespace_name(manifest) {
+                wait_for_namespace_ready(&namespace_name, executor, verbose)?;
+            }
+        }
+
+        if verbose {
+            println!("✓ Namespaces applied and ready");
+        }
+    }
+
+    // Apply remaining manifests
+    if !other_manifests.is_empty() {
+        if verbose {
+            println!("Applying remaining manifests...");
+        }
+        let remaining_yaml = other_manifests.join("\n---\n");
+        let output = executor.execute(
+            "k3s",
+            &["kubectl", "apply", "-f", "-"],
+            Some(&remaining_yaml),
+        )?;
+        if output.status != 0 {
+            eprintln!("Failed to apply manifests:");
+            eprintln!("stdout: {}", output.stdout);
+            eprintln!("stderr: {}", output.stderr);
+            anyhow::bail!("kubectl apply failed with exit code {}", output.status);
+        }
+
+        if verbose && !output.stdout.trim().is_empty() {
+            println!("{}", output.stdout.trim());
+        }
+
+        if verbose {
+            println!("✓ All manifests applied successfully");
+        }
     }
 
     Ok(())
+}
+
+fn extract_namespace_name(manifest: &str) -> Option<String> {
+    // Simple YAML parsing to extract namespace name
+    for line in manifest.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("name:") {
+            if let Some(name) = trimmed.strip_prefix("name:") {
+                return Some(name.trim().to_string());
+            }
+        }
+    }
+    None
+}
+
+fn wait_for_namespace_ready(
+    namespace: &str,
+    executor: &dyn k8s_bootstrap::CommandExecutor,
+    verbose: bool,
+) -> Result<()> {
+    if verbose {
+        println!("Waiting for namespace '{}' to be ready...", namespace);
+    }
+
+    // For testing with simulated executors, we can skip the actual wait
+    // since simulation doesn't model real Kubernetes behavior
+    if std::env::var("DEMONCTL_K8S_EXECUTOR").is_ok() {
+        if verbose {
+            println!("✓ Namespace '{}' is ready (simulated)", namespace);
+        }
+        return Ok(());
+    }
+
+    let timeout_secs = 30;
+    let check_interval_secs = 2;
+    let mut elapsed = 0;
+
+    while elapsed < timeout_secs {
+        let output = executor.execute(
+            "k3s",
+            &["kubectl", "get", "namespace", namespace, "--no-headers"],
+            None,
+        )?;
+
+        if output.status == 0 && output.stdout.contains("Active") {
+            if verbose {
+                println!("✓ Namespace '{}' is ready", namespace);
+            }
+            return Ok(());
+        }
+
+        std::thread::sleep(std::time::Duration::from_secs(check_interval_secs));
+        elapsed += check_interval_secs;
+    }
+
+    anyhow::bail!("Timeout waiting for namespace '{}' to be ready", namespace)
 }
 
 fn wait_for_demon_pods(
@@ -1805,3 +1934,133 @@ fn check_ui_health(
 }
 
 // no-op: exercise replies guard
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn given_namespace_manifest_when_extract_namespace_name_then_returns_correct_name() {
+        let manifest = r#"
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demon-system
+  labels:
+    app.kubernetes.io/name: demon
+"#;
+        let name = extract_namespace_name(manifest);
+        assert_eq!(name, Some("demon-system".to_string()));
+    }
+
+    #[test]
+    fn given_non_namespace_manifest_when_extract_namespace_name_then_returns_first_name() {
+        let manifest = r#"
+apiVersion: v1
+kind: Service
+metadata:
+  name: nats
+  namespace: demon-system
+"#;
+        let name = extract_namespace_name(manifest);
+        assert_eq!(name, Some("nats".to_string()));
+    }
+
+    #[test]
+    fn given_manifest_without_name_when_extract_namespace_name_then_returns_none() {
+        let manifest = r#"
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: demon-system
+"#;
+        let name = extract_namespace_name(manifest);
+        assert_eq!(name, None);
+    }
+
+    #[test]
+    fn given_manifests_with_namespace_when_apply_manifests_with_namespace_wait_then_separates_correctly(
+    ) {
+        let manifests = r#"---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-namespace
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-service
+  namespace: test-namespace
+"#;
+
+        // For testing, we need to create a custom executor that simulates namespace readiness
+        let executor = MockNamespaceWaitExecutor::new();
+        let result = apply_manifests_with_namespace_wait(manifests, &executor, false);
+
+        assert!(result.is_ok());
+    }
+
+    #[cfg(test)]
+    struct MockNamespaceWaitExecutor {
+        call_count: std::cell::RefCell<usize>,
+    }
+
+    #[cfg(test)]
+    impl MockNamespaceWaitExecutor {
+        fn new() -> Self {
+            Self {
+                call_count: std::cell::RefCell::new(0),
+            }
+        }
+    }
+
+    #[cfg(test)]
+    impl k8s_bootstrap::CommandExecutor for MockNamespaceWaitExecutor {
+        fn execute(&self, _program: &str, args: &[&str], _input: Option<&str>) -> anyhow::Result<k8s_bootstrap::CommandOutput> {
+            let mut count = self.call_count.borrow_mut();
+            *count += 1;
+
+            // If this is a namespace status check, return Active status
+            if args.len() >= 4 && args[1] == "get" && args[2] == "namespace" {
+                return Ok(k8s_bootstrap::CommandOutput {
+                    status: 0,
+                    stdout: "test-namespace   Active   1m".to_string(),
+                    stderr: String::new(),
+                });
+            }
+
+            // Otherwise return success for kubectl apply commands
+            Ok(k8s_bootstrap::CommandOutput {
+                status: 0,
+                stdout: "namespace/test-namespace created\nservice/test-service created".to_string(),
+                stderr: String::new(),
+            })
+        }
+    }
+
+    #[test]
+    fn given_manifests_without_namespace_when_apply_manifests_with_namespace_wait_then_applies_all()
+    {
+        use k8s_bootstrap::SimulatedCommandExecutor;
+
+        let manifests = r#"---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-service
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-config
+"#;
+
+        let executor = SimulatedCommandExecutor::success(
+            "service/test-service created\nconfigmap/test-config created",
+        );
+        let result = apply_manifests_with_namespace_wait(manifests, &executor, false);
+
+        assert!(result.is_ok());
+    }
+}

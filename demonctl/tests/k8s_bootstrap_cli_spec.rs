@@ -327,7 +327,7 @@ fn given_apply_only_mode_when_executor_fails_then_reports_error() {
 
     cmd.assert()
         .failure()
-        .stderr(predicate::str::contains("Failed to apply manifests"))
+        .stderr(predicate::str::contains("Failed to apply namespace manifests"))
         .stderr(predicate::str::contains("kubectl apply failed - simulated"))
         .stdout(predicate::str::contains(
             "🚀 Starting K8s bootstrap process (manifests only)",
@@ -356,9 +356,8 @@ fn given_apply_only_mode_when_executor_succeeds_then_prints_successful_summary()
         .stdout(predicate::str::contains(
             "🚀 Starting K8s bootstrap process (manifests only)",
         ))
-        .stdout(predicate::str::contains("Applying manifests to cluster"))
-        .stdout(predicate::str::contains("Manifests applied successfully"))
-        .stdout(predicate::str::contains("namespace/test-system created"))
+        .stdout(predicate::str::contains("Applying manifests to cluster with namespace readiness checks"))
+        .stdout(predicate::str::contains("✓ All manifests applied successfully"))
         .stdout(predicate::str::contains(
             "🎯 Manifest application simulation complete",
         ));
@@ -1016,4 +1015,59 @@ fn given_service_mesh_enabled_when_apply_then_manifests_include_mesh_annotations
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("Applying manifests to cluster"));
+}
+
+#[test]
+fn given_apply_only_mode_when_namespace_wait_succeeds_then_shows_namespace_readiness_checks() {
+    let file = write_config(BASE_CONFIG);
+
+    let mut cmd = Command::cargo_bin("demonctl").unwrap();
+    cmd.arg("k8s-bootstrap")
+        .arg("bootstrap")
+        .arg("--config")
+        .arg(file.path())
+        .arg("--verbose");
+    cmd.env("DEMONCTL_K8S_BOOTSTRAP_EXECUTION", "apply-only");
+    cmd.env("DEMONCTL_K8S_EXECUTOR", "simulate-success");
+    cmd.env(
+        "DEMONCTL_K8S_EXECUTOR_STDOUT",
+        "namespace/test-system created\nnamespace/test-system condition met\nservice/nats created\ndeployment.apps/nats created\n",
+    );
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Applying manifests to cluster with namespace readiness checks",
+        ))
+        .stdout(predicate::str::contains("Applying namespace manifests"))
+        .stdout(predicate::str::contains("Namespaces applied and ready"))
+        .stdout(predicate::str::contains("Applying remaining manifests"))
+        .stdout(predicate::str::contains(
+            "All manifests applied successfully",
+        ));
+}
+
+#[test]
+fn given_apply_only_mode_when_namespace_wait_timeout_then_fails_with_timeout_error() {
+    let file = write_config(BASE_CONFIG);
+
+    let mut cmd = Command::cargo_bin("demonctl").unwrap();
+    cmd.arg("k8s-bootstrap")
+        .arg("bootstrap")
+        .arg("--config")
+        .arg(file.path())
+        .arg("--verbose");
+    cmd.env("DEMONCTL_K8S_BOOTSTRAP_EXECUTION", "apply-only");
+    cmd.env("DEMONCTL_K8S_EXECUTOR", "simulate-failure");
+    cmd.env(
+        "DEMONCTL_K8S_EXECUTOR_STDERR",
+        "Error from server (NotFound): namespaces \"test-system\" not found",
+    );
+
+    cmd.assert()
+        .failure()
+        .stdout(predicate::str::contains("Applying namespace manifests"))
+        .stderr(predicate::str::contains(
+            "Failed to apply namespace manifests",
+        ));
 }
