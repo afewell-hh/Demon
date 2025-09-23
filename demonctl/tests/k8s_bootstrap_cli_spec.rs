@@ -320,7 +320,7 @@ demon:
 }
 
 #[test]
-fn given_env_provider_without_env_config_when_validate_then_shows_env_error() {
+fn given_env_provider_without_env_config_when_validate_then_succeeds() {
     let config_yaml = r#"
 apiVersion: demon.io/v1
 kind: BootstrapConfig
@@ -348,9 +348,9 @@ secrets:
         .arg(file.path())
         .arg("--dry-run");
 
-    cmd.assert().failure().stderr(predicate::str::contains(
-        "env configuration is required when provider is 'env'",
-    ));
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Configuration is valid"));
 }
 
 #[test]

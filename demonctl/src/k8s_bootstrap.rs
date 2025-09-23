@@ -245,9 +245,7 @@ pub fn validate_config(config: &K8sBootstrapConfig) -> Result<()> {
             }
         }
         "env" => {
-            if config.secrets.env.is_none() || config.secrets.env.as_ref().unwrap().is_empty() {
-                anyhow::bail!("env configuration is required when provider is 'env'");
-            }
+            // env provider can work with empty configuration (runtime env vars)
         }
         "file" => {
             // File provider doesn't need additional config
