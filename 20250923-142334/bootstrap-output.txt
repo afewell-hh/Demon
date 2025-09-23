@@ -1,0 +1,39 @@
+Loading K8s bootstrap configuration from: /home/runner/work/Demon/Demon/scripts/tests/fixtures/config.e2e.yaml
+Configuration loaded successfully
+Cluster: demon-smoke-test
+Namespace: demon-system
+Configuration validation passed
+  Processing add-on: monitoring - Prometheus and Grafana for monitoring and observability
+🚀 Starting K8s bootstrap process...
+Phase 1: Installing k3s cluster
+[INFO]  Using v1.28.2+k3s1 as release
+[INFO]  Downloading hash https://github.com/k3s-io/k3s/releases/download/v1.28.2+k3s1/sha256sum-amd64.txt
+[INFO]  Downloading binary https://github.com/k3s-io/k3s/releases/download/v1.28.2+k3s1/k3s
+[INFO]  Verifying binary download
+[INFO]  Installing k3s to /usr/local/bin/k3s
+[INFO]  Skipping installation of SELinux RPM
+[INFO]  Skipping /usr/local/bin/kubectl symlink to k3s, already exists
+[INFO]  Creating /usr/local/bin/crictl symlink to k3s
+[INFO]  Skipping /usr/local/bin/ctr symlink to k3s, command exists in PATH at /usr/bin/ctr
+[INFO]  Creating killall script /usr/local/bin/k3s-killall.sh
+[INFO]  Creating uninstall script /usr/local/bin/k3s-uninstall.sh
+[INFO]  env: Creating environment file /etc/systemd/system/k3s.service.env
+[INFO]  systemd: Creating service file /etc/systemd/system/k3s.service
+[INFO]  systemd: Enabling k3s unit
+Created symlink /etc/systemd/system/multi-user.target.wants/k3s.service → /etc/systemd/system/k3s.service.
+[INFO]  systemd: Starting k3s
+✓ k3s cluster installation completed
+Phase 2: Waiting for k3s cluster to be ready
+✓ k3s cluster is ready
+Phase 3: Deploying Demon components
+Applying manifests to cluster...
+Failed to apply manifests:
+stdout: namespace/demon-system created
+service/nats created
+
+stderr: E0923 14:24:16.270485    8926 memcache.go:287] couldn't get resource list for metrics.k8s.io/v1beta1: the server is currently unable to handle the request
+E0923 14:24:16.280363    8926 memcache.go:121] couldn't get resource list for metrics.k8s.io/v1beta1: the server is currently unable to handle the request
+error parsing STDIN: error converting YAML to JSON: yaml: invalid map key: map[interface {}]interface {}{".persistence.storageClass":interface {}(nil)}
+Error from server (NotFound): error when creating "STDIN": namespaces "demon-system" not found
+
+Error: kubectl apply failed with exit code 1

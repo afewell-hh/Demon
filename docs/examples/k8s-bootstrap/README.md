@@ -281,6 +281,17 @@ volumes:
 {{- end }}
 ```
 
+### Deployment Process
+
+The bootstrap command uses a phased deployment approach to ensure reliable resource creation:
+
+1. **Namespace Creation**: Creates the target namespace first
+2. **Namespace Readiness Wait**: Waits for the namespace to be in "Active" state before proceeding
+3. **Resource Deployment**: Applies remaining manifests (services, deployments, etc.)
+4. **Health Verification**: Validates that all components are running and healthy
+
+This phased approach prevents the "namespace not found" errors that can occur when Kubernetes resources are applied too quickly after namespace creation.
+
 ### Verification Commands
 
 After deployment, verify your cluster:
@@ -316,6 +327,7 @@ sudo k3s kubectl logs -n your-namespace deployment/engine
 - [x] Pod readiness verification with timeout
 - [x] Dry-run manifest preview with --verbose flag
 - [x] Command executor abstraction for testable deployment
+- [x] Namespace readiness wait to prevent race conditions
 
 ### ✅ Completed (Story 3: Secret Management)
 - [x] Environment variable secret provider
