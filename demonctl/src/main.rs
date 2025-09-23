@@ -1627,16 +1627,46 @@ fn apply_manifests_with_namespace_wait(
 }
 
 fn extract_namespace_name(manifest: &str) -> Option<String> {
-    // Simple YAML parsing to extract namespace name
-    for line in manifest.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("name:") {
-            if let Some(name) = trimmed.strip_prefix("name:") {
-                return Some(name.trim().to_string());
+    // Parse YAML properly to extract namespace name from a Namespace manifest
+    match serde_yaml::from_str::<serde_yaml::Value>(manifest) {
+        Ok(value) => {
+            // Check if this is a Namespace manifest
+            if value
+                .get("kind")
+                .and_then(|v| v.as_str())
+                .map(|s| s == "Namespace")
+                .unwrap_or(false)
+            {
+                // Extract metadata.name
+                value
+                    .get("metadata")
+                    .and_then(|m| m.get("name"))
+                    .and_then(|n| n.as_str())
+                    .map(|s| s.to_string())
+            } else {
+                None
             }
         }
+        Err(_) => {
+            // Fallback to simple parsing if YAML parsing fails
+            // This is more conservative: only matches if we see kind: Namespace first
+            let mut is_namespace = false;
+            for line in manifest.lines() {
+                let trimmed = line.trim();
+
+                // Check if this is a Namespace kind
+                if trimmed == "kind: Namespace" {
+                    is_namespace = true;
+                } else if is_namespace && trimmed.starts_with("name:") {
+                    // Only extract name if we've confirmed this is a Namespace
+                    if let Some(name) = trimmed.strip_prefix("name:") {
+                        return Some(name.trim().to_string());
+                    }
+                }
+            }
+            None
+        }
     }
-    None
 }
 
 fn wait_for_namespace_ready(
@@ -1687,7 +1717,10 @@ fn wait_for_demon_pods(
     executor: &dyn k8s_bootstrap::CommandExecutor,
     verbose: bool,
 ) -> Result<()> {
-    let timeout_secs = 120;
+    let timeout_secs = std::env::var("K8S_POD_TIMEOUT")
+        .unwrap_or_else(|_| "240".to_string())
+        .parse::<u64>()
+        .unwrap_or(240);
     let check_interval_secs = 5;
     let mut elapsed = 0;
 
@@ -1751,10 +1784,44 @@ fn wait_for_demon_pods(
         elapsed += check_interval_secs;
     }
 
-    anyhow::bail!(
+    // Capture diagnostics before failing
+    let mut error_message = format!(
         "Timeout waiting for Demon pods to be ready after {}s",
         timeout_secs
-    )
+    );
+
+    // Get pod status details
+    if let Ok(pod_output) = executor.execute(
+        "k3s",
+        &["kubectl", "get", "pods", "-n", namespace, "-o", "wide"],
+        None,
+    ) {
+        if pod_output.status == 0 {
+            error_message.push_str("\n\nPod status details:");
+            error_message.push_str(&format!("\n{}", pod_output.stdout));
+        }
+    }
+
+    // Get recent events
+    if let Ok(events_output) = executor.execute(
+        "k3s",
+        &[
+            "kubectl",
+            "get",
+            "events",
+            "-n",
+            namespace,
+            "--sort-by=.lastTimestamp",
+        ],
+        None,
+    ) {
+        if events_output.status == 0 && !events_output.stdout.trim().is_empty() {
+            error_message.push_str("\n\nRecent events:");
+            error_message.push_str(&format!("\n{}", events_output.stdout));
+        }
+    }
+
+    anyhow::bail!("{}", error_message)
 }
 
 fn run_health_checks(
@@ -1954,7 +2021,7 @@ metadata:
     }
 
     #[test]
-    fn given_non_namespace_manifest_when_extract_namespace_name_then_returns_first_name() {
+    fn given_non_namespace_manifest_when_extract_namespace_name_then_returns_none() {
         let manifest = r#"
 apiVersion: v1
 kind: Service
@@ -1963,7 +2030,7 @@ metadata:
   namespace: demon-system
 "#;
         let name = extract_namespace_name(manifest);
-        assert_eq!(name, Some("nats".to_string()));
+        assert_eq!(name, None);
     }
 
     #[test]
@@ -1973,6 +2040,66 @@ apiVersion: v1
 kind: Service
 metadata:
   namespace: demon-system
+"#;
+        let name = extract_namespace_name(manifest);
+        assert_eq!(name, None);
+    }
+
+    #[test]
+    fn given_namespace_with_comments_when_extract_namespace_name_then_returns_correct_name() {
+        let manifest = r#"
+# This is a comment
+---
+apiVersion: v1
+kind: Namespace  # Another comment
+metadata:
+  # Name of the namespace
+  name: test-namespace
+  labels:
+    app: test
+"#;
+        let name = extract_namespace_name(manifest);
+        assert_eq!(name, Some("test-namespace".to_string()));
+    }
+
+    #[test]
+    fn given_multiple_name_fields_when_extract_namespace_name_then_returns_only_namespace_name() {
+        let manifest = r#"
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: actual-namespace
+  labels:
+    name: label-name
+    app.kubernetes.io/name: app-name
+"#;
+        let name = extract_namespace_name(manifest);
+        assert_eq!(name, Some("actual-namespace".to_string()));
+    }
+
+    #[test]
+    fn given_malformed_yaml_but_valid_namespace_when_extract_namespace_name_then_uses_fallback() {
+        // Intentionally malformed YAML that would fail parsing but has clear structure
+        let manifest = r#"
+kind: Namespace
+metadata:
+  name: fallback-namespace
+  labels: {invalid yaml here
+"#;
+        let name = extract_namespace_name(manifest);
+        assert_eq!(name, Some("fallback-namespace".to_string()));
+    }
+
+    #[test]
+    fn given_deployment_with_name_field_when_extract_namespace_name_then_returns_none() {
+        let manifest = r#"
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+  namespace: demon-system
+spec:
+  replicas: 1
 "#;
         let name = extract_namespace_name(manifest);
         assert_eq!(name, None);
