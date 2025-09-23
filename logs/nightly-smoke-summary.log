@@ -1,0 +1,100 @@
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	﻿2025-09-23T14:22:01.3202787Z ##[group]Run dtolnay/rust-toolchain@v1
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3203501Z with:
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3203785Z   toolchain: 1.82.0
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3204075Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3313760Z ##[group]Run : parse toolchain version
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3314267Z [36;1m: parse toolchain version[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3314646Z [36;1mif [[ -z $toolchain ]]; then[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3315248Z [36;1m  # GitHub does not enforce `required: true` inputs itself. https://github.com/actions/runner/issues/1070[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3315880Z [36;1m  echo "'toolchain' is a required input" >&2[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3316270Z [36;1m  exit 1[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3316664Z [36;1melif [[ $toolchain =~ ^stable' '[0-9]+' '(year|month|week|day)s?' 'ago$ ]]; then[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3317361Z [36;1m  if [[ Linux == macOS ]]; then[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3317935Z [36;1m    echo "toolchain=1.$((($(date -v-$(sed 's/stable \([0-9]*\) \(.\).*/\1\2/' <<< $toolchain) +%s)/60/60/24-16569)/7/6))" >> $GITHUB_OUTPUT[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3318503Z [36;1m  else[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3318966Z [36;1m    echo "toolchain=1.$((($(date --date "${toolchain#stable }" +%s)/60/60/24-16569)/7/6))" >> $GITHUB_OUTPUT[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3319482Z [36;1m  fi[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3319846Z [36;1melif [[ $toolchain =~ ^stable' 'minus' '[0-9]+' 'releases?$ ]]; then[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3320433Z [36;1m  echo "toolchain=1.$((($(date +%s)/60/60/24-16569)/7/6-${toolchain//[^0-9]/}))" >> $GITHUB_OUTPUT[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3320949Z [36;1melif [[ $toolchain =~ ^1\.[0-9]+$ ]]; then[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3321510Z [36;1m  echo "toolchain=1.$((i=${toolchain#1.}, c=($(date +%s)/60/60/24-16569)/7/6, i+9*i*(10*i<=c)+90*i*(100*i<=c)))" >> $GITHUB_OUTPUT[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3322048Z [36;1melse[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3322369Z [36;1m  echo "toolchain=$toolchain" >> $GITHUB_OUTPUT[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3322736Z [36;1mfi[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3379909Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3380382Z env:
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3380648Z   toolchain: 1.82.0
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3380924Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3596020Z ##[group]Run : construct rustup command line
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3596531Z [36;1m: construct rustup command line[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3597056Z [36;1mecho "targets=$(for t in ${targets//,/ }; do echo -n ' --target' $t; done)" >> $GITHUB_OUTPUT[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3597735Z [36;1mecho "components=$(for c in ${components//,/ }; do echo -n ' --component' $c; done)" >> $GITHUB_OUTPUT[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3598284Z [36;1mecho "downgrade=" >> $GITHUB_OUTPUT[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3628467Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3628894Z env:
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3629151Z   targets: 
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3629400Z   components: 
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3629665Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3710125Z ##[group]Run : set $CARGO_HOME
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3710488Z [36;1m: set $CARGO_HOME[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3710893Z [36;1mecho CARGO_HOME=${CARGO_HOME:-"$HOME/.cargo"} >> $GITHUB_ENV[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3740536Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3740974Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3820473Z ##[group]Run : install rustup if needed
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3820871Z [36;1m: install rustup if needed[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3821247Z [36;1mif ! command -v rustup &>/dev/null; then[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3822050Z [36;1m  curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused --location --silent --show-error --fail https://sh.rustup.rs | sh -s -- --default-toolchain none -y[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3822834Z [36;1m  echo "$CARGO_HOME/bin" >> $GITHUB_PATH[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3823453Z [36;1mfi[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3853556Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3853978Z env:
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3854251Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3854634Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3934239Z ##[group]Run rustup toolchain install 1.82.0 --profile minimal --no-self-update
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3935057Z [36;1mrustup toolchain install 1.82.0 --profile minimal --no-self-update[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3966362Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3966786Z env:
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3967053Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.3967382Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.5052309Z info: syncing channel updates for '1.82.0-x86_64-unknown-linux-gnu'
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.7173681Z info: latest update on 2024-10-17, rust version 1.82.0 (f6e511eec 2024-10-15)
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.7174493Z info: downloading component 'cargo'
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:01.8305088Z info: downloading component 'rust-std'
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:02.0587484Z info: downloading component 'rustc'
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:02.5603425Z info: installing component 'cargo'
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:03.1585730Z info: installing component 'rust-std'
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:04.9239455Z info: installing component 'rustc'
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2061647Z 
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2167709Z   1.82.0-x86_64-unknown-linux-gnu installed - rustc 1.82.0 (f6e511eec 2024-10-15)
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2168199Z 
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2218334Z ##[group]Run rustup default 1.82.0
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2218626Z [36;1mrustup default 1.82.0[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2247844Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2248175Z env:
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2248349Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2248585Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2345918Z info: using existing install for '1.82.0-x86_64-unknown-linux-gnu'
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2631616Z info: default toolchain set to '1.82.0-x86_64-unknown-linux-gnu'
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2632239Z 
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2736096Z   1.82.0-x86_64-unknown-linux-gnu unchanged - rustc 1.82.0 (f6e511eec 2024-10-15)
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2737430Z info: note that the toolchain 'stable-x86_64-unknown-linux-gnu' is currently in use (overridden by '/home/runner/work/Demon/Demon/rust-toolchain.toml')
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2738143Z 
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2777742Z ##[group]Run : create cachekey
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2778026Z [36;1m: create cachekey[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2778457Z [36;1mDATE=$(rustc +1.82.0 --version --verbose | sed -ne 's/^commit-date: \(20[0-9][0-9]\)-\([01][0-9]\)-\([0-3][0-9]\)$/\1\2\3/p')[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2779016Z [36;1mHASH=$(rustc +1.82.0 --version --verbose | sed -ne 's/^commit-hash: //p')[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2779456Z [36;1mecho "cachekey=$(echo $DATE$HASH | head -c12)" >> $GITHUB_OUTPUT[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2809357Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2809681Z env:
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2809856Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.2810097Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.3224967Z ##[group]Run : disable incremental compilation
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.3225365Z [36;1m: disable incremental compilation[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.3225673Z [36;1mif [ -z "${CARGO_INCREMENTAL+set}" ]; then[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.3225985Z [36;1m  echo CARGO_INCREMENTAL=0 >> $GITHUB_ENV[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.3226259Z [36;1mfi[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.3255347Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.3255730Z env:
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.3255907Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.3256137Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T14:22:09.3320012Z ##[group]Run : enable colors in Cargo output

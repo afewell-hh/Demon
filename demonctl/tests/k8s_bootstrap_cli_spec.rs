@@ -327,7 +327,9 @@ fn given_apply_only_mode_when_executor_fails_then_reports_error() {
 
     cmd.assert()
         .failure()
-        .stderr(predicate::str::contains("Failed to apply namespace manifests"))
+        .stderr(predicate::str::contains(
+            "Failed to apply namespace manifests",
+        ))
         .stderr(predicate::str::contains("kubectl apply failed - simulated"))
         .stdout(predicate::str::contains(
             "🚀 Starting K8s bootstrap process (manifests only)",
@@ -356,8 +358,12 @@ fn given_apply_only_mode_when_executor_succeeds_then_prints_successful_summary()
         .stdout(predicate::str::contains(
             "🚀 Starting K8s bootstrap process (manifests only)",
         ))
-        .stdout(predicate::str::contains("Applying manifests to cluster with namespace readiness checks"))
-        .stdout(predicate::str::contains("✓ All manifests applied successfully"))
+        .stdout(predicate::str::contains(
+            "Applying manifests to cluster with namespace readiness checks",
+        ))
+        .stdout(predicate::str::contains(
+            "✓ All manifests applied successfully",
+        ))
         .stdout(predicate::str::contains(
             "🎯 Manifest application simulation complete",
         ));

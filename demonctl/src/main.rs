@@ -2017,7 +2017,12 @@ metadata:
 
     #[cfg(test)]
     impl k8s_bootstrap::CommandExecutor for MockNamespaceWaitExecutor {
-        fn execute(&self, _program: &str, args: &[&str], _input: Option<&str>) -> anyhow::Result<k8s_bootstrap::CommandOutput> {
+        fn execute(
+            &self,
+            _program: &str,
+            args: &[&str],
+            _input: Option<&str>,
+        ) -> anyhow::Result<k8s_bootstrap::CommandOutput> {
             let mut count = self.call_count.borrow_mut();
             *count += 1;
 
@@ -2033,7 +2038,8 @@ metadata:
             // Otherwise return success for kubectl apply commands
             Ok(k8s_bootstrap::CommandOutput {
                 status: 0,
-                stdout: "namespace/test-namespace created\nservice/test-service created".to_string(),
+                stdout: "namespace/test-namespace created\nservice/test-service created"
+                    .to_string(),
                 stderr: String::new(),
             })
         }
