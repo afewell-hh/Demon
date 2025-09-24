@@ -1049,7 +1049,10 @@ async fn export_contracts_bundle(format: &str, include_wit: bool) -> Result<()> 
 }
 
 fn handle_secrets_command(cmd: SecretsCommands) -> Result<()> {
-    use config_loader::{secrets_store, SecretProvider, SecretsStore, VaultStubProvider};
+    use config_loader::{
+        secrets_store, SecretProvider, SecretsStore, VaultHttpSecretProvider, VaultStubProvider,
+    };
+    use std::env;
     use std::io::Read;
 
     match cmd {
@@ -1095,15 +1098,40 @@ fn handle_secrets_command(cmd: SecretsCommands) -> Result<()> {
                         eprintln!("⚠ Warning: --secrets-file is ignored when using vault provider");
                     }
 
-                    let vault_provider = VaultStubProvider::from_env().map_err(|e| {
-                        anyhow::anyhow!("Failed to initialize vault provider: {}", e)
-                    })?;
+                    // Determine which Vault provider to use based on VAULT_ADDR
+                    let vault_addr =
+                        env::var("VAULT_ADDR").unwrap_or_else(|_| "file://vault_stub".to_string());
 
-                    vault_provider
-                        .put(&scope, &key, &secret_value)
-                        .map_err(|e| anyhow::anyhow!("Failed to store secret in vault: {}", e))?;
+                    if vault_addr.starts_with("http://") || vault_addr.starts_with("https://") {
+                        // Use HTTP provider for real Vault
+                        let vault_provider = VaultHttpSecretProvider::from_env().map_err(|e| {
+                            anyhow::anyhow!("Failed to initialize Vault HTTP provider: {}", e)
+                        })?;
 
-                    println!("✓ Secret {}/{} set successfully in vault", scope, key);
+                        vault_provider
+                            .put(&scope, &key, &secret_value)
+                            .map_err(|e| {
+                                anyhow::anyhow!("Failed to store secret in Vault: {}", e)
+                            })?;
+
+                        println!(
+                            "✓ Secret {}/{} set successfully in Vault (HTTP)",
+                            scope, key
+                        );
+                    } else {
+                        // Use stub provider for file:// URLs
+                        let vault_provider = VaultStubProvider::from_env().map_err(|e| {
+                            anyhow::anyhow!("Failed to initialize Vault stub provider: {}", e)
+                        })?;
+
+                        vault_provider
+                            .put(&scope, &key, &secret_value)
+                            .map_err(|e| {
+                                anyhow::anyhow!("Failed to store secret in vault stub: {}", e)
+                            })?;
+
+                        println!("✓ Secret {}/{} set successfully in vault stub", scope, key);
+                    }
                 }
             }
         }
@@ -1136,13 +1164,31 @@ fn handle_secrets_command(cmd: SecretsCommands) -> Result<()> {
                         eprintln!("⚠ Warning: --secrets-file is ignored when using vault provider");
                     }
 
-                    let vault_provider = VaultStubProvider::from_env().map_err(|e| {
-                        anyhow::anyhow!("Failed to initialize vault provider: {}", e)
-                    })?;
+                    // Determine which Vault provider to use based on VAULT_ADDR
+                    let vault_addr =
+                        env::var("VAULT_ADDR").unwrap_or_else(|_| "file://vault_stub".to_string());
 
-                    let value = vault_provider
-                        .resolve(&scope, &key)
-                        .map_err(|e| anyhow::anyhow!("Failed to get secret from vault: {}", e))?;
+                    let value = if vault_addr.starts_with("http://")
+                        || vault_addr.starts_with("https://")
+                    {
+                        // Use HTTP provider for real Vault
+                        let vault_provider = VaultHttpSecretProvider::from_env().map_err(|e| {
+                            anyhow::anyhow!("Failed to initialize Vault HTTP provider: {}", e)
+                        })?;
+
+                        vault_provider.resolve(&scope, &key).map_err(|e| {
+                            anyhow::anyhow!("Failed to get secret from Vault: {}", e)
+                        })?
+                    } else {
+                        // Use stub provider for file:// URLs
+                        let vault_provider = VaultStubProvider::from_env().map_err(|e| {
+                            anyhow::anyhow!("Failed to initialize Vault stub provider: {}", e)
+                        })?;
+
+                        vault_provider.resolve(&scope, &key).map_err(|e| {
+                            anyhow::anyhow!("Failed to get secret from vault stub: {}", e)
+                        })?
+                    };
 
                     if raw {
                         println!("{}", value);
@@ -1194,34 +1240,47 @@ fn handle_secrets_command(cmd: SecretsCommands) -> Result<()> {
                     eprintln!("⚠ Warning: --secrets-file is ignored when using vault provider");
                 }
 
-                let vault_provider = VaultStubProvider::from_env()
-                    .map_err(|e| anyhow::anyhow!("Failed to initialize vault provider: {}", e))?;
+                // Determine which Vault provider to use based on VAULT_ADDR
+                let vault_addr =
+                    env::var("VAULT_ADDR").unwrap_or_else(|_| "file://vault_stub".to_string());
 
-                let all_secrets = vault_provider
-                    .list(scope.as_deref())
-                    .map_err(|e| anyhow::anyhow!("Failed to list secrets from vault: {}", e))?;
+                if vault_addr.starts_with("http://") || vault_addr.starts_with("https://") {
+                    // HTTP provider doesn't support list operation yet
+                    eprintln!("List operation is not yet supported for Vault HTTP provider");
+                    eprintln!("Use vault CLI directly: vault kv list secret/");
+                    std::process::exit(1);
+                } else {
+                    // Use stub provider for file:// URLs
+                    let vault_provider = VaultStubProvider::from_env().map_err(|e| {
+                        anyhow::anyhow!("Failed to initialize vault stub provider: {}", e)
+                    })?;
 
-                if all_secrets.is_empty() {
-                    if let Some(scope_filter) = scope {
-                        println!("No secrets found for scope: {}", scope_filter);
-                    } else {
-                        println!("No secrets found");
-                    }
-                } else if let Some(scope_filter) = scope {
-                    if let Some(secrets) = all_secrets.get(&scope_filter) {
-                        println!("Secrets in scope '{}' (vault):", scope_filter);
-                        for (key, value) in secrets {
-                            println!("  {}: {}", key, value);
+                    let all_secrets = vault_provider.list(scope.as_deref()).map_err(|e| {
+                        anyhow::anyhow!("Failed to list secrets from vault stub: {}", e)
+                    })?;
+
+                    if all_secrets.is_empty() {
+                        if let Some(scope_filter) = scope {
+                            println!("No secrets found for scope: {}", scope_filter);
+                        } else {
+                            println!("No secrets found");
+                        }
+                    } else if let Some(scope_filter) = scope {
+                        if let Some(secrets) = all_secrets.get(&scope_filter) {
+                            println!("Secrets in scope '{}' (vault stub):", scope_filter);
+                            for (key, value) in secrets {
+                                println!("  {}: {}", key, value);
+                            }
+                        } else {
+                            println!("No secrets found for scope: {}", scope_filter);
                         }
                     } else {
-                        println!("No secrets found for scope: {}", scope_filter);
-                    }
-                } else {
-                    println!("Secrets (vault):");
-                    for (scope, secrets) in all_secrets {
-                        println!("  {}:", scope);
-                        for (key, value) in secrets {
-                            println!("    {}: {}", key, value);
+                        println!("Secrets (vault stub):");
+                        for (scope, secrets) in all_secrets {
+                            println!("  {}:", scope);
+                            for (key, value) in secrets {
+                                println!("    {}: {}", key, value);
+                            }
                         }
                     }
                 }
@@ -1250,15 +1309,33 @@ fn handle_secrets_command(cmd: SecretsCommands) -> Result<()> {
                         eprintln!("⚠ Warning: --secrets-file is ignored when using vault provider");
                     }
 
-                    let vault_provider = VaultStubProvider::from_env().map_err(|e| {
-                        anyhow::anyhow!("Failed to initialize vault provider: {}", e)
-                    })?;
+                    // Determine which Vault provider to use based on VAULT_ADDR
+                    let vault_addr =
+                        env::var("VAULT_ADDR").unwrap_or_else(|_| "file://vault_stub".to_string());
 
-                    vault_provider.delete(&scope, &key).map_err(|e| {
-                        anyhow::anyhow!("Failed to delete secret from vault: {}", e)
-                    })?;
+                    if vault_addr.starts_with("http://") || vault_addr.starts_with("https://") {
+                        // Use HTTP provider for real Vault
+                        let vault_provider = VaultHttpSecretProvider::from_env().map_err(|e| {
+                            anyhow::anyhow!("Failed to initialize Vault HTTP provider: {}", e)
+                        })?;
 
-                    println!("✓ Secret {}/{} deleted from vault", scope, key);
+                        vault_provider.delete(&scope, &key).map_err(|e| {
+                            anyhow::anyhow!("Failed to delete secret from Vault: {}", e)
+                        })?;
+
+                        println!("✓ Secret {}/{} deleted from Vault (HTTP)", scope, key);
+                    } else {
+                        // Use stub provider for file:// URLs
+                        let vault_provider = VaultStubProvider::from_env().map_err(|e| {
+                            anyhow::anyhow!("Failed to initialize Vault stub provider: {}", e)
+                        })?;
+
+                        vault_provider.delete(&scope, &key).map_err(|e| {
+                            anyhow::anyhow!("Failed to delete secret from vault stub: {}", e)
+                        })?;
+
+                        println!("✓ Secret {}/{} deleted from vault stub", scope, key);
+                    }
                 }
             }
         }
