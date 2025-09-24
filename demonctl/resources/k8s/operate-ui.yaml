@@ -56,13 +56,13 @@ spec:
           value: "http://demon-engine.{{ .namespace }}.svc.cluster.local:8081"
         livenessProbe:
           httpGet:
-            path: /api/health
+            path: /health
             port: 3000
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /api/health
+            path: /health
             port: 3000
           initialDelaySeconds: 5
           periodSeconds: 5

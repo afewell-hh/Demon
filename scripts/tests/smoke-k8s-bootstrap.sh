@@ -339,14 +339,21 @@ run_health_checks() {
     if [[ -n "${runtime_pod}" ]]; then
         log "Checking runtime health endpoint: ${runtime_pod}"
 
-        if kubectl exec -n "${namespace}" "${runtime_pod}" -- wget -q -O- http://localhost:8080/health >/dev/null 2>&1; then
+        # Use kubectl port-forward instead of exec wget (distroless containers don't have wget)
+        local local_port=8180
+        kubectl port-forward -n "${namespace}" "${runtime_pod}" "${local_port}:8080" >/dev/null 2>&1 &
+        local pf_pid=$!
+        sleep 2
+
+        if curl -s -f "http://localhost:${local_port}/health" > "${ARTIFACTS_DIR}/runtime-health.txt" 2>&1; then
             success "Runtime health check passed"
-            kubectl exec -n "${namespace}" "${runtime_pod}" -- wget -q -O- http://localhost:8080/health > "${ARTIFACTS_DIR}/runtime-health.txt" 2>&1 || true
         else
             error "Runtime health check failed"
             kubectl logs -n "${namespace}" "${runtime_pod}" > "${ARTIFACTS_DIR}/runtime-health-logs.txt" 2>&1 || true
+            kill ${pf_pid} 2>/dev/null || true
             return 1
         fi
+        kill ${pf_pid} 2>/dev/null || true
     else
         error "No demon-runtime pod found for health checking"
         return 1
@@ -359,14 +366,21 @@ run_health_checks() {
     if [[ -n "${ui_pod}" ]]; then
         log "Checking Operate UI health endpoint: ${ui_pod}"
 
-        if kubectl exec -n "${namespace}" "${ui_pod}" -- wget -q -O- http://localhost:3000/api/health >/dev/null 2>&1; then
+        # Use kubectl port-forward and correct health endpoint (/health not /api/health)
+        local local_port=3080
+        kubectl port-forward -n "${namespace}" "${ui_pod}" "${local_port}:3000" >/dev/null 2>&1 &
+        local pf_pid=$!
+        sleep 2
+
+        if curl -s -f "http://localhost:${local_port}/health" > "${ARTIFACTS_DIR}/ui-health.txt" 2>&1; then
             success "Operate UI health check passed"
-            kubectl exec -n "${namespace}" "${ui_pod}" -- wget -q -O- http://localhost:3000/api/health > "${ARTIFACTS_DIR}/ui-health.txt" 2>&1 || true
         else
             error "Operate UI health check failed"
             kubectl logs -n "${namespace}" "${ui_pod}" > "${ARTIFACTS_DIR}/ui-health-logs.txt" 2>&1 || true
+            kill ${pf_pid} 2>/dev/null || true
             return 1
         fi
+        kill ${pf_pid} 2>/dev/null || true
     else
         error "No operate-ui pod found for health checking"
         return 1
@@ -379,14 +393,21 @@ run_health_checks() {
     if [[ -n "${engine_pod}" ]]; then
         log "Checking Engine health endpoint: ${engine_pod}"
 
-        if kubectl exec -n "${namespace}" "${engine_pod}" -- wget -q -O- http://localhost:8081/health >/dev/null 2>&1; then
+        # Use kubectl port-forward instead of exec wget (distroless containers don't have wget)
+        local local_port=8181
+        kubectl port-forward -n "${namespace}" "${engine_pod}" "${local_port}:8081" >/dev/null 2>&1 &
+        local pf_pid=$!
+        sleep 2
+
+        if curl -s -f "http://localhost:${local_port}/health" > "${ARTIFACTS_DIR}/engine-health.txt" 2>&1; then
             success "Engine health check passed"
-            kubectl exec -n "${namespace}" "${engine_pod}" -- wget -q -O- http://localhost:8081/health > "${ARTIFACTS_DIR}/engine-health.txt" 2>&1 || true
         else
             error "Engine health check failed"
             kubectl logs -n "${namespace}" "${engine_pod}" > "${ARTIFACTS_DIR}/engine-health-logs.txt" 2>&1 || true
+            kill ${pf_pid} 2>/dev/null || true
             return 1
         fi
+        kill ${pf_pid} 2>/dev/null || true
     else
         error "No demon-engine pod found for health checking"
         return 1
