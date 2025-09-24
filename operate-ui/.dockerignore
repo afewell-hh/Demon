@@ -1,0 +1,13 @@
+# Test files
+tests/
+test-results/
+playwright/
+
+# Node modules (if any)
+node_modules/
+
+# Build artifacts
+target/
+
+# Documentation
+docs/

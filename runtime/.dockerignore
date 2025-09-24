@@ -1,0 +1,9 @@
+# Test files
+tests/
+test-results/
+
+# Build artifacts
+target/
+
+# Documentation
+docs/
