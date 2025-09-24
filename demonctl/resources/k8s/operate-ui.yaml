@@ -43,10 +43,7 @@ spec:
     spec:
       containers:
       - name: ui
-        # TEMPORARY: Using nginx as placeholder until GHCR images are built
-        # TODO: Replace with ghcr.io/demon-project/operate-ui:latest once Docker infrastructure is implemented
-        image: nginx:alpine
-        command: ["/bin/sh", "-c", "while true; do echo 'Operate UI placeholder running'; sleep 30; done"]
+        image: ghcr.io/afewell-hh/demon-operate-ui:main
         ports:
         - containerPort: 3000
           name: http
@@ -57,19 +54,18 @@ spec:
           value: "{{ .streamName }}"
         - name: API_BASE_URL
           value: "http://demon-engine.{{ .namespace }}.svc.cluster.local:8081"
-        # TEMPORARY: Disabled health checks for placeholder image
-        # livenessProbe:
-        #   httpGet:
-        #     path: /api/health
-        #     port: 3000
-        #   initialDelaySeconds: 30
-        #   periodSeconds: 10
-        # readinessProbe:
-        #   httpGet:
-        #     path: /api/health
-        #     port: 3000
-        #   initialDelaySeconds: 5
-        #   periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
         resources:
           requests:
             memory: "128Mi"

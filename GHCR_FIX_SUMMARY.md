@@ -67,12 +67,36 @@ Local testing confirmed: `docker pull ghcr.io/demon-project/operate-ui:latest` r
 - Is clearly documented for future reversal
 - Doesn't change any authentication or security configurations
 
-## Next Steps
+## Docker Infrastructure Implementation (Update)
 
-1. Merge this PR to unblock nightly CI
-2. Create a follow-up epic/story for implementing full Docker infrastructure
-3. Once Docker infrastructure is complete, revert these placeholder changes
-4. Ensure the original K8s deployment vision is properly implemented
+**Status**: Docker build workflow implemented and deployed (PR #188)
+**Workflow Run**: 17964002949 (in progress as of Sept 24, 2025)
+
+The full Docker infrastructure has been implemented per `DOCKER_PIPELINE_PLAN.md`:
+
+### Phase 1-2 Completed
+- ✅ **Dockerfiles Created**: All 3 components (operate-ui, runtime, engine)
+- ✅ **CI Workflow**: `.github/workflows/docker-build.yml` implemented
+- ✅ **GHCR Integration**: Authentication and publishing configured
+- ✅ **Image Naming**: Using `ghcr.io/afewell-hh/demon-*:main` convention
+
+### Phase 3 Ready for Deployment
+- ✅ **K8s Manifests Updated**: All placeholder references replaced with real GHCR images
+- ✅ **Health Checks Restored**: Full HTTP endpoint validation restored
+- ✅ **Smoke Test Updated**: Placeholder detection logic removed
+- ✅ **Validation Passed**: `demonctl k8s-bootstrap --dry-run --verbose` successful
+
+## Published Images (Expected)
+Based on the workflow configuration, the following images should be available:
+- `ghcr.io/afewell-hh/demon-runtime:main`
+- `ghcr.io/afewell-hh/demon-engine:main`
+- `ghcr.io/afewell-hh/demon-operate-ui:main`
+
+## Next Steps
+1. Monitor workflow completion and capture final digests
+2. Deploy restored K8s manifests to production
+3. Validate nightly smoke test with real images
+4. Archive placeholder workaround documentation
 
 ---
 
