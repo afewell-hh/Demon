@@ -30,9 +30,8 @@ RUN cargo build --release --bin operate-ui
 # Runtime stage
 FROM gcr.io/distroless/cc-debian12
 
-# Copy static files
-COPY operate-ui/templates /app/templates
-COPY operate-ui/static /app/static
+# Copy template files
+COPY --from=builder /app/operate-ui/templates /app/templates
 
 # Copy the binary
 COPY --from=builder /app/target/release/operate-ui /usr/local/bin/operate-ui
