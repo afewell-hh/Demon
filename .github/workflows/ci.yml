@@ -791,9 +791,11 @@ jobs:
       contains(github.event.head_commit.message, 'k8s-bootstrap') ||
       contains(github.event.pull_request.title, 'k8s-bootstrap') ||
       (github.event_name == 'pull_request' && (
+        contains(github.event.pull_request.changed_files.*.filename, 'bootstrapper/') ||
         contains(github.event.pull_request.changed_files.*.filename, 'demonctl/src/k8s_bootstrap/') ||
+        contains(github.event.pull_request.changed_files.*.filename, 'demonctl/resources/') ||
         contains(github.event.pull_request.changed_files.*.filename, 'docs/examples/k8s-bootstrap/') ||
-        contains(github.event.pull_request.changed_files.*.filename, 'scripts/tests/smoke-k8s-bootstrap.sh')
+        contains(github.event.pull_request.changed_files.*.filename, 'scripts/tests/')
       )) ||
       (github.event_name == 'push' && github.ref == 'refs/heads/main')
     steps:

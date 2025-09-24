@@ -275,10 +275,6 @@ fn given_valid_config_when_dry_run_verbose_then_shows_manifest_plan_and_preview(
 fn given_vault_config_when_dry_run_verbose_then_shows_vault_summary() {
     let file = write_config(VAULT_CONFIG);
 
-    // Set required env vars for vault
-    std::env::set_var("VAULT_ADDR", "https://vault.example.com");
-    std::env::set_var("VAULT_TOKEN", "test-token");
-
     let mut cmd = Command::cargo_bin("demonctl").unwrap();
     cmd.arg("k8s-bootstrap")
         .arg("bootstrap")
@@ -287,13 +283,13 @@ fn given_vault_config_when_dry_run_verbose_then_shows_vault_summary() {
         .arg("--dry-run")
         .arg("--verbose");
 
+    // Set environment variables directly on the command to avoid leakage
+    cmd.env("VAULT_ADDR", "https://vault.example.com");
+    cmd.env("VAULT_TOKEN", "test-token");
+
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("Secrets: vault (configured)"));
-
-    // Clean up env vars
-    std::env::remove_var("VAULT_ADDR");
-    std::env::remove_var("VAULT_TOKEN");
 }
 
 #[test]
@@ -448,10 +444,6 @@ networking:
 
 #[test]
 fn given_vault_secrets_configured_when_dry_run_then_validates_config() {
-    // Clean up env vars to ensure test isolation
-    std::env::remove_var("VAULT_ADDR");
-    std::env::remove_var("VAULT_TOKEN");
-
     let file = write_config(VAULT_CONFIG);
 
     let mut cmd = Command::cargo_bin("demonctl").unwrap();
@@ -461,6 +453,10 @@ fn given_vault_secrets_configured_when_dry_run_then_validates_config() {
         .arg(file.path())
         .arg("--dry-run")
         .arg("--verbose");
+
+    // Explicitly remove vault environment variables to ensure they're not set
+    cmd.env_remove("VAULT_ADDR");
+    cmd.env_remove("VAULT_TOKEN");
 
     // Without VAULT_ADDR and VAULT_TOKEN, validation should fail
     cmd.assert().failure().stderr(predicate::str::contains(
@@ -472,10 +468,6 @@ fn given_vault_secrets_configured_when_dry_run_then_validates_config() {
 fn given_vault_secrets_with_env_when_dry_run_then_shows_vault_configured() {
     let file = write_config(VAULT_CONFIG);
 
-    // Set required env vars
-    std::env::set_var("VAULT_ADDR", "https://vault.example.com");
-    std::env::set_var("VAULT_TOKEN", "test-token");
-
     let mut cmd = Command::cargo_bin("demonctl").unwrap();
     cmd.arg("k8s-bootstrap")
         .arg("bootstrap")
@@ -484,13 +476,13 @@ fn given_vault_secrets_with_env_when_dry_run_then_shows_vault_configured() {
         .arg("--dry-run")
         .arg("--verbose");
 
+    // Set environment variables directly on the command to avoid leakage
+    cmd.env("VAULT_ADDR", "https://vault.example.com");
+    cmd.env("VAULT_TOKEN", "test-token");
+
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("vault (configured)"));
-
-    // Clean up env vars
-    std::env::remove_var("VAULT_ADDR");
-    std::env::remove_var("VAULT_TOKEN");
 }
 
 #[test]

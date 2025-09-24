@@ -54,7 +54,7 @@ Purpose: enable a fresh PM session (new context window) to regain full mastery q
 3) Inspect open PRs and Issues:
    - Ensure Review‑lock lines present; required checks green or being worked.
 4) Smoke local build:
-   - Commands: `make dev`; `cargo run -p demonctl -- run examples/rituals/echo.yaml --jetstream`.
+   - Commands: `make dev`; `cargo run -p demonctl -- run examples/rituals/echo.yaml`.
 5) Update weekly status issue (e.g., `#73`) with % complete and next steps.
 
 ## 7) Coding Agent Dispatch Template (Per Task)
