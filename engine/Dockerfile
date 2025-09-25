@@ -22,6 +22,7 @@ COPY operate-ui/ ./operate-ui/
 COPY wards/ ./wards/
 COPY capsules/ ./capsules/
 COPY demonctl/ ./demonctl/
+COPY bootstrapper/ ./bootstrapper/
 
 # Set build target for fully static linking
 ENV RUSTFLAGS="-C target-feature=+crt-static"
