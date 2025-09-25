@@ -1,0 +1,6 @@
+E0923 22:11:00.173538    3499 memcache.go:287] "Unhandled Error" err="couldn't get resource list for metrics.k8s.io/v1beta1: the server is currently unable to handle the request"
+E0923 22:11:00.188199    3499 memcache.go:121] "Unhandled Error" err="couldn't get resource list for metrics.k8s.io/v1beta1: the server is currently unable to handle the request"
+E0923 22:11:00.190083    3499 memcache.go:121] "Unhandled Error" err="couldn't get resource list for metrics.k8s.io/v1beta1: the server is currently unable to handle the request"
+E0923 22:11:00.193016    3499 memcache.go:121] "Unhandled Error" err="couldn't get resource list for metrics.k8s.io/v1beta1: the server is currently unable to handle the request"
+NAME                            STATUS   ROLES                  AGE   VERSION        INTERNAL-IP   EXTERNAL-IP   OS-IMAGE   KERNEL-VERSION      CONTAINER-RUNTIME
+k3d-demon-smoke-test-server-0   Ready    control-plane,master   11s   v1.24.4+k3s1   172.18.0.2    <none>        K3s dev    6.11.0-1018-azure   containerd://1.6.6-k3s1

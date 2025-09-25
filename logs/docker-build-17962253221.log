@@ -1,0 +1,1441 @@
+build (runtime)	Set up job	﻿2025-09-24T00:07:24.7225543Z Current runner version: '2.328.0'
+build (runtime)	Set up job	2025-09-24T00:07:24.7248213Z ##[group]Runner Image Provisioner
+build (runtime)	Set up job	2025-09-24T00:07:24.7248991Z Hosted Compute Agent
+build (runtime)	Set up job	2025-09-24T00:07:24.7249536Z Version: 20250829.383
+build (runtime)	Set up job	2025-09-24T00:07:24.7250219Z Commit: 27cb235aab5b0e52e153a26cd86b4742e89dac5d
+build (runtime)	Set up job	2025-09-24T00:07:24.7250954Z Build Date: 2025-08-29T13:48:48Z
+build (runtime)	Set up job	2025-09-24T00:07:24.7251533Z ##[endgroup]
+build (runtime)	Set up job	2025-09-24T00:07:24.7252101Z ##[group]Operating System
+build (runtime)	Set up job	2025-09-24T00:07:24.7252667Z Ubuntu
+build (runtime)	Set up job	2025-09-24T00:07:24.7253393Z 24.04.3
+build (runtime)	Set up job	2025-09-24T00:07:24.7253971Z LTS
+build (runtime)	Set up job	2025-09-24T00:07:24.7254439Z ##[endgroup]
+build (runtime)	Set up job	2025-09-24T00:07:24.7254924Z ##[group]Runner Image
+build (runtime)	Set up job	2025-09-24T00:07:24.7255472Z Image: ubuntu-24.04
+build (runtime)	Set up job	2025-09-24T00:07:24.7255993Z Version: 20250907.24.1
+build (runtime)	Set up job	2025-09-24T00:07:24.7257015Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20250907.24/images/ubuntu/Ubuntu2404-Readme.md
+build (runtime)	Set up job	2025-09-24T00:07:24.7258420Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20250907.24
+build (runtime)	Set up job	2025-09-24T00:07:24.7259618Z ##[endgroup]
+build (runtime)	Set up job	2025-09-24T00:07:24.7260733Z ##[group]GITHUB_TOKEN Permissions
+build (runtime)	Set up job	2025-09-24T00:07:24.7262496Z Contents: read
+build (runtime)	Set up job	2025-09-24T00:07:24.7263374Z Metadata: read
+build (runtime)	Set up job	2025-09-24T00:07:24.7263916Z Packages: write
+build (runtime)	Set up job	2025-09-24T00:07:24.7264420Z ##[endgroup]
+build (runtime)	Set up job	2025-09-24T00:07:24.7266573Z Secret source: Actions
+build (runtime)	Set up job	2025-09-24T00:07:24.7267396Z Prepare workflow directory
+build (runtime)	Set up job	2025-09-24T00:07:24.7726612Z Prepare all required actions
+build (runtime)	Set up job	2025-09-24T00:07:24.7762901Z Getting action download info
+build (runtime)	Set up job	2025-09-24T00:07:25.1999838Z Download action repository 'actions/checkout@v4' (SHA:08eba0b27e820071cde6df949e0beb9ba4906955)
+build (runtime)	Set up job	2025-09-24T00:07:25.4214445Z Download action repository 'docker/setup-buildx-action@v3' (SHA:e468171a9de216ec08956ac3ada2f0791b6bd435)
+build (runtime)	Set up job	2025-09-24T00:07:26.1538812Z Download action repository 'docker/login-action@v3' (SHA:184bdaa0721073962dff0199f1fb9940f07167d1)
+build (runtime)	Set up job	2025-09-24T00:07:26.9309027Z Download action repository 'docker/metadata-action@v5' (SHA:c1e51972afc2121e065aed6d45c65596fe445f3f)
+build (runtime)	Set up job	2025-09-24T00:07:27.6822561Z Download action repository 'docker/build-push-action@v5' (SHA:ca052bb54ab0790a636c9b5f226502c73d547a25)
+build (runtime)	Set up job	2025-09-24T00:07:28.4554821Z Complete job name: build (runtime)
+build (runtime)	Checkout repository	﻿2025-09-24T00:07:28.5164480Z ##[group]Run actions/checkout@v4
+build (runtime)	Checkout repository	2025-09-24T00:07:28.5165045Z with:
+build (runtime)	Checkout repository	2025-09-24T00:07:28.5165243Z   repository: afewell-hh/Demon
+build (runtime)	Checkout repository	2025-09-24T00:07:28.5165605Z   token: ***
+build (runtime)	Checkout repository	2025-09-24T00:07:28.5165800Z   ssh-strict: true
+build (runtime)	Checkout repository	2025-09-24T00:07:28.5165982Z   ssh-user: git
+build (runtime)	Checkout repository	2025-09-24T00:07:28.5166166Z   persist-credentials: true
+build (runtime)	Checkout repository	2025-09-24T00:07:28.5166378Z   clean: true
+build (runtime)	Checkout repository	2025-09-24T00:07:28.5166562Z   sparse-checkout-cone-mode: true
+build (runtime)	Checkout repository	2025-09-24T00:07:28.5166802Z   fetch-depth: 1
+build (runtime)	Checkout repository	2025-09-24T00:07:28.5166979Z   fetch-tags: false
+build (runtime)	Checkout repository	2025-09-24T00:07:28.5167168Z   show-progress: true
+build (runtime)	Checkout repository	2025-09-24T00:07:28.5167355Z   lfs: false
+build (runtime)	Checkout repository	2025-09-24T00:07:28.5167514Z   submodules: false
+build (runtime)	Checkout repository	2025-09-24T00:07:28.5167702Z   set-safe-directory: true
+build (runtime)	Checkout repository	2025-09-24T00:07:28.5168084Z env:
+build (runtime)	Checkout repository	2025-09-24T00:07:28.5168260Z   REGISTRY: ghcr.io
+build (runtime)	Checkout repository	2025-09-24T00:07:28.5168482Z   IMAGE_PREFIX: ghcr.io/afewell-hh/demon
+build (runtime)	Checkout repository	2025-09-24T00:07:28.5168731Z ##[endgroup]
+build (runtime)	Checkout repository	2025-09-24T00:07:28.6240931Z Syncing repository: afewell-hh/Demon
+build (runtime)	Checkout repository	2025-09-24T00:07:28.6242288Z ##[group]Getting Git version info
+build (runtime)	Checkout repository	2025-09-24T00:07:28.6242714Z Working directory is '/home/runner/work/Demon/Demon'
+build (runtime)	Checkout repository	2025-09-24T00:07:28.6243405Z [command]/usr/bin/git version
+build (runtime)	Checkout repository	2025-09-24T00:07:28.7142590Z git version 2.51.0
+build (runtime)	Checkout repository	2025-09-24T00:07:28.7169063Z ##[endgroup]
+build (runtime)	Checkout repository	2025-09-24T00:07:28.7182132Z Temporarily overriding HOME='/home/runner/work/_temp/2cdf39ca-2cfa-4031-9017-d005ebe8f58d' before making global git config changes
+build (runtime)	Checkout repository	2025-09-24T00:07:28.7183306Z Adding repository directory to the temporary git global config as a safe directory
+build (runtime)	Checkout repository	2025-09-24T00:07:28.7187102Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Demon/Demon
+build (runtime)	Checkout repository	2025-09-24T00:07:28.7263213Z Deleting the contents of '/home/runner/work/Demon/Demon'
+build (runtime)	Checkout repository	2025-09-24T00:07:28.7266629Z ##[group]Initializing the repository
+build (runtime)	Checkout repository	2025-09-24T00:07:28.7270337Z [command]/usr/bin/git init /home/runner/work/Demon/Demon
+build (runtime)	Checkout repository	2025-09-24T00:07:28.8098149Z hint: Using 'master' as the name for the initial branch. This default branch name
+build (runtime)	Checkout repository	2025-09-24T00:07:28.8099310Z hint: is subject to change. To configure the initial branch name to use in all
+build (runtime)	Checkout repository	2025-09-24T00:07:28.8100386Z hint: of your new repositories, which will suppress this warning, call:
+build (runtime)	Checkout repository	2025-09-24T00:07:28.8101132Z hint:
+build (runtime)	Checkout repository	2025-09-24T00:07:28.8102157Z hint: 	git config --global init.defaultBranch <name>
+build (runtime)	Checkout repository	2025-09-24T00:07:28.8102813Z hint:
+build (runtime)	Checkout repository	2025-09-24T00:07:28.8104242Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+build (runtime)	Checkout repository	2025-09-24T00:07:28.8105375Z hint: 'development'. The just-created branch can be renamed via this command:
+build (runtime)	Checkout repository	2025-09-24T00:07:28.8106144Z hint:
+build (runtime)	Checkout repository	2025-09-24T00:07:28.8107053Z hint: 	git branch -m <name>
+build (runtime)	Checkout repository	2025-09-24T00:07:28.8107684Z hint:
+build (runtime)	Checkout repository	2025-09-24T00:07:28.8108761Z hint: Disable this message with "git config set advice.defaultBranchName false"
+build (runtime)	Checkout repository	2025-09-24T00:07:28.8142650Z Initialized empty Git repository in /home/runner/work/Demon/Demon/.git/
+build (runtime)	Checkout repository	2025-09-24T00:07:28.8158383Z [command]/usr/bin/git remote add origin https://github.com/afewell-hh/Demon
+build (runtime)	Checkout repository	2025-09-24T00:07:28.8271421Z ##[endgroup]
+build (runtime)	Checkout repository	2025-09-24T00:07:28.8272083Z ##[group]Disabling automatic garbage collection
+build (runtime)	Checkout repository	2025-09-24T00:07:28.8277042Z [command]/usr/bin/git config --local gc.auto 0
+build (runtime)	Checkout repository	2025-09-24T00:07:28.8304568Z ##[endgroup]
+build (runtime)	Checkout repository	2025-09-24T00:07:28.8305204Z ##[group]Setting up auth
+build (runtime)	Checkout repository	2025-09-24T00:07:28.8311954Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+build (runtime)	Checkout repository	2025-09-24T00:07:28.8341516Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+build (runtime)	Checkout repository	2025-09-24T00:07:28.9817485Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+build (runtime)	Checkout repository	2025-09-24T00:07:28.9846533Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+build (runtime)	Checkout repository	2025-09-24T00:07:29.0073500Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+build (runtime)	Checkout repository	2025-09-24T00:07:29.0105615Z ##[endgroup]
+build (runtime)	Checkout repository	2025-09-24T00:07:29.0106253Z ##[group]Fetching the repository
+build (runtime)	Checkout repository	2025-09-24T00:07:29.0113981Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +0899a359caa1418d8c661ae137ef7a27aba2f449:refs/remotes/pull/188/merge
+build (runtime)	Checkout repository	2025-09-24T00:07:29.7875678Z From https://github.com/afewell-hh/Demon
+build (runtime)	Checkout repository	2025-09-24T00:07:29.7877122Z  * [new ref]         0899a359caa1418d8c661ae137ef7a27aba2f449 -> pull/188/merge
+build (runtime)	Checkout repository	2025-09-24T00:07:29.7950230Z ##[endgroup]
+build (runtime)	Checkout repository	2025-09-24T00:07:29.7950984Z ##[group]Determining the checkout info
+build (runtime)	Checkout repository	2025-09-24T00:07:29.7952245Z ##[endgroup]
+build (runtime)	Checkout repository	2025-09-24T00:07:29.7957691Z [command]/usr/bin/git sparse-checkout disable
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8039099Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8066878Z ##[group]Checking out the ref
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8070785Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/188/merge
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8632040Z Note: switching to 'refs/remotes/pull/188/merge'.
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8632684Z 
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8633417Z You are in 'detached HEAD' state. You can look around, make experimental
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8634650Z changes and commit them, and you can discard any commits you make in this
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8635861Z state without impacting any branches by switching back to a branch.
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8636503Z 
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8636974Z If you want to create a new branch to retain commits you create, you may
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8637986Z do so (now or later) by using -c with the switch command. Example:
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8638576Z 
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8638804Z   git switch -c <new-branch-name>
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8639203Z 
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8639411Z Or undo this operation with:
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8640206Z 
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8640397Z   git switch -
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8640702Z 
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8641234Z Turn off this advice by setting config variable advice.detachedHead to false
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8642032Z 
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8642953Z HEAD is now at 0899a35 Merge 601bf5fcdab5663990bebf00eec17c87315ba32a into fb3d5fc5c74ba3f741b01d0257c44c5fcb3ec000
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8645857Z ##[endgroup]
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8685481Z [command]/usr/bin/git log -1 --format=%H
+build (runtime)	Checkout repository	2025-09-24T00:07:29.8708985Z 0899a359caa1418d8c661ae137ef7a27aba2f449
+build (runtime)	Set up Docker Buildx	﻿2025-09-24T00:07:29.8989450Z ##[group]Run docker/setup-buildx-action@v3
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:29.8989741Z with:
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:29.8989948Z   driver: docker-container
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:29.8990147Z   install: false
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:29.8990316Z   use: true
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:29.8990477Z   keep-state: false
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:29.8990653Z   cache-binary: true
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:29.8990862Z   cleanup: true
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:29.8991022Z env:
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:29.8991184Z   REGISTRY: ghcr.io
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:29.8991453Z   IMAGE_PREFIX: ghcr.io/afewell-hh/demon
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:29.8991726Z ##[endgroup]
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:30.1742383Z ##[group]Docker info
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:30.1764986Z [command]/usr/bin/docker version
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2229378Z Client: Docker Engine - Community
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2229869Z  Version:           28.0.4
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2243392Z  API version:       1.48
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2243833Z  Go version:        go1.23.7
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2244214Z  Git commit:        b8034c0
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2244600Z  Built:             Tue Mar 25 15:07:16 2025
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2245114Z  OS/Arch:           linux/amd64
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2245487Z  Context:           default
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2245722Z 
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2245879Z Server: Docker Engine - Community
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2246340Z  Engine:
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2246625Z   Version:          28.0.4
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2247037Z   API version:      1.48 (minimum version 1.24)
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2247565Z   Go version:       go1.23.7
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2247948Z   Git commit:       6430e49
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2248357Z   Built:            Tue Mar 25 15:07:16 2025
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2248799Z   OS/Arch:          linux/amd64
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2249199Z   Experimental:     false
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2249542Z  containerd:
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2249849Z   Version:          1.7.27
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2250295Z   GitCommit:        05044ec0a9a75232cad458027ca83437aae3f4da
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2250806Z  runc:
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2251072Z   Version:          1.2.5
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2251430Z   GitCommit:        v1.2.5-0-g59923ef
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2251849Z  docker-init:
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2252144Z   Version:          0.19.0
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2252491Z   GitCommit:        de40ad0
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:31.2286015Z [command]/usr/bin/docker info
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5868796Z Client: Docker Engine - Community
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5869519Z  Version:    28.0.4
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5870145Z  Context:    default
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5870620Z  Debug Mode: false
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5870995Z  Plugins:
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5871402Z   buildx: Docker Buildx (Docker Inc.)
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5871933Z     Version:  v0.28.0
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5872480Z     Path:     /usr/libexec/docker/cli-plugins/docker-buildx
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5873351Z   compose: Docker Compose (Docker Inc.)
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5873905Z     Version:  v2.38.2
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5874459Z     Path:     /usr/libexec/docker/cli-plugins/docker-compose
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5874957Z 
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5875103Z Server:
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5875452Z  Containers: 0
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5875846Z   Running: 0
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5876231Z   Paused: 0
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5876584Z   Stopped: 0
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5876948Z  Images: 0
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5877316Z  Server Version: 28.0.4
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5877700Z  Storage Driver: overlay2
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5877994Z   Backing Filesystem: extfs
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5878291Z   Supports d_type: true
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5878561Z   Using metacopy: false
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5879082Z   Native Overlay Diff: false
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5879330Z   userxattr: false
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5879577Z  Logging Driver: json-file
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5879849Z  Cgroup Driver: systemd
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5880067Z  Cgroup Version: 2
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5880295Z  Plugins:
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5880481Z   Volume: local
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5880734Z   Network: bridge host ipvlan macvlan null overlay
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5881189Z   Log: awslogs fluentd gcplogs gelf journald json-file local splunk syslog
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5881589Z  Swarm: inactive
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5882034Z  Runtimes: io.containerd.runc.v2 runc
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5882318Z  Default Runtime: runc
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5882554Z  Init Binary: docker-init
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5882873Z  containerd version: 05044ec0a9a75232cad458027ca83437aae3f4da
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5883548Z  runc version: v1.2.5-0-g59923ef
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5883813Z  init version: de40ad0
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5884048Z  Security Options:
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5884264Z   apparmor
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5884454Z   seccomp
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5884641Z    Profile: builtin
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5884862Z   cgroupns
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5885061Z  Kernel Version: 6.11.0-1018-azure
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5885350Z  Operating System: Ubuntu 24.04.3 LTS
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5885620Z  OSType: linux
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5885892Z  Architecture: x86_64
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5886219Z  CPUs: 4
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5886480Z  Total Memory: 15.62GiB
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5886706Z  Name: runnervmf4ws1
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5886963Z  ID: 80b0c887-f378-498c-94b8-5e260688697c
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5887350Z  Docker Root Dir: /var/lib/docker
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5887617Z  Debug Mode: false
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5887838Z  Username: githubactions
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5888081Z  Experimental: false
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5888314Z  Insecure Registries:
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5891699Z   ::1/128
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5891889Z   127.0.0.0/8
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5892073Z  Live Restore Enabled: false
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5892234Z 
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.5893813Z ##[endgroup]
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.6834572Z ##[group]Buildx version
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.6856124Z [command]/usr/bin/docker buildx version
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7417646Z github.com/docker/buildx v0.28.0 b1281b81bba797b21d9eaf256e6a13eb14419836
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7450827Z ##[endgroup]
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7603589Z ##[group]Inspecting default docker context
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7745506Z [
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7746154Z   {
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7746508Z     "Name": "default",
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7746883Z     "Metadata": {},
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7747216Z     "Endpoints": {
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7747556Z       "docker": {
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7747924Z         "Host": "unix:///var/run/docker.sock",
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7748379Z         "SkipTLSVerify": false
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7748758Z       }
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7749030Z     },
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7749337Z     "TLSMaterial": {},
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7749683Z     "Storage": {
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7750027Z       "MetadataPath": "<IN MEMORY>",
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7750502Z       "TLSPath": "<IN MEMORY>"
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7750886Z     }
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7751155Z   }
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7751430Z ]
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7752186Z ##[endgroup]
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.7752839Z ##[group]Creating a new builder instance
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.9025187Z [command]/usr/bin/docker buildx create --name builder-738a6187-bd5e-4f9a-8b9d-9307071de66a --driver docker-container --buildkitd-flags --allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host --use
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.9889263Z builder-738a6187-bd5e-4f9a-8b9d-9307071de66a
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.9923713Z ##[endgroup]
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.9924391Z ##[group]Booting builder
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:33.9953436Z [command]/usr/bin/docker buildx inspect --bootstrap --builder builder-738a6187-bd5e-4f9a-8b9d-9307071de66a
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:34.0633361Z #1 [internal] booting buildkit
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:34.2137748Z #1 pulling image moby/buildkit:buildx-stable-1
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:38.7357195Z #1 pulling image moby/buildkit:buildx-stable-1 4.7s done
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:38.8864818Z #1 creating container buildx_buildkit_builder-738a6187-bd5e-4f9a-8b9d-9307071de66a0
+build (runtime)	Set up Docker Buildx	2025-09-24T00:07:39.2007274Z ##[error]The operation was canceled.
+build (runtime)	Post Set up Docker Buildx	﻿2025-09-24T00:07:39.2112124Z Post job cleanup.
+build (runtime)	Post Set up Docker Buildx	2025-09-24T00:07:39.5475695Z ##[group]Removing builder
+build (runtime)	Post Set up Docker Buildx	2025-09-24T00:07:39.6563721Z [command]/usr/bin/docker buildx rm builder-738a6187-bd5e-4f9a-8b9d-9307071de66a
+build (runtime)	Post Set up Docker Buildx	2025-09-24T00:07:39.7860115Z builder-738a6187-bd5e-4f9a-8b9d-9307071de66a removed
+build (runtime)	Post Set up Docker Buildx	2025-09-24T00:07:39.7908601Z ##[endgroup]
+build (runtime)	Post Set up Docker Buildx	2025-09-24T00:07:39.7909235Z ##[group]Cleaning up certificates
+build (runtime)	Post Set up Docker Buildx	2025-09-24T00:07:39.7914581Z ##[endgroup]
+build (runtime)	Post Set up Docker Buildx	2025-09-24T00:07:39.7915147Z ##[group]Post cache
+build (runtime)	Post Set up Docker Buildx	2025-09-24T00:07:39.7917582Z State not set
+build (runtime)	Post Set up Docker Buildx	2025-09-24T00:07:39.7918169Z ##[endgroup]
+build (runtime)	Post Checkout repository	﻿2025-09-24T00:07:39.8052064Z Post job cleanup.
+build (runtime)	Post Checkout repository	2025-09-24T00:07:39.9021722Z [command]/usr/bin/git version
+build (runtime)	Post Checkout repository	2025-09-24T00:07:39.9063306Z git version 2.51.0
+build (runtime)	Post Checkout repository	2025-09-24T00:07:39.9104004Z Temporarily overriding HOME='/home/runner/work/_temp/5992ea17-17ad-4ff5-93ef-5a01ed23a936' before making global git config changes
+build (runtime)	Post Checkout repository	2025-09-24T00:07:39.9104979Z Adding repository directory to the temporary git global config as a safe directory
+build (runtime)	Post Checkout repository	2025-09-24T00:07:39.9110359Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Demon/Demon
+build (runtime)	Post Checkout repository	2025-09-24T00:07:39.9144948Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+build (runtime)	Post Checkout repository	2025-09-24T00:07:39.9177675Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+build (runtime)	Post Checkout repository	2025-09-24T00:07:39.9441144Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+build (runtime)	Post Checkout repository	2025-09-24T00:07:39.9461893Z http.https://github.com/.extraheader
+build (runtime)	Post Checkout repository	2025-09-24T00:07:39.9474867Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+build (runtime)	Post Checkout repository	2025-09-24T00:07:39.9504364Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+build (runtime)	Complete job	﻿2025-09-24T00:07:39.9825710Z Cleaning up orphan processes
+build (engine)	Set up job	﻿2025-09-24T00:07:24.7728140Z Current runner version: '2.328.0'
+build (engine)	Set up job	2025-09-24T00:07:24.7752319Z ##[group]Runner Image Provisioner
+build (engine)	Set up job	2025-09-24T00:07:24.7753141Z Hosted Compute Agent
+build (engine)	Set up job	2025-09-24T00:07:24.7753756Z Version: 20250829.383
+build (engine)	Set up job	2025-09-24T00:07:24.7754334Z Commit: 27cb235aab5b0e52e153a26cd86b4742e89dac5d
+build (engine)	Set up job	2025-09-24T00:07:24.7755060Z Build Date: 2025-08-29T13:48:48Z
+build (engine)	Set up job	2025-09-24T00:07:24.7755595Z ##[endgroup]
+build (engine)	Set up job	2025-09-24T00:07:24.7756187Z ##[group]Operating System
+build (engine)	Set up job	2025-09-24T00:07:24.7756710Z Ubuntu
+build (engine)	Set up job	2025-09-24T00:07:24.7757165Z 24.04.3
+build (engine)	Set up job	2025-09-24T00:07:24.7757654Z LTS
+build (engine)	Set up job	2025-09-24T00:07:24.7758138Z ##[endgroup]
+build (engine)	Set up job	2025-09-24T00:07:24.7758583Z ##[group]Runner Image
+build (engine)	Set up job	2025-09-24T00:07:24.7759441Z Image: ubuntu-24.04
+build (engine)	Set up job	2025-09-24T00:07:24.7759975Z Version: 20250907.24.1
+build (engine)	Set up job	2025-09-24T00:07:24.7760938Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20250907.24/images/ubuntu/Ubuntu2404-Readme.md
+build (engine)	Set up job	2025-09-24T00:07:24.7762356Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20250907.24
+build (engine)	Set up job	2025-09-24T00:07:24.7763524Z ##[endgroup]
+build (engine)	Set up job	2025-09-24T00:07:24.7764628Z ##[group]GITHUB_TOKEN Permissions
+build (engine)	Set up job	2025-09-24T00:07:24.7766392Z Contents: read
+build (engine)	Set up job	2025-09-24T00:07:24.7766983Z Metadata: read
+build (engine)	Set up job	2025-09-24T00:07:24.7767532Z Packages: write
+build (engine)	Set up job	2025-09-24T00:07:24.7767985Z ##[endgroup]
+build (engine)	Set up job	2025-09-24T00:07:24.7770495Z Secret source: Actions
+build (engine)	Set up job	2025-09-24T00:07:24.7771195Z Prepare workflow directory
+build (engine)	Set up job	2025-09-24T00:07:24.8207127Z Prepare all required actions
+build (engine)	Set up job	2025-09-24T00:07:24.8244135Z Getting action download info
+build (engine)	Set up job	2025-09-24T00:07:25.3074224Z Download action repository 'actions/checkout@v4' (SHA:08eba0b27e820071cde6df949e0beb9ba4906955)
+build (engine)	Set up job	2025-09-24T00:07:25.4949459Z Download action repository 'docker/setup-buildx-action@v3' (SHA:e468171a9de216ec08956ac3ada2f0791b6bd435)
+build (engine)	Set up job	2025-09-24T00:07:26.2413206Z Download action repository 'docker/login-action@v3' (SHA:184bdaa0721073962dff0199f1fb9940f07167d1)
+build (engine)	Set up job	2025-09-24T00:07:27.0239466Z Download action repository 'docker/metadata-action@v5' (SHA:c1e51972afc2121e065aed6d45c65596fe445f3f)
+build (engine)	Set up job	2025-09-24T00:07:27.7900711Z Download action repository 'docker/build-push-action@v5' (SHA:ca052bb54ab0790a636c9b5f226502c73d547a25)
+build (engine)	Set up job	2025-09-24T00:07:28.5376034Z Complete job name: build (engine)
+build (engine)	Checkout repository	﻿2025-09-24T00:07:28.6009983Z ##[group]Run actions/checkout@v4
+build (engine)	Checkout repository	2025-09-24T00:07:28.6010609Z with:
+build (engine)	Checkout repository	2025-09-24T00:07:28.6010814Z   repository: afewell-hh/Demon
+build (engine)	Checkout repository	2025-09-24T00:07:28.6011204Z   token: ***
+build (engine)	Checkout repository	2025-09-24T00:07:28.6011378Z   ssh-strict: true
+build (engine)	Checkout repository	2025-09-24T00:07:28.6011556Z   ssh-user: git
+build (engine)	Checkout repository	2025-09-24T00:07:28.6011742Z   persist-credentials: true
+build (engine)	Checkout repository	2025-09-24T00:07:28.6011953Z   clean: true
+build (engine)	Checkout repository	2025-09-24T00:07:28.6012142Z   sparse-checkout-cone-mode: true
+build (engine)	Checkout repository	2025-09-24T00:07:28.6012381Z   fetch-depth: 1
+build (engine)	Checkout repository	2025-09-24T00:07:28.6012556Z   fetch-tags: false
+build (engine)	Checkout repository	2025-09-24T00:07:28.6012738Z   show-progress: true
+build (engine)	Checkout repository	2025-09-24T00:07:28.6012925Z   lfs: false
+build (engine)	Checkout repository	2025-09-24T00:07:28.6013088Z   submodules: false
+build (engine)	Checkout repository	2025-09-24T00:07:28.6013275Z   set-safe-directory: true
+build (engine)	Checkout repository	2025-09-24T00:07:28.6013656Z env:
+build (engine)	Checkout repository	2025-09-24T00:07:28.6013832Z   REGISTRY: ghcr.io
+build (engine)	Checkout repository	2025-09-24T00:07:28.6014056Z   IMAGE_PREFIX: ghcr.io/afewell-hh/demon
+build (engine)	Checkout repository	2025-09-24T00:07:28.6014297Z ##[endgroup]
+build (engine)	Checkout repository	2025-09-24T00:07:28.7079840Z Syncing repository: afewell-hh/Demon
+build (engine)	Checkout repository	2025-09-24T00:07:28.7081590Z ##[group]Getting Git version info
+build (engine)	Checkout repository	2025-09-24T00:07:28.7082047Z Working directory is '/home/runner/work/Demon/Demon'
+build (engine)	Checkout repository	2025-09-24T00:07:28.7082549Z [command]/usr/bin/git version
+build (engine)	Checkout repository	2025-09-24T00:07:28.7143059Z git version 2.51.0
+build (engine)	Checkout repository	2025-09-24T00:07:28.7168482Z ##[endgroup]
+build (engine)	Checkout repository	2025-09-24T00:07:28.7182741Z Temporarily overriding HOME='/home/runner/work/_temp/138d7d46-ef5f-4f4b-97e6-fe8028c7200f' before making global git config changes
+build (engine)	Checkout repository	2025-09-24T00:07:28.7183614Z Adding repository directory to the temporary git global config as a safe directory
+build (engine)	Checkout repository	2025-09-24T00:07:28.7187925Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Demon/Demon
+build (engine)	Checkout repository	2025-09-24T00:07:28.7223478Z Deleting the contents of '/home/runner/work/Demon/Demon'
+build (engine)	Checkout repository	2025-09-24T00:07:28.7226868Z ##[group]Initializing the repository
+build (engine)	Checkout repository	2025-09-24T00:07:28.7230950Z [command]/usr/bin/git init /home/runner/work/Demon/Demon
+build (engine)	Checkout repository	2025-09-24T00:07:28.7324991Z hint: Using 'master' as the name for the initial branch. This default branch name
+build (engine)	Checkout repository	2025-09-24T00:07:28.7325759Z hint: is subject to change. To configure the initial branch name to use in all
+build (engine)	Checkout repository	2025-09-24T00:07:28.7326452Z hint: of your new repositories, which will suppress this warning, call:
+build (engine)	Checkout repository	2025-09-24T00:07:28.7326805Z hint:
+build (engine)	Checkout repository	2025-09-24T00:07:28.7327085Z hint: 	git config --global init.defaultBranch <name>
+build (engine)	Checkout repository	2025-09-24T00:07:28.7327371Z hint:
+build (engine)	Checkout repository	2025-09-24T00:07:28.7327640Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+build (engine)	Checkout repository	2025-09-24T00:07:28.7328101Z hint: 'development'. The just-created branch can be renamed via this command:
+build (engine)	Checkout repository	2025-09-24T00:07:28.7328452Z hint:
+build (engine)	Checkout repository	2025-09-24T00:07:28.7328630Z hint: 	git branch -m <name>
+build (engine)	Checkout repository	2025-09-24T00:07:28.7328899Z hint:
+build (engine)	Checkout repository	2025-09-24T00:07:28.7329808Z hint: Disable this message with "git config set advice.defaultBranchName false"
+build (engine)	Checkout repository	2025-09-24T00:07:28.7330563Z Initialized empty Git repository in /home/runner/work/Demon/Demon/.git/
+build (engine)	Checkout repository	2025-09-24T00:07:28.7340692Z [command]/usr/bin/git remote add origin https://github.com/afewell-hh/Demon
+build (engine)	Checkout repository	2025-09-24T00:07:28.7376227Z ##[endgroup]
+build (engine)	Checkout repository	2025-09-24T00:07:28.7376867Z ##[group]Disabling automatic garbage collection
+build (engine)	Checkout repository	2025-09-24T00:07:28.7381542Z [command]/usr/bin/git config --local gc.auto 0
+build (engine)	Checkout repository	2025-09-24T00:07:28.7409233Z ##[endgroup]
+build (engine)	Checkout repository	2025-09-24T00:07:28.7409887Z ##[group]Setting up auth
+build (engine)	Checkout repository	2025-09-24T00:07:28.7416909Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+build (engine)	Checkout repository	2025-09-24T00:07:28.7446714Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+build (engine)	Checkout repository	2025-09-24T00:07:28.7768807Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+build (engine)	Checkout repository	2025-09-24T00:07:28.7799653Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+build (engine)	Checkout repository	2025-09-24T00:07:28.8017389Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+build (engine)	Checkout repository	2025-09-24T00:07:28.8052020Z ##[endgroup]
+build (engine)	Checkout repository	2025-09-24T00:07:28.8052467Z ##[group]Fetching the repository
+build (engine)	Checkout repository	2025-09-24T00:07:28.8060219Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +0899a359caa1418d8c661ae137ef7a27aba2f449:refs/remotes/pull/188/merge
+build (engine)	Checkout repository	2025-09-24T00:07:29.4016590Z From https://github.com/afewell-hh/Demon
+build (engine)	Checkout repository	2025-09-24T00:07:29.4017395Z  * [new ref]         0899a359caa1418d8c661ae137ef7a27aba2f449 -> pull/188/merge
+build (engine)	Checkout repository	2025-09-24T00:07:29.4093648Z ##[endgroup]
+build (engine)	Checkout repository	2025-09-24T00:07:29.4094229Z ##[group]Determining the checkout info
+build (engine)	Checkout repository	2025-09-24T00:07:29.4095933Z ##[endgroup]
+build (engine)	Checkout repository	2025-09-24T00:07:29.4101107Z [command]/usr/bin/git sparse-checkout disable
+build (engine)	Checkout repository	2025-09-24T00:07:29.4139388Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+build (engine)	Checkout repository	2025-09-24T00:07:29.4165483Z ##[group]Checking out the ref
+build (engine)	Checkout repository	2025-09-24T00:07:29.4169308Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/188/merge
+build (engine)	Checkout repository	2025-09-24T00:07:29.4686024Z Note: switching to 'refs/remotes/pull/188/merge'.
+build (engine)	Checkout repository	2025-09-24T00:07:29.4686599Z 
+build (engine)	Checkout repository	2025-09-24T00:07:29.4686902Z You are in 'detached HEAD' state. You can look around, make experimental
+build (engine)	Checkout repository	2025-09-24T00:07:29.4687634Z changes and commit them, and you can discard any commits you make in this
+build (engine)	Checkout repository	2025-09-24T00:07:29.4688352Z state without impacting any branches by switching back to a branch.
+build (engine)	Checkout repository	2025-09-24T00:07:29.4688788Z 
+build (engine)	Checkout repository	2025-09-24T00:07:29.4689272Z If you want to create a new branch to retain commits you create, you may
+build (engine)	Checkout repository	2025-09-24T00:07:29.4689955Z do so (now or later) by using -c with the switch command. Example:
+build (engine)	Checkout repository	2025-09-24T00:07:29.4690351Z 
+build (engine)	Checkout repository	2025-09-24T00:07:29.4690503Z   git switch -c <new-branch-name>
+build (engine)	Checkout repository	2025-09-24T00:07:29.4690767Z 
+build (engine)	Checkout repository	2025-09-24T00:07:29.4690914Z Or undo this operation with:
+build (engine)	Checkout repository	2025-09-24T00:07:29.4691473Z 
+build (engine)	Checkout repository	2025-09-24T00:07:29.4691598Z   git switch -
+build (engine)	Checkout repository	2025-09-24T00:07:29.4691823Z 
+build (engine)	Checkout repository	2025-09-24T00:07:29.4692140Z Turn off this advice by setting config variable advice.detachedHead to false
+build (engine)	Checkout repository	2025-09-24T00:07:29.4692601Z 
+build (engine)	Checkout repository	2025-09-24T00:07:29.4693117Z HEAD is now at 0899a35 Merge 601bf5fcdab5663990bebf00eec17c87315ba32a into fb3d5fc5c74ba3f741b01d0257c44c5fcb3ec000
+build (engine)	Checkout repository	2025-09-24T00:07:29.4697733Z ##[endgroup]
+build (engine)	Checkout repository	2025-09-24T00:07:29.4735121Z [command]/usr/bin/git log -1 --format=%H
+build (engine)	Checkout repository	2025-09-24T00:07:29.4756722Z 0899a359caa1418d8c661ae137ef7a27aba2f449
+build (engine)	Set up Docker Buildx	﻿2025-09-24T00:07:29.5016189Z ##[group]Run docker/setup-buildx-action@v3
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:29.5016519Z with:
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:29.5016696Z   driver: docker-container
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:29.5016914Z   install: false
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:29.5017086Z   use: true
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:29.5017256Z   keep-state: false
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:29.5017438Z   cache-binary: true
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:29.5017622Z   cleanup: true
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:29.5017780Z env:
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:29.5017946Z   REGISTRY: ghcr.io
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:29.5018148Z   IMAGE_PREFIX: ghcr.io/afewell-hh/demon
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:29.5018380Z ##[endgroup]
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:29.7859668Z ##[group]Docker info
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:29.7886971Z [command]/usr/bin/docker version
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9803187Z Client: Docker Engine - Community
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9805943Z  Version:           28.0.4
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9806551Z  API version:       1.48
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9807200Z  Go version:        go1.23.7
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9807554Z  Git commit:        b8034c0
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9807936Z  Built:             Tue Mar 25 15:07:16 2025
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9808384Z  OS/Arch:           linux/amd64
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9808616Z  Context:           default
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9808755Z 
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9808860Z Server: Docker Engine - Community
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9809349Z  Engine:
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9809524Z   Version:          28.0.4
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9809766Z   API version:      1.48 (minimum version 1.24)
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9810033Z   Go version:       go1.23.7
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9810278Z   Git commit:       6430e49
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9810556Z   Built:            Tue Mar 25 15:07:16 2025
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9810797Z   OS/Arch:          linux/amd64
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9811006Z   Experimental:     false
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9811204Z  containerd:
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9811369Z   Version:          1.7.27
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9811616Z   GitCommit:        05044ec0a9a75232cad458027ca83437aae3f4da
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9811891Z  runc:
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9812052Z   Version:          1.2.5
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9812265Z   GitCommit:        v1.2.5-0-g59923ef
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9812496Z  docker-init:
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9812677Z   Version:          0.19.0
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9812880Z   GitCommit:        de40ad0
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:30.9861748Z [command]/usr/bin/docker info
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3825582Z Client: Docker Engine - Community
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3826499Z  Version:    28.0.4
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3826885Z  Context:    default
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3827266Z  Debug Mode: false
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3827567Z  Plugins:
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3827872Z   buildx: Docker Buildx (Docker Inc.)
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3828260Z     Version:  v0.28.0
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3828674Z     Path:     /usr/libexec/docker/cli-plugins/docker-buildx
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3829390Z   compose: Docker Compose (Docker Inc.)
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3829802Z     Version:  v2.38.2
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3830207Z     Path:     /usr/libexec/docker/cli-plugins/docker-compose
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3830575Z 
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3830686Z Server:
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3830944Z  Containers: 0
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3831230Z   Running: 0
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3831512Z   Paused: 0
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3831782Z   Stopped: 0
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3832058Z  Images: 0
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3832333Z  Server Version: 28.0.4
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3832712Z  Storage Driver: overlay2
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3833062Z   Backing Filesystem: extfs
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3833412Z   Supports d_type: true
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3833744Z   Using metacopy: false
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3834424Z   Native Overlay Diff: false
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3834784Z   userxattr: false
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3835098Z  Logging Driver: json-file
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3835442Z  Cgroup Driver: systemd
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3835770Z  Cgroup Version: 2
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3836076Z  Plugins:
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3836333Z   Volume: local
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3836687Z   Network: bridge host ipvlan macvlan null overlay
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3837317Z   Log: awslogs fluentd gcplogs gelf journald json-file local splunk syslog
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3837885Z  Swarm: inactive
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3838508Z  Runtimes: runc io.containerd.runc.v2
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3838908Z  Default Runtime: runc
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3839393Z  Init Binary: docker-init
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3839839Z  containerd version: 05044ec0a9a75232cad458027ca83437aae3f4da
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3840357Z  runc version: v1.2.5-0-g59923ef
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3840717Z  init version: de40ad0
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3841032Z  Security Options:
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3841301Z   apparmor
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3841539Z   seccomp
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3841804Z    Profile: builtin
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3842088Z   cgroupns
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3842377Z  Kernel Version: 6.11.0-1018-azure
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3842786Z  Operating System: Ubuntu 24.04.3 LTS
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3843185Z  OSType: linux
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3843495Z  Architecture: x86_64
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3843818Z  CPUs: 4
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3844103Z  Total Memory: 15.62GiB
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3844451Z  Name: runnervmf4ws1
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3844813Z  ID: 80b0c887-f378-498c-94b8-5e260688697c
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3845301Z  Docker Root Dir: /var/lib/docker
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3845705Z  Debug Mode: false
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3846005Z  Username: githubactions
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3846346Z  Experimental: false
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3846631Z  Insecure Registries:
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3851232Z   ::1/128
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3851532Z   127.0.0.0/8
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3851845Z  Live Restore Enabled: false
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3852118Z 
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.3852695Z ##[endgroup]
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.4753758Z ##[group]Buildx version
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.4775240Z [command]/usr/bin/docker buildx version
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5359883Z github.com/docker/buildx v0.28.0 b1281b81bba797b21d9eaf256e6a13eb14419836
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5392120Z ##[endgroup]
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5542933Z ##[group]Inspecting default docker context
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5724715Z [
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5725201Z   {
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5725466Z     "Name": "default",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5725835Z     "Metadata": {},
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5726147Z     "Endpoints": {
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5726491Z       "docker": {
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5726841Z         "Host": "unix:///var/run/docker.sock",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5727323Z         "SkipTLSVerify": false
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5727706Z       }
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5727966Z     },
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5728262Z     "TLSMaterial": {},
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5728595Z     "Storage": {
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5728941Z       "MetadataPath": "<IN MEMORY>",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5729574Z       "TLSPath": "<IN MEMORY>"
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5729927Z     }
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5730339Z   }
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5730617Z ]
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5731372Z ##[endgroup]
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.5732003Z ##[group]Creating a new builder instance
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.7092346Z [command]/usr/bin/docker buildx create --name builder-2bf3e026-7bb8-4147-b617-dcbe562b6e86 --driver docker-container --buildkitd-flags --allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host --use
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.7967493Z builder-2bf3e026-7bb8-4147-b617-dcbe562b6e86
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.8002580Z ##[endgroup]
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.8003210Z ##[group]Booting builder
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.8039923Z [command]/usr/bin/docker buildx inspect --bootstrap --builder builder-2bf3e026-7bb8-4147-b617-dcbe562b6e86
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:33.8629327Z #1 [internal] booting buildkit
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:34.0135072Z #1 pulling image moby/buildkit:buildx-stable-1
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:37.9513591Z #1 pulling image moby/buildkit:buildx-stable-1 4.1s done
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.1024302Z #1 creating container buildx_buildkit_builder-2bf3e026-7bb8-4147-b617-dcbe562b6e860
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8495051Z #1 creating container buildx_buildkit_builder-2bf3e026-7bb8-4147-b617-dcbe562b6e860 0.9s done
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8550492Z #1 DONE 5.0s
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8865781Z Name:          builder-2bf3e026-7bb8-4147-b617-dcbe562b6e86
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8866369Z Driver:        docker-container
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8866754Z Last Activity: 2025-09-24 00:07:33 +0000 UTC
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8867054Z 
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8867168Z Nodes:
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8868583Z Name:                  builder-2bf3e026-7bb8-4147-b617-dcbe562b6e860
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8869421Z Endpoint:              unix:///var/run/docker.sock
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8869863Z Status:                running
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8870648Z BuildKit daemon flags: --allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8871478Z BuildKit version:      v0.24.0
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8871991Z Platforms:             linux/amd64, linux/amd64/v2, linux/amd64/v3, linux/386
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8872505Z Labels:
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8872871Z  org.mobyproject.buildkit.worker.executor:         oci
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8873495Z  org.mobyproject.buildkit.worker.hostname:         0bc0c30fb13d
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8874125Z  org.mobyproject.buildkit.worker.network:          host
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8874742Z  org.mobyproject.buildkit.worker.oci.process-mode: sandbox
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8875383Z  org.mobyproject.buildkit.worker.selinux.enabled:  false
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8876030Z  org.mobyproject.buildkit.worker.snapshotter:      overlayfs
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8876535Z GC Policy rule#0:
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8876895Z  All:            false
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8880639Z  Filters:        type==source.local,type==exec.cachemount,type==source.git.checkout
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8885691Z  Keep Duration:  48h0m0s
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8886046Z  Max Used Space: 488.3MiB
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8886389Z GC Policy rule#1:
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8886667Z  All:            false
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8886961Z  Keep Duration:  1440h0m0s
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8887266Z  Reserved Space: 7.451GiB
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8887576Z  Max Used Space: 54.02GiB
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8887886Z  Min Free Space: 13.97GiB
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8888178Z GC Policy rule#2:
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8888446Z  All:            false
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8888738Z  Reserved Space: 7.451GiB
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8889178Z  Max Used Space: 54.02GiB
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8889495Z  Min Free Space: 13.97GiB
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8889805Z GC Policy rule#3:
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8890096Z  All:            true
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8890396Z  Reserved Space: 7.451GiB
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8890715Z  Max Used Space: 54.02GiB
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8891035Z  Min Free Space: 13.97GiB
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.8922350Z ##[endgroup]
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9842952Z ##[group]Inspect builder
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9845653Z {
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9845950Z   "nodes": [
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9846244Z     {
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9846611Z       "name": "builder-2bf3e026-7bb8-4147-b617-dcbe562b6e860",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9847128Z       "endpoint": "unix:///var/run/docker.sock",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9847554Z       "status": "running",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9848319Z       "buildkitd-flags": "--allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9849530Z       "buildkit": "v0.24.0",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9850016Z       "platforms": "linux/amd64,linux/amd64/v2,linux/amd64/v3,linux/386",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9850525Z       "features": {
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9850999Z         "Automatically load images to the Docker Engine image store": true,
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9851543Z         "Cache export": true,
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9851884Z         "Direct push": true,
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9852222Z         "Docker exporter": true,
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9852588Z         "Multi-platform build": true,
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9853026Z         "OCI exporter": true
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9853658Z       },
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9853909Z       "labels": {
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9854279Z         "org.mobyproject.buildkit.worker.executor": "oci",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9854888Z         "org.mobyproject.buildkit.worker.hostname": "0bc0c30fb13d",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9855375Z         "org.mobyproject.buildkit.worker.network": "host",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9855780Z         "org.mobyproject.buildkit.worker.oci.process-mode": "sandbox",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9856191Z         "org.mobyproject.buildkit.worker.selinux.enabled": "false",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9856577Z         "org.mobyproject.buildkit.worker.snapshotter": "overlayfs"
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9857038Z       },
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9857195Z       "gcPolicy": [
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9857366Z         {
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9857516Z           "all": false,
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9857703Z           "filter": [
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9857886Z             "type==source.local",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9858115Z             "type==exec.cachemount",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9858351Z             "type==source.git.checkout"
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9858577Z           ],
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9858745Z           "keepDuration": "48h0m0s",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9858965Z           "maxUsedSpace": "488.3MiB"
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9859474Z         },
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9859624Z         {
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9859774Z           "all": false,
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9859961Z           "keepDuration": "1440h0m0s",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9860191Z           "reservedSpace": "7.451GiB",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9860406Z           "maxUsedSpace": "54.02GiB",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9860627Z           "minFreeSpace": "13.97GiB"
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9860839Z         },
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9860987Z         {
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9861131Z           "all": false,
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9861323Z           "reservedSpace": "7.451GiB",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9861553Z           "maxUsedSpace": "54.02GiB",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9861765Z           "minFreeSpace": "13.97GiB"
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9861965Z         },
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9862099Z         {
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9862250Z           "all": true,
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9862429Z           "reservedSpace": "7.451GiB",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9862648Z           "maxUsedSpace": "54.02GiB",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9862862Z           "minFreeSpace": "13.97GiB"
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9863059Z         }
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9863193Z       ]
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9863334Z     }
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9863466Z   ],
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9863670Z   "name": "builder-2bf3e026-7bb8-4147-b617-dcbe562b6e86",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9863958Z   "driver": "docker-container",
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9864180Z   "lastActivity": "2025-09-24T00:07:33.000Z"
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9864405Z }
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9864931Z ##[endgroup]
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9865257Z ##[group]BuildKit version
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9865505Z builder-2bf3e026-7bb8-4147-b617-dcbe562b6e860: v0.24.0
+build (engine)	Set up Docker Buildx	2025-09-24T00:07:38.9865890Z ##[endgroup]
+build (engine)	Extract metadata	﻿2025-09-24T00:07:39.0070514Z ##[group]Run docker/metadata-action@v5
+build (engine)	Extract metadata	2025-09-24T00:07:39.0070797Z with:
+build (engine)	Extract metadata	2025-09-24T00:07:39.0070988Z   images: ghcr.io/afewell-hh/demon-engine
+build (engine)	Extract metadata	2025-09-24T00:07:39.0071506Z   tags: type=ref,event=branch
+build (engine)	Extract metadata	type=ref,event=pr
+build (engine)	Extract metadata	type=sha,prefix={{branch}}-
+build (engine)	Extract metadata	type=raw,value=latest,enable={{is_default_branch}}
+build (engine)	Extract metadata	
+build (engine)	Extract metadata	2025-09-24T00:07:39.0071984Z   context: workflow
+build (engine)	Extract metadata	2025-09-24T00:07:39.0072310Z   github-token: ***
+build (engine)	Extract metadata	2025-09-24T00:07:39.0072496Z env:
+build (engine)	Extract metadata	2025-09-24T00:07:39.0072653Z   REGISTRY: ghcr.io
+build (engine)	Extract metadata	2025-09-24T00:07:39.0072848Z   IMAGE_PREFIX: ghcr.io/afewell-hh/demon
+build (engine)	Extract metadata	2025-09-24T00:07:39.0073079Z ##[endgroup]
+build (engine)	Extract metadata	2025-09-24T00:07:39.2428829Z ##[error]The operation was canceled.
+build (engine)	Post Set up Docker Buildx	﻿2025-09-24T00:07:39.2507526Z Post job cleanup.
+build (engine)	Post Set up Docker Buildx	2025-09-24T00:07:39.5441340Z ##[group]Removing builder
+build (engine)	Post Set up Docker Buildx	2025-09-24T00:07:39.6544047Z [command]/usr/bin/docker buildx rm builder-2bf3e026-7bb8-4147-b617-dcbe562b6e86
+build (engine)	Post Set up Docker Buildx	2025-09-24T00:07:39.7767933Z builder-2bf3e026-7bb8-4147-b617-dcbe562b6e86 removed
+build (engine)	Post Set up Docker Buildx	2025-09-24T00:07:39.7800934Z ##[endgroup]
+build (engine)	Post Set up Docker Buildx	2025-09-24T00:07:39.7802955Z ##[group]Cleaning up certificates
+build (engine)	Post Set up Docker Buildx	2025-09-24T00:07:39.7809313Z ##[endgroup]
+build (engine)	Post Set up Docker Buildx	2025-09-24T00:07:39.7810214Z ##[group]Post cache
+build (engine)	Post Set up Docker Buildx	2025-09-24T00:07:39.7812256Z State not set
+build (engine)	Post Set up Docker Buildx	2025-09-24T00:07:39.7813007Z ##[endgroup]
+build (engine)	Post Checkout repository	﻿2025-09-24T00:07:39.7944801Z Post job cleanup.
+build (engine)	Post Checkout repository	2025-09-24T00:07:39.8905972Z [command]/usr/bin/git version
+build (engine)	Post Checkout repository	2025-09-24T00:07:39.8947743Z git version 2.51.0
+build (engine)	Post Checkout repository	2025-09-24T00:07:39.9007830Z Temporarily overriding HOME='/home/runner/work/_temp/22fbbef1-e445-40b9-9fe3-a1e6708bc324' before making global git config changes
+build (engine)	Post Checkout repository	2025-09-24T00:07:39.9009287Z Adding repository directory to the temporary git global config as a safe directory
+build (engine)	Post Checkout repository	2025-09-24T00:07:39.9015165Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Demon/Demon
+build (engine)	Post Checkout repository	2025-09-24T00:07:39.9056340Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+build (engine)	Post Checkout repository	2025-09-24T00:07:39.9093099Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+build (engine)	Post Checkout repository	2025-09-24T00:07:39.9375432Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+build (engine)	Post Checkout repository	2025-09-24T00:07:39.9395768Z http.https://github.com/.extraheader
+build (engine)	Post Checkout repository	2025-09-24T00:07:39.9409366Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+build (engine)	Post Checkout repository	2025-09-24T00:07:39.9440417Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+build (engine)	Complete job	﻿2025-09-24T00:07:39.9760486Z Cleaning up orphan processes
+build (operate-ui)	Set up job	﻿2025-09-24T00:07:24.5453208Z Current runner version: '2.328.0'
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5478439Z ##[group]Runner Image Provisioner
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5479746Z Hosted Compute Agent
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5480334Z Version: 20250829.383
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5480946Z Commit: 27cb235aab5b0e52e153a26cd86b4742e89dac5d
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5481622Z Build Date: 2025-08-29T13:48:48Z
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5482300Z ##[endgroup]
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5482837Z ##[group]Operating System
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5483380Z Ubuntu
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5483934Z 24.04.3
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5484365Z LTS
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5484847Z ##[endgroup]
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5485375Z ##[group]Runner Image
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5485931Z Image: ubuntu-24.04
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5486407Z Version: 20250907.24.1
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5487471Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20250907.24/images/ubuntu/Ubuntu2404-Readme.md
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5489013Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20250907.24
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5490278Z ##[endgroup]
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5491369Z ##[group]GITHUB_TOKEN Permissions
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5493235Z Contents: read
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5493801Z Metadata: read
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5494329Z Packages: write
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5494916Z ##[endgroup]
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5497870Z Secret source: Actions
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5499179Z Prepare workflow directory
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5885831Z Prepare all required actions
+build (operate-ui)	Set up job	2025-09-24T00:07:24.5923210Z Getting action download info
+build (operate-ui)	Set up job	2025-09-24T00:07:24.9334117Z Download action repository 'actions/checkout@v4' (SHA:08eba0b27e820071cde6df949e0beb9ba4906955)
+build (operate-ui)	Set up job	2025-09-24T00:07:25.2833762Z Download action repository 'docker/setup-buildx-action@v3' (SHA:e468171a9de216ec08956ac3ada2f0791b6bd435)
+build (operate-ui)	Set up job	2025-09-24T00:07:25.6113395Z Download action repository 'docker/login-action@v3' (SHA:184bdaa0721073962dff0199f1fb9940f07167d1)
+build (operate-ui)	Set up job	2025-09-24T00:07:25.9810257Z Download action repository 'docker/metadata-action@v5' (SHA:c1e51972afc2121e065aed6d45c65596fe445f3f)
+build (operate-ui)	Set up job	2025-09-24T00:07:26.3470652Z Download action repository 'docker/build-push-action@v5' (SHA:ca052bb54ab0790a636c9b5f226502c73d547a25)
+build (operate-ui)	Set up job	2025-09-24T00:07:26.7377394Z Complete job name: build (operate-ui)
+build (operate-ui)	Checkout repository	﻿2025-09-24T00:07:26.8167863Z ##[group]Run actions/checkout@v4
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.8169337Z with:
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.8170081Z   repository: afewell-hh/Demon
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.8171239Z   token: ***
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.8171976Z   ssh-strict: true
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.8172751Z   ssh-user: git
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.8173572Z   persist-credentials: true
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.8174425Z   clean: true
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.8175210Z   sparse-checkout-cone-mode: true
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.8176149Z   fetch-depth: 1
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.8176917Z   fetch-tags: false
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.8177685Z   show-progress: true
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.8178664Z   lfs: false
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.8179376Z   submodules: false
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.8180184Z   set-safe-directory: true
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.8181269Z env:
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.8181950Z   REGISTRY: ghcr.io
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.8182805Z   IMAGE_PREFIX: ghcr.io/afewell-hh/demon
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.8183788Z ##[endgroup]
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.9285510Z Syncing repository: afewell-hh/Demon
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.9287935Z ##[group]Getting Git version info
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.9289480Z Working directory is '/home/runner/work/Demon/Demon'
+build (operate-ui)	Checkout repository	2025-09-24T00:07:26.9291212Z [command]/usr/bin/git version
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0124320Z git version 2.51.0
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0151369Z ##[endgroup]
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0166882Z Temporarily overriding HOME='/home/runner/work/_temp/d858607d-00f2-456e-9236-0d8e190d39d0' before making global git config changes
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0170137Z Adding repository directory to the temporary git global config as a safe directory
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0173462Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Demon/Demon
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0245341Z Deleting the contents of '/home/runner/work/Demon/Demon'
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0249186Z ##[group]Initializing the repository
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0253079Z [command]/usr/bin/git init /home/runner/work/Demon/Demon
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0659285Z hint: Using 'master' as the name for the initial branch. This default branch name
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0661752Z hint: is subject to change. To configure the initial branch name to use in all
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0663680Z hint: of your new repositories, which will suppress this warning, call:
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0665043Z hint:
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0666004Z hint: 	git config --global init.defaultBranch <name>
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0667166Z hint:
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0668560Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0670637Z hint: 'development'. The just-created branch can be renamed via this command:
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0672066Z hint:
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0672819Z hint: 	git branch -m <name>
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0673664Z hint:
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0674804Z hint: Disable this message with "git config set advice.defaultBranchName false"
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0700165Z Initialized empty Git repository in /home/runner/work/Demon/Demon/.git/
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0712559Z [command]/usr/bin/git remote add origin https://github.com/afewell-hh/Demon
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0870605Z ##[endgroup]
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0872082Z ##[group]Disabling automatic garbage collection
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0874453Z [command]/usr/bin/git config --local gc.auto 0
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0905363Z ##[endgroup]
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0906691Z ##[group]Setting up auth
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0912558Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.0945604Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.2364659Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.2396863Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.2627793Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.2665264Z ##[endgroup]
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.2667550Z ##[group]Fetching the repository
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.2677485Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +0899a359caa1418d8c661ae137ef7a27aba2f449:refs/remotes/pull/188/merge
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.7299058Z From https://github.com/afewell-hh/Demon
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.7299720Z  * [new ref]         0899a359caa1418d8c661ae137ef7a27aba2f449 -> pull/188/merge
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.7366054Z ##[endgroup]
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.7366744Z ##[group]Determining the checkout info
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.7369100Z ##[endgroup]
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.7374425Z [command]/usr/bin/git sparse-checkout disable
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.7451576Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.7478697Z ##[group]Checking out the ref
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.7482798Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/188/merge
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.8029386Z Note: switching to 'refs/remotes/pull/188/merge'.
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.8029875Z 
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.8030188Z You are in 'detached HEAD' state. You can look around, make experimental
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.8030925Z changes and commit them, and you can discard any commits you make in this
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.8031651Z state without impacting any branches by switching back to a branch.
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.8032084Z 
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.8032398Z If you want to create a new branch to retain commits you create, you may
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.8033132Z do so (now or later) by using -c with the switch command. Example:
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.8033643Z 
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.8033822Z   git switch -c <new-branch-name>
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.8034078Z 
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.8034202Z Or undo this operation with:
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.8034648Z 
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.8034733Z   git switch -
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.8034854Z 
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.8035058Z Turn off this advice by setting config variable advice.detachedHead to false
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.8035360Z 
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.8035682Z HEAD is now at 0899a35 Merge 601bf5fcdab5663990bebf00eec17c87315ba32a into fb3d5fc5c74ba3f741b01d0257c44c5fcb3ec000
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.8039810Z ##[endgroup]
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.8078621Z [command]/usr/bin/git log -1 --format=%H
+build (operate-ui)	Checkout repository	2025-09-24T00:07:27.8100635Z 0899a359caa1418d8c661ae137ef7a27aba2f449
+build (operate-ui)	Set up Docker Buildx	﻿2025-09-24T00:07:27.8368920Z ##[group]Run docker/setup-buildx-action@v3
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:27.8369268Z with:
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:27.8369447Z   driver: docker-container
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:27.8369657Z   install: false
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:27.8369824Z   use: true
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:27.8369987Z   keep-state: false
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:27.8370164Z   cache-binary: true
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:27.8370348Z   cleanup: true
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:27.8370504Z env:
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:27.8370663Z   REGISTRY: ghcr.io
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:27.8370869Z   IMAGE_PREFIX: ghcr.io/afewell-hh/demon
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:27.8371107Z ##[endgroup]
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:28.1297457Z ##[group]Docker info
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:28.1320199Z [command]/usr/bin/docker version
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1834887Z Client: Docker Engine - Community
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1835533Z  Version:           28.0.4
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1835910Z  API version:       1.48
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1836264Z  Go version:        go1.23.7
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1836640Z  Git commit:        b8034c0
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1837034Z  Built:             Tue Mar 25 15:07:16 2025
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1837524Z  OS/Arch:           linux/amd64
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1837911Z  Context:           default
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1838339Z 
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1838504Z Server: Docker Engine - Community
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1838897Z  Engine:
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1839069Z   Version:          28.0.4
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1839308Z   API version:      1.48 (minimum version 1.24)
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1839575Z   Go version:       go1.23.7
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1839802Z   Git commit:       6430e49
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1840055Z   Built:            Tue Mar 25 15:07:16 2025
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1840299Z   OS/Arch:          linux/amd64
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1840512Z   Experimental:     false
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1840711Z  containerd:
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1840885Z   Version:          1.7.27
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1841132Z   GitCommit:        05044ec0a9a75232cad458027ca83437aae3f4da
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1841414Z  runc:
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1841579Z   Version:          1.2.5
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1841788Z   GitCommit:        v1.2.5-0-g59923ef
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1842019Z  docker-init:
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1842329Z   Version:          0.19.0
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1843746Z   GitCommit:        de40ad0
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:29.1887410Z [command]/usr/bin/docker info
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2649296Z Client: Docker Engine - Community
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2649968Z  Version:    28.0.4
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2650321Z  Context:    default
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2650731Z  Debug Mode: false
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2651029Z  Plugins:
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2651334Z   buildx: Docker Buildx (Docker Inc.)
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2651596Z     Version:  v0.28.0
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2651869Z     Path:     /usr/libexec/docker/cli-plugins/docker-buildx
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2652200Z   compose: Docker Compose (Docker Inc.)
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2652464Z     Version:  v2.38.2
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2652725Z     Path:     /usr/libexec/docker/cli-plugins/docker-compose
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2652964Z 
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2653040Z Server:
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2653221Z  Containers: 0
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2653420Z   Running: 0
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2653609Z   Paused: 0
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2653787Z   Stopped: 0
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2653970Z  Images: 0
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2654147Z  Server Version: 28.0.4
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2654373Z  Storage Driver: overlay2
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2654600Z   Backing Filesystem: extfs
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2654838Z   Supports d_type: true
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2655056Z   Using metacopy: false
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2655571Z   Native Overlay Diff: false
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2655805Z   userxattr: false
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2656006Z  Logging Driver: json-file
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2656236Z  Cgroup Driver: systemd
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2656443Z  Cgroup Version: 2
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2656647Z  Plugins:
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2656820Z   Volume: local
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2657054Z   Network: bridge host ipvlan macvlan null overlay
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2657459Z   Log: awslogs fluentd gcplogs gelf journald json-file local splunk syslog
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2657832Z  Swarm: inactive
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2658489Z  Runtimes: io.containerd.runc.v2 runc
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2658772Z  Default Runtime: runc
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2659085Z  Init Binary: docker-init
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2659379Z  containerd version: 05044ec0a9a75232cad458027ca83437aae3f4da
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2659744Z  runc version: v1.2.5-0-g59923ef
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2659989Z  init version: de40ad0
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2660191Z  Security Options:
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2660394Z   apparmor
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2660565Z   seccomp
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2660758Z    Profile: builtin
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2660935Z   cgroupns
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2661119Z  Kernel Version: 6.11.0-1018-azure
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2661361Z  Operating System: Ubuntu 24.04.3 LTS
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2661600Z  OSType: linux
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2661780Z  Architecture: x86_64
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2661969Z  CPUs: 4
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2662137Z  Total Memory: 15.62GiB
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2662337Z  Name: runnervmf4ws1
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2662622Z  ID: 80b0c887-f378-498c-94b8-5e260688697c
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2663058Z  Docker Root Dir: /var/lib/docker
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2663458Z  Debug Mode: false
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2663801Z  Username: githubactions
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2664159Z  Experimental: false
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2664490Z  Insecure Registries:
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2669164Z   ::1/128
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2669487Z   127.0.0.0/8
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2669817Z  Live Restore Enabled: false
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2670094Z 
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.2670854Z ##[endgroup]
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.3735361Z ##[group]Buildx version
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.3762441Z [command]/usr/bin/docker buildx version
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4531157Z github.com/docker/buildx v0.28.0 b1281b81bba797b21d9eaf256e6a13eb14419836
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4565213Z ##[endgroup]
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4720867Z ##[group]Inspecting default docker context
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4864233Z [
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4864492Z   {
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4864657Z     "Name": "default",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4864886Z     "Metadata": {},
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4865074Z     "Endpoints": {
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4865311Z       "docker": {
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4865515Z         "Host": "unix:///var/run/docker.sock",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4865786Z         "SkipTLSVerify": false
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4866008Z       }
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4866162Z     },
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4866327Z     "TLSMaterial": {},
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4866519Z     "Storage": {
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4866713Z       "MetadataPath": "<IN MEMORY>",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4867056Z       "TLSPath": "<IN MEMORY>"
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4867319Z     }
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4867468Z   }
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4867614Z ]
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4868130Z ##[endgroup]
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.4868783Z ##[group]Creating a new builder instance
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.6153591Z [command]/usr/bin/docker buildx create --name builder-22c91171-7d9e-48b6-b0aa-34532e348b74 --driver docker-container --buildkitd-flags --allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host --use
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.6911013Z builder-22c91171-7d9e-48b6-b0aa-34532e348b74
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.6946705Z ##[endgroup]
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.6948379Z ##[group]Booting builder
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.6981568Z [command]/usr/bin/docker buildx inspect --bootstrap --builder builder-22c91171-7d9e-48b6-b0aa-34532e348b74
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.7671140Z #1 [internal] booting buildkit
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:31.9175756Z #1 pulling image moby/buildkit:buildx-stable-1
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:34.0554449Z #1 pulling image moby/buildkit:buildx-stable-1 2.3s done
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:34.2058425Z #1 creating container buildx_buildkit_builder-22c91171-7d9e-48b6-b0aa-34532e348b740
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0204495Z #1 creating container buildx_buildkit_builder-22c91171-7d9e-48b6-b0aa-34532e348b740 1.0s done
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0222205Z #1 DONE 3.3s
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0622383Z Name:          builder-22c91171-7d9e-48b6-b0aa-34532e348b74
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0624918Z Driver:        docker-container
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0625331Z Last Activity: 2025-09-24 00:07:31 +0000 UTC
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0625634Z 
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0625740Z Nodes:
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0626539Z Name:                  builder-22c91171-7d9e-48b6-b0aa-34532e348b740
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0627065Z Endpoint:              unix:///var/run/docker.sock
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0627505Z Status:                running
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0631620Z BuildKit daemon flags: --allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0632451Z BuildKit version:      v0.24.0
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0632952Z Platforms:             linux/amd64, linux/amd64/v2, linux/amd64/v3, linux/386
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0633456Z Labels:
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0633821Z  org.mobyproject.buildkit.worker.executor:         oci
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0634427Z  org.mobyproject.buildkit.worker.hostname:         aa9e31219371
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0635050Z  org.mobyproject.buildkit.worker.network:          host
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0635655Z  org.mobyproject.buildkit.worker.oci.process-mode: sandbox
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0636289Z  org.mobyproject.buildkit.worker.selinux.enabled:  false
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0636911Z  org.mobyproject.buildkit.worker.snapshotter:      overlayfs
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0637415Z GC Policy rule#0:
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0637704Z  All:            false
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0638363Z  Filters:        type==source.local,type==exec.cachemount,type==source.git.checkout
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0638958Z  Keep Duration:  48h0m0s
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0639287Z  Max Used Space: 488.3MiB
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0639626Z GC Policy rule#1:
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0639911Z  All:            false
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0640225Z  Keep Duration:  1440h0m0s
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0640563Z  Reserved Space: 7.451GiB
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0640904Z  Max Used Space: 54.02GiB
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0641235Z  Min Free Space: 13.97GiB
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0641569Z GC Policy rule#2:
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0641854Z  All:            false
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0642146Z  Reserved Space: 7.451GiB
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0642443Z  Max Used Space: 54.02GiB
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0642744Z  Min Free Space: 13.97GiB
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0643038Z GC Policy rule#3:
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0643307Z  All:            true
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0643597Z  Reserved Space: 7.451GiB
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0643894Z  Max Used Space: 54.02GiB
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0644204Z  Min Free Space: 13.97GiB
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.0678809Z ##[endgroup]
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1640869Z ##[group]Inspect builder
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1643482Z {
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1643743Z   "nodes": [
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1644061Z     {
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1644421Z       "name": "builder-22c91171-7d9e-48b6-b0aa-34532e348b740",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1644933Z       "endpoint": "unix:///var/run/docker.sock",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1645352Z       "status": "running",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1646115Z       "buildkitd-flags": "--allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1646907Z       "buildkit": "v0.24.0",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1647378Z       "platforms": "linux/amd64,linux/amd64/v2,linux/amd64/v3,linux/386",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1647889Z       "features": {
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1648549Z         "Automatically load images to the Docker Engine image store": true,
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1649099Z         "Cache export": true,
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1649448Z         "Direct push": true,
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1649795Z         "Docker exporter": true,
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1650172Z         "Multi-platform build": true,
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1650550Z         "OCI exporter": true
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1651198Z       },
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1651447Z       "labels": {
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1651827Z         "org.mobyproject.buildkit.worker.executor": "oci",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1652415Z         "org.mobyproject.buildkit.worker.hostname": "aa9e31219371",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1652999Z         "org.mobyproject.buildkit.worker.network": "host",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1653612Z         "org.mobyproject.buildkit.worker.oci.process-mode": "sandbox",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1654270Z         "org.mobyproject.buildkit.worker.selinux.enabled": "false",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1654906Z         "org.mobyproject.buildkit.worker.snapshotter": "overlayfs"
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1655472Z       },
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1655695Z       "gcPolicy": [
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1655869Z         {
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1656019Z           "all": false,
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1656211Z           "filter": [
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1656411Z             "type==source.local",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1656641Z             "type==exec.cachemount",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1656879Z             "type==source.git.checkout"
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1657116Z           ],
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1657298Z           "keepDuration": "48h0m0s",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1657534Z           "maxUsedSpace": "488.3MiB"
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1657746Z         },
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1657891Z         {
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1658045Z           "all": false,
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1658445Z           "keepDuration": "1440h0m0s",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1658682Z           "reservedSpace": "7.451GiB",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1658902Z           "maxUsedSpace": "54.02GiB",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1659123Z           "minFreeSpace": "13.97GiB"
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1659327Z         },
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1659479Z         {
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1659624Z           "all": false,
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1659814Z           "reservedSpace": "7.451GiB",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1660042Z           "maxUsedSpace": "54.02GiB",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1660263Z           "minFreeSpace": "13.97GiB"
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1660464Z         },
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1660604Z         {
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1660759Z           "all": true,
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1660944Z           "reservedSpace": "7.451GiB",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1661169Z           "maxUsedSpace": "54.02GiB",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1661383Z           "minFreeSpace": "13.97GiB"
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1661584Z         }
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1661724Z       ]
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1661872Z     }
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1662008Z   ],
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1662215Z   "name": "builder-22c91171-7d9e-48b6-b0aa-34532e348b74",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1662501Z   "driver": "docker-container",
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1662732Z   "lastActivity": "2025-09-24T00:07:31.000Z"
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1662958Z }
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1663280Z ##[endgroup]
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1663575Z ##[group]BuildKit version
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1663823Z builder-22c91171-7d9e-48b6-b0aa-34532e348b740: v0.24.0
+build (operate-ui)	Set up Docker Buildx	2025-09-24T00:07:35.1664207Z ##[endgroup]
+build (operate-ui)	Extract metadata	﻿2025-09-24T00:07:35.1848949Z ##[group]Run docker/metadata-action@v5
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.1849262Z with:
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.1849466Z   images: ghcr.io/afewell-hh/demon-operate-ui
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.1849989Z   tags: type=ref,event=branch
+build (operate-ui)	Extract metadata	type=ref,event=pr
+build (operate-ui)	Extract metadata	type=sha,prefix={{branch}}-
+build (operate-ui)	Extract metadata	type=raw,value=latest,enable={{is_default_branch}}
+build (operate-ui)	Extract metadata	
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.1850454Z   context: workflow
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.1850770Z   github-token: ***
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.1850971Z env:
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.1851123Z   REGISTRY: ghcr.io
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.1851324Z   IMAGE_PREFIX: ghcr.io/afewell-hh/demon
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.1851560Z ##[endgroup]
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9188325Z ##[group]Context info
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9188740Z eventName: pull_request
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9189116Z sha: 0899a359caa1418d8c661ae137ef7a27aba2f449
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9189541Z ref: refs/pull/188/merge
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9189898Z workflow: Build and Push Docker Images
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9190306Z action: meta
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9190588Z actor: afewell-hh
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9190877Z runNumber: 1
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9191228Z runId: 17962253221
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9192709Z commitDate: Wed Sep 24 2025 00:07:18 GMT+0000 (Coordinated Universal Time)
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9193869Z ##[endgroup]
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9199995Z ##[group]Processing images input
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9200456Z name=ghcr.io/afewell-hh/demon-operate-ui,enable=true
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9201026Z ##[endgroup]
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9212400Z ##[group]Processing tags input
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9212809Z type=ref,event=branch,enable=true,priority=600
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9213344Z type=ref,event=pr,prefix=pr-,enable=true,priority=600
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9214093Z type=raw,value=latest,enable={{is_default_branch}},priority=200
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9214726Z type=sha,prefix={{branch}}-,format=short,enable=true,priority=100
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9215405Z ##[endgroup]
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9216416Z ##[group]Processing flavor input
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9216771Z latest=auto
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9217029Z prefix=
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9217289Z prefixLatest=false
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9217486Z suffix=
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9217640Z suffixLatest=false
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9217919Z ##[endgroup]
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9286474Z ##[group]Docker image version
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9286923Z pr-188
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9287484Z ##[endgroup]
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9292892Z ##[group]Docker tags
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9293359Z ghcr.io/afewell-hh/demon-operate-ui:pr-188
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9293930Z ghcr.io/afewell-hh/demon-operate-ui:-0899a35
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9294538Z ##[endgroup]
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9368838Z ##[group]Docker labels
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9369436Z org.opencontainers.image.created=2025-09-24T00:07:35.921Z
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9371057Z org.opencontainers.image.description=Demon Meta‑PaaS: a wasmCloud‑native runtime and toolkit to compose your own vPaaS
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9372313Z org.opencontainers.image.licenses=
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9372852Z org.opencontainers.image.revision=0899a359caa1418d8c661ae137ef7a27aba2f449
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9373850Z org.opencontainers.image.source=https://github.com/afewell-hh/Demon
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9374701Z org.opencontainers.image.title=Demon
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9375478Z org.opencontainers.image.url=https://github.com/afewell-hh/Demon
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9376119Z org.opencontainers.image.version=pr-188
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9376717Z ##[endgroup]
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9377346Z ##[group]Annotations
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9377974Z manifest:org.opencontainers.image.created=2025-09-24T00:07:35.921Z
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9379151Z manifest:org.opencontainers.image.description=Demon Meta‑PaaS: a wasmCloud‑native runtime and toolkit to compose your own vPaaS
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9379819Z manifest:org.opencontainers.image.licenses=
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9380527Z manifest:org.opencontainers.image.revision=0899a359caa1418d8c661ae137ef7a27aba2f449
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9381482Z manifest:org.opencontainers.image.source=https://github.com/afewell-hh/Demon
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9382075Z manifest:org.opencontainers.image.title=Demon
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9382583Z manifest:org.opencontainers.image.url=https://github.com/afewell-hh/Demon
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9383620Z manifest:org.opencontainers.image.version=pr-188
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9384112Z ##[endgroup]
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9384445Z ##[group]JSON output
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9384650Z {
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9384825Z   "tags": [
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9385053Z     "ghcr.io/afewell-hh/demon-operate-ui:pr-188",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9385425Z     "ghcr.io/afewell-hh/demon-operate-ui:-0899a35"
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9385874Z   ],
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9386144Z   "labels": {
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9386582Z     "org.opencontainers.image.created": "2025-09-24T00:07:35.921Z",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9387815Z     "org.opencontainers.image.description": "Demon Meta‑PaaS: a wasmCloud‑native runtime and toolkit to compose your own vPaaS",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9388817Z     "org.opencontainers.image.licenses": "",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9389391Z     "org.opencontainers.image.revision": "0899a359caa1418d8c661ae137ef7a27aba2f449",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9389896Z     "org.opencontainers.image.source": "https://github.com/afewell-hh/Demon",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9390295Z     "org.opencontainers.image.title": "Demon",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9390836Z     "org.opencontainers.image.url": "https://github.com/afewell-hh/Demon",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9391448Z     "org.opencontainers.image.version": "pr-188"
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9391861Z   },
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9392106Z   "annotations": [
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9392532Z     "manifest:org.opencontainers.image.created=2025-09-24T00:07:35.921Z",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9393619Z     "manifest:org.opencontainers.image.description=Demon Meta‑PaaS: a wasmCloud‑native runtime and toolkit to compose your own vPaaS",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9394327Z     "manifest:org.opencontainers.image.licenses=",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9394747Z     "manifest:org.opencontainers.image.revision=0899a359caa1418d8c661ae137ef7a27aba2f449",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9395532Z     "manifest:org.opencontainers.image.source=https://github.com/afewell-hh/Demon",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9396222Z     "manifest:org.opencontainers.image.title=Demon",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9396801Z     "manifest:org.opencontainers.image.url=https://github.com/afewell-hh/Demon",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9397224Z     "manifest:org.opencontainers.image.version=pr-188"
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9397482Z   ]
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9397741Z }
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9398381Z ##[endgroup]
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9398853Z ##[group]Bake file definition (tags)
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9399067Z {
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9399211Z   "target": {
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9399382Z     "docker-metadata-action": {
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9399592Z       "tags": [
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9399799Z         "ghcr.io/afewell-hh/demon-operate-ui:pr-188",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9400100Z         "ghcr.io/afewell-hh/demon-operate-ui:-0899a35"
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9400341Z       ],
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9400493Z       "args": {
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9400735Z         "DOCKER_META_IMAGES": "ghcr.io/afewell-hh/demon-operate-ui",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9401038Z         "DOCKER_META_VERSION": "pr-188"
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9401260Z       }
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9401414Z     }
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9401561Z   }
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9401695Z }
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9401965Z ##[endgroup]
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9402263Z ##[group]Bake file definition (labels)
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9402482Z {
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9402627Z   "target": {
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9402803Z     "docker-metadata-action": {
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9403013Z       "labels": {
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9403266Z         "org.opencontainers.image.created": "2025-09-24T00:07:35.921Z",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9403977Z         "org.opencontainers.image.description": "Demon Meta‑PaaS: a wasmCloud‑native runtime and toolkit to compose your own vPaaS",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9404515Z         "org.opencontainers.image.licenses": "",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9404900Z         "org.opencontainers.image.revision": "0899a359caa1418d8c661ae137ef7a27aba2f449",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9405383Z         "org.opencontainers.image.source": "https://github.com/afewell-hh/Demon",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9405759Z         "org.opencontainers.image.title": "Demon",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9406315Z         "org.opencontainers.image.url": "https://github.com/afewell-hh/Demon",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9406696Z         "org.opencontainers.image.version": "pr-188"
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9406943Z       }
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9407094Z     }
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9407230Z   }
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9407373Z }
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9407654Z ##[endgroup]
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9407959Z ##[group]Bake file definition (annotations)
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9408409Z {
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9408550Z   "target": {
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9408728Z     "docker-metadata-action": {
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9408938Z       "annotations": [
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9409226Z         "manifest:org.opencontainers.image.created=2025-09-24T00:07:35.921Z",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9409974Z         "manifest:org.opencontainers.image.description=Demon Meta‑PaaS: a wasmCloud‑native runtime and toolkit to compose your own vPaaS",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9410538Z         "manifest:org.opencontainers.image.licenses=",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9410976Z         "manifest:org.opencontainers.image.revision=0899a359caa1418d8c661ae137ef7a27aba2f449",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9411656Z         "manifest:org.opencontainers.image.source=https://github.com/afewell-hh/Demon",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9412075Z         "manifest:org.opencontainers.image.title=Demon",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9412464Z         "manifest:org.opencontainers.image.url=https://github.com/afewell-hh/Demon",
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9412870Z         "manifest:org.opencontainers.image.version=pr-188"
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9413225Z       ]
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9413407Z     }
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9413547Z   }
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9413688Z }
+build (operate-ui)	Extract metadata	2025-09-24T00:07:35.9413956Z ##[endgroup]
+build (operate-ui)	Build and push Docker image	﻿2025-09-24T00:07:35.9602143Z ##[group]Run docker/build-push-action@v5
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9602455Z with:
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9602622Z   context: .
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9602802Z   file: ./operate-ui/Dockerfile
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9603026Z   push: false
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9603382Z   tags: ghcr.io/afewell-hh/demon-operate-ui:pr-188
+build (operate-ui)	Build and push Docker image	ghcr.io/afewell-hh/demon-operate-ui:-0899a35
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9605366Z   labels: org.opencontainers.image.created=2025-09-24T00:07:35.921Z
+build (operate-ui)	Build and push Docker image	org.opencontainers.image.description=Demon Meta‑PaaS: a wasmCloud‑native runtime and toolkit to compose your own vPaaS
+build (operate-ui)	Build and push Docker image	org.opencontainers.image.licenses=
+build (operate-ui)	Build and push Docker image	org.opencontainers.image.revision=0899a359caa1418d8c661ae137ef7a27aba2f449
+build (operate-ui)	Build and push Docker image	org.opencontainers.image.source=https://github.com/afewell-hh/Demon
+build (operate-ui)	Build and push Docker image	org.opencontainers.image.title=Demon
+build (operate-ui)	Build and push Docker image	org.opencontainers.image.url=https://github.com/afewell-hh/Demon
+build (operate-ui)	Build and push Docker image	org.opencontainers.image.version=pr-188
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9607142Z   cache-from: type=gha
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9607351Z   cache-to: type=gha,mode=max
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9607555Z   load: false
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9607747Z   no-cache: false
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9607917Z   pull: false
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9608423Z   github-token: ***
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9608612Z env:
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9608771Z   REGISTRY: ghcr.io
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9608962Z   IMAGE_PREFIX: ghcr.io/afewell-hh/demon
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9609226Z   DOCKER_METADATA_OUTPUT_VERSION: pr-188
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9609702Z   DOCKER_METADATA_OUTPUT_TAGS: ghcr.io/afewell-hh/demon-operate-ui:pr-188
+build (operate-ui)	Build and push Docker image	ghcr.io/afewell-hh/demon-operate-ui:-0899a35
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9611777Z   DOCKER_METADATA_OUTPUT_LABELS: org.opencontainers.image.created=2025-09-24T00:07:35.921Z
+build (operate-ui)	Build and push Docker image	org.opencontainers.image.description=Demon Meta‑PaaS: a wasmCloud‑native runtime and toolkit to compose your own vPaaS
+build (operate-ui)	Build and push Docker image	org.opencontainers.image.licenses=
+build (operate-ui)	Build and push Docker image	org.opencontainers.image.revision=0899a359caa1418d8c661ae137ef7a27aba2f449
+build (operate-ui)	Build and push Docker image	org.opencontainers.image.source=https://github.com/afewell-hh/Demon
+build (operate-ui)	Build and push Docker image	org.opencontainers.image.title=Demon
+build (operate-ui)	Build and push Docker image	org.opencontainers.image.url=https://github.com/afewell-hh/Demon
+build (operate-ui)	Build and push Docker image	org.opencontainers.image.version=pr-188
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9615415Z   DOCKER_METADATA_OUTPUT_ANNOTATIONS: manifest:org.opencontainers.image.created=2025-09-24T00:07:35.921Z
+build (operate-ui)	Build and push Docker image	manifest:org.opencontainers.image.description=Demon Meta‑PaaS: a wasmCloud‑native runtime and toolkit to compose your own vPaaS
+build (operate-ui)	Build and push Docker image	manifest:org.opencontainers.image.licenses=
+build (operate-ui)	Build and push Docker image	manifest:org.opencontainers.image.revision=0899a359caa1418d8c661ae137ef7a27aba2f449
+build (operate-ui)	Build and push Docker image	manifest:org.opencontainers.image.source=https://github.com/afewell-hh/Demon
+build (operate-ui)	Build and push Docker image	manifest:org.opencontainers.image.title=Demon
+build (operate-ui)	Build and push Docker image	manifest:org.opencontainers.image.url=https://github.com/afewell-hh/Demon
+build (operate-ui)	Build and push Docker image	manifest:org.opencontainers.image.version=pr-188
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9621420Z   DOCKER_METADATA_OUTPUT_JSON: {"tags":["ghcr.io/afewell-hh/demon-operate-ui:pr-188","ghcr.io/afewell-hh/demon-operate-ui:-0899a35"],"labels":{"org.opencontainers.image.created":"2025-09-24T00:07:35.921Z","org.opencontainers.image.description":"Demon Meta‑PaaS: a wasmCloud‑native runtime and toolkit to compose your own vPaaS","org.opencontainers.image.licenses":"","org.opencontainers.image.revision":"0899a359caa1418d8c661ae137ef7a27aba2f449","org.opencontainers.image.source":"https://github.com/afewell-hh/Demon","org.opencontainers.image.title":"Demon","org.opencontainers.image.url":"https://github.com/afewell-hh/Demon","org.opencontainers.image.version":"pr-188"},"annotations":["manifest:org.opencontainers.image.created=2025-09-24T00:07:35.921Z","manifest:org.opencontainers.image.description=Demon Meta‑PaaS: a wasmCloud‑native runtime and toolkit to compose your own vPaaS","manifest:org.opencontainers.image.licenses=","manifest:org.opencontainers.image.revision=0899a359caa1418d8c661ae137ef7a27aba2f449","manifest:org.opencontainers.image.source=https://github.com/afewell-hh/Demon","manifest:org.opencontainers.image.title=Demon","manifest:org.opencontainers.image.url=https://github.com/afewell-hh/Demon","manifest:org.opencontainers.image.version=pr-188"]}
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9626104Z   DOCKER_METADATA_OUTPUT_BAKE_FILE_TAGS: /home/runner/work/_temp/docker-actions-toolkit-DN3AL6/docker-metadata-action-bake-tags.json
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9627100Z   DOCKER_METADATA_OUTPUT_BAKE_FILE_LABELS: /home/runner/work/_temp/docker-actions-toolkit-DN3AL6/docker-metadata-action-bake-labels.json
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9627988Z   DOCKER_METADATA_OUTPUT_BAKE_FILE_ANNOTATIONS: /home/runner/work/_temp/docker-actions-toolkit-DN3AL6/docker-metadata-action-bake-annotations.json
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9628949Z   DOCKER_METADATA_OUTPUT_BAKE_FILE: /home/runner/work/_temp/docker-actions-toolkit-DN3AL6/docker-metadata-action-bake.json
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:35.9629439Z ##[endgroup]
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.1942523Z ##[group]GitHub Actions runtime token ACs
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.1953216Z refs/pull/188/merge: read/write
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.1954878Z refs/heads/main: read
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.1955482Z ##[endgroup]
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.1956752Z ##[group]Docker info
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2000721Z [command]/usr/bin/docker version
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2201517Z Client: Docker Engine - Community
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2206265Z  Version:           28.0.4
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2207623Z  API version:       1.48
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2208510Z  Go version:        go1.23.7
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2209040Z  Git commit:        b8034c0
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2209620Z  Built:             Tue Mar 25 15:07:16 2025
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2210570Z  OS/Arch:           linux/amd64
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2211233Z  Context:           default
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2211517Z 
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2211671Z Server: Docker Engine - Community
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2212052Z  Engine:
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2212336Z   Version:          28.0.4
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2212720Z   API version:      1.48 (minimum version 1.24)
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2213141Z   Go version:       go1.23.7
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2213484Z   Git commit:       6430e49
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2213852Z   Built:            Tue Mar 25 15:07:16 2025
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2214275Z   OS/Arch:          linux/amd64
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2214657Z   Experimental:     false
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2215012Z  containerd:
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2215322Z   Version:          1.7.27
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2215765Z   GitCommit:        05044ec0a9a75232cad458027ca83437aae3f4da
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2216249Z  runc:
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2216523Z   Version:          1.2.5
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2216902Z   GitCommit:        v1.2.5-0-g59923ef
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2217326Z  docker-init:
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2217634Z   Version:          0.19.0
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2217989Z   GitCommit:        de40ad0
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2255358Z [command]/usr/bin/docker info
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2800780Z Client: Docker Engine - Community
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2801288Z  Version:    28.0.4
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2801612Z  Context:    default
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2801945Z  Debug Mode: false
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2802263Z  Plugins:
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2802590Z   buildx: Docker Buildx (Docker Inc.)
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2802987Z     Version:  v0.28.0
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2803398Z     Path:     /usr/libexec/docker/cli-plugins/docker-buildx
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2803940Z   compose: Docker Compose (Docker Inc.)
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2804335Z     Version:  v2.38.2
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2804727Z     Path:     /usr/libexec/docker/cli-plugins/docker-compose
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2805069Z 
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2805176Z Server:
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2805430Z  Containers: 1
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2805697Z   Running: 1
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2805952Z   Paused: 0
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2806201Z   Stopped: 0
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2806786Z  Images: 1
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2807043Z  Server Version: 28.0.4
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2807366Z  Storage Driver: overlay2
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2807696Z   Backing Filesystem: extfs
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2808024Z   Supports d_type: true
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2808741Z   Using metacopy: false
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2809059Z   Native Overlay Diff: false
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2809402Z   userxattr: false
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2809699Z  Logging Driver: json-file
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2810030Z  Cgroup Driver: systemd
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2810330Z  Cgroup Version: 2
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2810817Z  Plugins:
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2811070Z   Volume: local
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2811405Z   Network: bridge host ipvlan macvlan null overlay
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2811981Z   Log: awslogs fluentd gcplogs gelf journald json-file local splunk syslog
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2812534Z  Swarm: inactive
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2812849Z  Runtimes: io.containerd.runc.v2 runc
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2813225Z  Default Runtime: runc
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2813538Z  Init Binary: docker-init
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2813968Z  containerd version: 05044ec0a9a75232cad458027ca83437aae3f4da
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2814449Z  runc version: v1.2.5-0-g59923ef
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2814785Z  init version: de40ad0
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2815079Z  Security Options:
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2815357Z   apparmor
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2815608Z   seccomp
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2815866Z    Profile: builtin
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2816140Z   cgroupns
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2816427Z  Kernel Version: 6.11.0-1018-azure
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2816807Z  Operating System: Ubuntu 24.04.3 LTS
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2817191Z  OSType: linux
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2817476Z  Architecture: x86_64
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2817776Z  CPUs: 4
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2818037Z  Total Memory: 15.62GiB
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2818515Z  Name: runnervmf4ws1
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2818845Z  ID: 80b0c887-f378-498c-94b8-5e260688697c
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2819283Z  Docker Root Dir: /var/lib/docker
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2819643Z  Debug Mode: false
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2819953Z  Username: githubactions
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2820277Z  Experimental: false
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2820581Z  Insecure Registries:
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2820907Z   ::1/128
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2821166Z   127.0.0.0/8
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2821480Z  Live Restore Enabled: false
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2821707Z 
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2826093Z ##[endgroup]
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2826610Z ##[group]Proxy configuration
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2830443Z No proxy configuration found
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.2832253Z ##[endgroup]
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.3449369Z ##[group]Buildx version
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.3471109Z [command]/usr/bin/docker buildx version
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.3941083Z github.com/docker/buildx v0.28.0 b1281b81bba797b21d9eaf256e6a13eb14419836
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.3974058Z ##[endgroup]
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.3974596Z ##[group]Builder info
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4866639Z {
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4867051Z   "nodes": [
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4867356Z     {
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4867760Z       "name": "builder-22c91171-7d9e-48b6-b0aa-34532e348b740",
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4868572Z       "endpoint": "unix:///var/run/docker.sock",
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4868992Z       "status": "running",
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4869792Z       "buildkitd-flags": "--allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host",
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4870641Z       "buildkit": "v0.24.0",
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4871178Z       "platforms": "linux/amd64,linux/amd64/v2,linux/amd64/v3,linux/386",
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4871745Z       "features": {
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4872196Z         "Automatically load images to the Docker Engine image store": true,
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4872810Z         "Cache export": true,
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4873192Z         "Direct push": true,
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4873576Z         "Docker exporter": true,
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4873973Z         "Multi-platform build": true,
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4874393Z         "OCI exporter": true
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4874738Z       },
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4875019Z       "labels": {
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4876196Z         "org.mobyproject.buildkit.worker.executor": "oci",
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4876814Z         "org.mobyproject.buildkit.worker.hostname": "aa9e31219371",
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4877456Z         "org.mobyproject.buildkit.worker.network": "host",
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4878116Z         "org.mobyproject.buildkit.worker.oci.process-mode": "sandbox",
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4879046Z         "org.mobyproject.buildkit.worker.selinux.enabled": "false",
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4879737Z         "org.mobyproject.buildkit.worker.snapshotter": "overlayfs"
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4880265Z       },
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4880516Z       "gcPolicy": [
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4881073Z         {
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4881352Z           "all": false,
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4881673Z           "filter": [
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4882013Z             "type==source.local",
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4882411Z             "type==exec.cachemount",
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4882812Z             "type==source.git.checkout"
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4883193Z           ],
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4883508Z           "keepDuration": "48h0m0s"
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4883886Z         },
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4884168Z         {
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4884437Z           "all": false,
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4884783Z           "keepDuration": "1440h0m0s"
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4885169Z         },
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4885449Z         {
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4885741Z           "all": false
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4886060Z         },
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4886337Z         {
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4886613Z           "all": true
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4886913Z         }
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4887172Z       ]
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4887453Z     }
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4887699Z   ],
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4888064Z   "name": "builder-22c91171-7d9e-48b6-b0aa-34532e348b74",
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4888775Z   "driver": "docker-container",
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4889202Z   "lastActivity": "2025-09-24T00:07:31.000Z"
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4889607Z }
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.4890205Z ##[endgroup]
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.6447607Z [command]/usr/bin/docker buildx build --cache-from type=gha --cache-to type=gha,mode=max --file ./operate-ui/Dockerfile --iidfile /home/runner/work/_temp/docker-actions-toolkit-0Ym0tr/build-iidfile-0b0ebe63ab.txt --label org.opencontainers.image.created=2025-09-24T00:07:35.921Z --label org.opencontainers.image.description=Demon Meta‑PaaS: a wasmCloud‑native runtime and toolkit to compose your own vPaaS --label org.opencontainers.image.licenses= --label org.opencontainers.image.revision=0899a359caa1418d8c661ae137ef7a27aba2f449 --label org.opencontainers.image.source=https://github.com/afewell-hh/Demon --label org.opencontainers.image.title=Demon --label org.opencontainers.image.url=https://github.com/afewell-hh/Demon --label org.opencontainers.image.version=pr-188 --attest type=provenance,mode=max,builder-id=https://github.com/afewell-hh/Demon/actions/runs/17962253221 --tag ghcr.io/afewell-hh/demon-operate-ui:pr-188 --tag ghcr.io/afewell-hh/demon-operate-ui:-0899a35 --metadata-file /home/runner/work/_temp/docker-actions-toolkit-0Ym0tr/build-metadata-7cf231acea.json .
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.7536118Z WARNING: No output specified with docker-container driver. Build result will only remain in the build cache. To push result image into registry use --push or to load image into docker use --load
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.7558438Z ERROR: failed to build: invalid tag "ghcr.io/afewell-hh/demon-operate-ui:-0899a35": invalid reference format
+build (operate-ui)	Build and push Docker image	2025-09-24T00:07:36.7628740Z ##[error]buildx failed with: ERROR: failed to build: invalid tag "ghcr.io/afewell-hh/demon-operate-ui:-0899a35": invalid reference format
+build (operate-ui)	Post Build and push Docker image	﻿2025-09-24T00:07:36.7755133Z Post job cleanup.
+build (operate-ui)	Post Build and push Docker image	2025-09-24T00:07:37.0056289Z ##[group]Removing temp folder /home/runner/work/_temp/docker-actions-toolkit-0Ym0tr
+build (operate-ui)	Post Build and push Docker image	2025-09-24T00:07:37.0066880Z ##[endgroup]
+build (operate-ui)	Post Build and push Docker image	2025-09-24T00:07:37.0067469Z ##[group]Post cache
+build (operate-ui)	Post Build and push Docker image	2025-09-24T00:07:37.0069064Z State not set
+build (operate-ui)	Post Build and push Docker image	2025-09-24T00:07:37.0070513Z ##[endgroup]
+build (operate-ui)	Post Set up Docker Buildx	﻿2025-09-24T00:07:37.0196939Z Post job cleanup.
+build (operate-ui)	Post Set up Docker Buildx	2025-09-24T00:07:37.2982476Z ##[group]Removing builder
+build (operate-ui)	Post Set up Docker Buildx	2025-09-24T00:07:37.4071662Z [command]/usr/bin/docker buildx rm builder-22c91171-7d9e-48b6-b0aa-34532e348b74
+build (operate-ui)	Post Set up Docker Buildx	2025-09-24T00:07:37.5495010Z builder-22c91171-7d9e-48b6-b0aa-34532e348b74 removed
+build (operate-ui)	Post Set up Docker Buildx	2025-09-24T00:07:37.5531123Z ##[endgroup]
+build (operate-ui)	Post Set up Docker Buildx	2025-09-24T00:07:37.5532788Z ##[group]Cleaning up certificates
+build (operate-ui)	Post Set up Docker Buildx	2025-09-24T00:07:37.5539163Z ##[endgroup]
+build (operate-ui)	Post Set up Docker Buildx	2025-09-24T00:07:37.5540081Z ##[group]Post cache
+build (operate-ui)	Post Set up Docker Buildx	2025-09-24T00:07:37.5542534Z State not set
+build (operate-ui)	Post Set up Docker Buildx	2025-09-24T00:07:37.5543126Z ##[endgroup]
+build (operate-ui)	Post Checkout repository	﻿2025-09-24T00:07:37.5674222Z Post job cleanup.
+build (operate-ui)	Post Checkout repository	2025-09-24T00:07:37.6616841Z [command]/usr/bin/git version
+build (operate-ui)	Post Checkout repository	2025-09-24T00:07:37.6667178Z git version 2.51.0
+build (operate-ui)	Post Checkout repository	2025-09-24T00:07:37.6713780Z Temporarily overriding HOME='/home/runner/work/_temp/da4b82c4-8e68-43c3-9043-02a89d15690b' before making global git config changes
+build (operate-ui)	Post Checkout repository	2025-09-24T00:07:37.6714951Z Adding repository directory to the temporary git global config as a safe directory
+build (operate-ui)	Post Checkout repository	2025-09-24T00:07:37.6719298Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Demon/Demon
+build (operate-ui)	Post Checkout repository	2025-09-24T00:07:37.6754235Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+build (operate-ui)	Post Checkout repository	2025-09-24T00:07:37.6786211Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+build (operate-ui)	Post Checkout repository	2025-09-24T00:07:37.7014452Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+build (operate-ui)	Post Checkout repository	2025-09-24T00:07:37.7035098Z http.https://github.com/.extraheader
+build (operate-ui)	Post Checkout repository	2025-09-24T00:07:37.7048449Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+build (operate-ui)	Post Checkout repository	2025-09-24T00:07:37.7078448Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+build (operate-ui)	Complete job	﻿2025-09-24T00:07:37.7401839Z Cleaning up orphan processes

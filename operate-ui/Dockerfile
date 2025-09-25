@@ -4,6 +4,9 @@ FROM rust:1.77-alpine AS builder
 # Install build dependencies
 RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static
 
+# Add musl target for static linking
+RUN rustup target add x86_64-unknown-linux-musl
+
 WORKDIR /app
 
 # Copy workspace files
@@ -21,20 +24,20 @@ COPY capsules/ ./capsules/
 COPY demonctl/ ./demonctl/
 COPY bootstrapper/ ./bootstrapper/
 
-# Set build target for static linking
-ENV RUSTFLAGS="-C target-feature=-crt-static"
+# Set build target for fully static linking
+ENV RUSTFLAGS="-C target-feature=+crt-static"
 
 # Build the operate-ui binary
-RUN cargo build --release --bin operate-ui
+RUN cargo build --release --bin operate-ui --target x86_64-unknown-linux-musl
 
-# Runtime stage
-FROM gcr.io/distroless/cc-debian12
+# Runtime stage - use static distroless for musl-built binaries
+FROM gcr.io/distroless/static-debian12
 
 # Copy template files
 COPY --from=builder /app/operate-ui/templates /app/templates
 
 # Copy the binary
-COPY --from=builder /app/target/release/operate-ui /usr/local/bin/operate-ui
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/operate-ui /usr/local/bin/operate-ui
 
 # Set working directory
 WORKDIR /app
@@ -46,4 +49,4 @@ EXPOSE 3000
 USER nonroot:nonroot
 
 # Start the application
-CMD ["operate-ui"]
+CMD ["/usr/local/bin/operate-ui"]

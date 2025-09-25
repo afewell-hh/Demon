@@ -4,6 +4,9 @@ FROM rust:1.77-alpine AS builder
 # Install build dependencies
 RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static
 
+# Add musl target for static linking
+RUN rustup target add x86_64-unknown-linux-musl
+
 WORKDIR /app
 
 # Copy workspace files
@@ -21,17 +24,17 @@ COPY capsules/ ./capsules/
 COPY demonctl/ ./demonctl/
 COPY bootstrapper/ ./bootstrapper/
 
-# Set build target for static linking
-ENV RUSTFLAGS="-C target-feature=-crt-static"
+# Set build target for fully static linking
+ENV RUSTFLAGS="-C target-feature=+crt-static"
 
 # Build the engine binary
-RUN cargo build --release --bin engine
+RUN cargo build --release --bin engine --target x86_64-unknown-linux-musl
 
-# Runtime stage
-FROM gcr.io/distroless/cc-debian12
+# Runtime stage - use static distroless for musl-built binaries
+FROM gcr.io/distroless/static-debian12
 
 # Copy the binary
-COPY --from=builder /app/target/release/engine /usr/local/bin/engine
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/engine /usr/local/bin/engine
 
 # Expose port
 EXPOSE 8081
@@ -40,4 +43,4 @@ EXPOSE 8081
 USER nonroot:nonroot
 
 # Start the application
-CMD ["engine"]
+CMD ["/usr/local/bin/engine"]

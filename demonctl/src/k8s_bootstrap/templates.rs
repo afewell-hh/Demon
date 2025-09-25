@@ -103,6 +103,10 @@ impl TemplateRenderer {
         let networking_context = self.build_networking_context(&config.networking)?;
         context.insert("networking".to_string(), Value::Object(networking_context));
 
+        // Add registry context
+        let registry_context = self.build_registry_context(&config.registries)?;
+        context.insert("registries".to_string(), Value::Object(registry_context));
+
         Ok(context)
     }
 
@@ -172,6 +176,55 @@ impl TemplateRenderer {
         networking_obj.insert("serviceMesh".to_string(), Value::Object(service_mesh_obj));
 
         Ok(networking_obj)
+    }
+
+    fn build_registry_context(
+        &self,
+        registries: &Option<Vec<crate::k8s_bootstrap::RegistryConfig>>,
+    ) -> Result<serde_json::Map<String, Value>> {
+        let mut registry_obj = serde_json::Map::new();
+
+        if let Some(registries) = registries {
+            // Build imagePullSecrets for each registry
+            let mut image_pull_secrets = Vec::new();
+            let mut registry_map = serde_json::Map::new();
+
+            for registry in registries {
+                let secret_name = format!("registry-{}", registry.name);
+                image_pull_secrets.push(Value::Object(
+                    vec![("name".to_string(), Value::String(secret_name.clone()))]
+                        .into_iter()
+                        .collect(),
+                ));
+
+                // Build per-component mapping
+                for component in &registry.applies_to {
+                    registry_map.insert(
+                        component.clone(),
+                        Value::Array(vec![Value::Object(
+                            vec![("name".to_string(), Value::String(secret_name.clone()))]
+                                .into_iter()
+                                .collect(),
+                        )]),
+                    );
+                }
+            }
+
+            registry_obj.insert(
+                "imagePullSecrets".to_string(),
+                Value::Array(image_pull_secrets),
+            );
+            registry_obj.insert("byComponent".to_string(), Value::Object(registry_map));
+        } else {
+            // Empty arrays when no registries configured
+            registry_obj.insert("imagePullSecrets".to_string(), Value::Array(Vec::new()));
+            registry_obj.insert(
+                "byComponent".to_string(),
+                Value::Object(serde_json::Map::new()),
+            );
+        }
+
+        Ok(registry_obj)
     }
 
     fn build_nats_url(&self, demon_config: &DemonConfig) -> String {
@@ -578,6 +631,7 @@ mod tests {
                     annotations: crate::k8s_bootstrap::default_mesh_annotations(),
                 },
             },
+            registries: None,
         };
 
         let context = renderer.build_template_context(&config).unwrap();
@@ -1022,6 +1076,7 @@ volumes:
                     annotations: crate::k8s_bootstrap::default_mesh_annotations(),
                 },
             },
+            registries: None,
         };
 
         // This should fail because templates directory doesn't exist, but we can test the context building

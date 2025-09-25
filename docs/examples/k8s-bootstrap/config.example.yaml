@@ -102,3 +102,21 @@ networking:
   serviceMesh:
     enabled: false                     # Enable service mesh sidecar injection
 
+# Registry credentials for private or rate-limited registries
+# Optional: Configure credentials for Docker Hub and other container registries
+registries:
+  - name: dockerhub
+    registry: https://index.docker.io/v1/
+    usernameEnv: DOCKERHUB_USERNAME    # Environment variable containing username
+    passwordEnv: DOCKERHUB_TOKEN       # Environment variable containing password/token
+    appliesTo:
+      - nats                           # Apply to NATS pod (uses nats:2.10-alpine from Docker Hub)
+      - prometheus                     # Apply to Prometheus pod (uses prom/prometheus from Docker Hub)
+      - grafana                        # Apply to Grafana pod (uses grafana/grafana from Docker Hub)
+  # - name: other-registry
+  #   registry: https://registry.example.com
+  #   usernameEnv: OTHER_REGISTRY_USER
+  #   passwordEnv: OTHER_REGISTRY_PASS
+  #   appliesTo:
+  #     - custom-addon
+
