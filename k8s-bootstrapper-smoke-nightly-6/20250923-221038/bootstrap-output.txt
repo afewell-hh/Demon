@@ -1,0 +1,73 @@
+Loading K8s bootstrap configuration from: /home/runner/work/Demon/Demon/scripts/tests/fixtures/config.e2e.yaml
+Configuration loaded successfully
+Cluster: demon-smoke-test
+Namespace: demon-system
+Configuration validation passed
+  Processing add-on: monitoring - Prometheus and Grafana for monitoring and observability
+🚀 Starting K8s bootstrap process...
+Phase 1: Installing k3s cluster
+[INFO]  Using v1.28.2+k3s1 as release
+[INFO]  Downloading hash https://github.com/k3s-io/k3s/releases/download/v1.28.2+k3s1/sha256sum-amd64.txt
+[INFO]  Downloading binary https://github.com/k3s-io/k3s/releases/download/v1.28.2+k3s1/k3s
+[INFO]  Verifying binary download
+[INFO]  Installing k3s to /usr/local/bin/k3s
+[INFO]  Skipping installation of SELinux RPM
+[INFO]  Skipping /usr/local/bin/kubectl symlink to k3s, already exists
+[INFO]  Creating /usr/local/bin/crictl symlink to k3s
+[INFO]  Skipping /usr/local/bin/ctr symlink to k3s, command exists in PATH at /usr/bin/ctr
+[INFO]  Creating killall script /usr/local/bin/k3s-killall.sh
+[INFO]  Creating uninstall script /usr/local/bin/k3s-uninstall.sh
+[INFO]  env: Creating environment file /etc/systemd/system/k3s.service.env
+[INFO]  systemd: Creating service file /etc/systemd/system/k3s.service
+[INFO]  systemd: Enabling k3s unit
+Created symlink /etc/systemd/system/multi-user.target.wants/k3s.service → /etc/systemd/system/k3s.service.
+[INFO]  systemd: Starting k3s
+✓ k3s cluster installation completed
+Phase 2: Waiting for k3s cluster to be ready
+✓ k3s cluster is ready
+Phase 3: Deploying Demon components
+Applying manifests to cluster with namespace readiness checks...
+Applying namespace manifests...
+namespace/demon-system created
+Waiting for namespace 'demon-system' to be ready...
+✓ Namespace 'demon-system' is ready
+✓ Namespaces applied and ready
+Applying remaining manifests...
+secret/demon-secrets created
+service/nats created
+statefulset.apps/nats created
+service/demon-runtime created
+deployment.apps/demon-runtime created
+service/demon-engine created
+deployment.apps/demon-engine created
+service/operate-ui created
+deployment.apps/operate-ui created
+configmap/prometheus-config created
+deployment.apps/prometheus created
+service/prometheus created
+persistentvolumeclaim/prometheus-pvc created
+serviceaccount/prometheus created
+clusterrole.rbac.authorization.k8s.io/prometheus created
+clusterrolebinding.rbac.authorization.k8s.io/prometheus created
+configmap/grafana-datasources created
+configmap/grafana-config created
+deployment.apps/grafana created
+service/grafana created
+persistentvolumeclaim/grafana-pvc created
+serviceaccount/grafana created
+✓ All manifests applied successfully
+✓ Demon components deployed
+Phase 4: Waiting for pods to be ready
+Waiting for Demon pods to be ready (timeout: 240s)...
+Pods ready: 0/6
+Pods ready: 0/6
+Pods ready: 3/6
+Pods ready: 3/6
+Pods ready: 4/6
+Pods ready: 5/6
+Pods ready: 5/6
+Pods ready: 6/6
+All Demon pods are ready!
+Phase 5: Running health checks
+Running post-deployment health checks...
+Error: No demon-runtime pod found for health checking

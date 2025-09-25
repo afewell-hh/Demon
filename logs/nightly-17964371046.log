@@ -1,0 +1,60 @@
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	﻿2025-09-24T02:20:58.7426412Z ##[group]Run make bootstrap-smoke ARGS="--cleanup --verbose"
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:58.7426950Z [36;1mmake bootstrap-smoke ARGS="--cleanup --verbose"[0m
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:58.7456186Z shell: /usr/bin/bash -e {0}
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:58.7456414Z env:
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:58.7456589Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:58.7456830Z   CARGO_INCREMENTAL: 0
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:58.7457024Z   CARGO_TERM_COLOR: always
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:58.7457246Z   CACHE_ON_FAILURE: true
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:58.7457450Z   GITHUB_TOKEN: test-token-value
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:58.7457681Z   ADMIN_TOKEN: test-admin-token
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:58.7457953Z   DATABASE_URL: postgresql://localhost/demon_test
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:58.7458274Z   NATS_PASSWORD: test-nats-password
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:58.7458535Z   JWT_SECRET: test-jwt-secret-12345
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:58.7458761Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:59.0584251Z Running Kubernetes bootstrapper smoke test...
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:59.0667649Z [0;34m[02:20:59][0m Starting Kubernetes bootstrapper smoke test...
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:59.0685204Z [0;34m[02:20:59][0m Mode: FULL
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:59.0698613Z [0;34m[02:20:59][0m Checking dependencies...
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:59.0712002Z [0;34m[02:20:59][0m Found k3d (preferred)
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:59.0713818Z [0;32m[SUCCESS][0m All dependencies available
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:59.0727843Z [0;34m[02:20:59][0m Creating artifacts directory: /home/runner/work/Demon/Demon/dist/bootstrapper-smoke/20250924-022059
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:59.0754364Z [0;34m[02:20:59][0m Provisioning k3d cluster: demon-smoke-test
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:59.1143927Z [36mINFO[0m[0000] Prep: Network                                
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:59.2218300Z [36mINFO[0m[0000] Created network 'k3d-demon-smoke-test'       
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:59.2233639Z [36mINFO[0m[0000] Created image volume k3d-demon-smoke-test-images 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:59.2241055Z [36mINFO[0m[0000] Creating node 'demon-registry'               
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:20:59.4467625Z [36mINFO[0m[0000] Pulling image 'docker.io/library/registry:2' 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:01.1851071Z [36mINFO[0m[0002] Successfully created registry 'demon-registry' 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:01.1939632Z [36mINFO[0m[0002] Starting new tools node...                   
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:01.4201142Z [36mINFO[0m[0002] Pulling image 'ghcr.io/k3d-io/k3d-tools:5.4.6' 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:01.9264134Z [36mINFO[0m[0002] Starting Node 'k3d-demon-smoke-test-tools'   
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:02.1998971Z [36mINFO[0m[0003] Creating node 'k3d-demon-smoke-test-server-0' 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:02.3870451Z [36mINFO[0m[0003] Pulling image 'docker.io/rancher/k3s:v1.24.4-k3s1' 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:04.2341483Z [36mINFO[0m[0005] Creating LoadBalancer 'k3d-demon-smoke-test-serverlb' 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:04.5087515Z [36mINFO[0m[0005] Pulling image 'ghcr.io/k3d-io/k3d-proxy:5.4.6' 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:05.4505643Z [36mINFO[0m[0006] Using the k3d-tools node to gather environment information 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:05.5312501Z [36mINFO[0m[0006] HostIP: using network gateway 172.18.0.1 address 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:05.5313420Z [36mINFO[0m[0006] Starting cluster 'demon-smoke-test'          
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:05.5314231Z [36mINFO[0m[0006] Starting servers...                          
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:05.5515214Z [36mINFO[0m[0006] Starting Node 'k3d-demon-smoke-test-server-0' 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:09.6927153Z [36mINFO[0m[0010] All agents already running.                  
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:09.6928147Z [36mINFO[0m[0010] Starting helpers...                          
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:09.6954243Z [36mINFO[0m[0010] Starting Node 'demon-registry'               
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:09.7070243Z [36mINFO[0m[0010] Starting Node 'k3d-demon-smoke-test-serverlb' 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:16.0519907Z [36mINFO[0m[0016] Injecting records for hostAliases (incl. host.k3d.internal) and for 3 network members into CoreDNS configmap... 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:19.0643040Z [36mINFO[0m[0019] Cluster 'demon-smoke-test' created successfully! 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:19.0700311Z [36mINFO[0m[0019] You can now use it like this:                
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:19.0701078Z kubectl cluster-info
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:19.1021848Z [0;34m[02:21:19][0m Waiting for cluster nodes to be ready...
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:19.1549017Z E0924 02:21:19.154519    3523 memcache.go:287] "Unhandled Error" err="couldn't get resource list for metrics.k8s.io/v1beta1: the server is currently unable to handle the request"
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:19.1631186Z E0924 02:21:19.162961    3523 memcache.go:121] "Unhandled Error" err="couldn't get resource list for metrics.k8s.io/v1beta1: the server is currently unable to handle the request"
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:19.1732810Z E0924 02:21:19.173081    3523 memcache.go:121] "Unhandled Error" err="couldn't get resource list for metrics.k8s.io/v1beta1: the server is currently unable to handle the request"
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:19.1751117Z E0924 02:21:19.174959    3523 memcache.go:121] "Unhandled Error" err="couldn't get resource list for metrics.k8s.io/v1beta1: the server is currently unable to handle the request"
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:20.5250163Z node/k3d-demon-smoke-test-server-0 condition met
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:20.5270347Z [0;32m[SUCCESS][0m Cluster demon-smoke-test is ready
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:20.6647583Z [0;34m[02:21:20][0m Running dry-run bootstrap validation...
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:20.6788237Z [0;32m[SUCCESS][0m Dry-run validation completed
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:21:20.6813734Z [0;34m[02:21:20][0m Running live bootstrap deployment...
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:22:01.3144398Z make: *** [Makefile:30: bootstrap-smoke] Error 1
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-24T02:22:01.3161326Z ##[error]Process completed with exit code 2.

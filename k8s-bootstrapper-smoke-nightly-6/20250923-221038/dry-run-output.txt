@@ -1,0 +1,403 @@
+Loading K8s bootstrap configuration from: /home/runner/work/Demon/Demon/scripts/tests/fixtures/config.e2e.yaml
+Configuration loaded successfully
+Cluster: demon-smoke-test
+Namespace: demon-system
+Configuration validation passed
+  Processing add-on: monitoring - Prometheus and Grafana for monitoring and observability
+Add-ons enabled (1):
+  - monitoring (Prometheus and Grafana for monitoring and observability)
+✓ Configuration is valid
+Dry run mode - no changes will be made
+Cluster: demon-smoke-test (namespace: demon-system)
+6 manifests will be generated.
+
+Configuration summary:
+  Cluster: demon-smoke-test (v1.28.2+k3s1)
+  Runtime: k3s
+  Namespace: demon-system
+  NATS URL: nats://nats.demon-system.svc.cluster.local:4222
+  Stream: RITUAL_EVENTS
+  UI URL: http://operate-ui.demon-system.svc.cluster.local:3000
+  Add-ons: 1
+    - monitoring (enabled: true)
+  Secrets: env (5 keys)
+    - Keys to be configured: ["github_token", "jwt_secret", "nats_password", "admin_token", "database_url"]
+  Networking:
+    Ingress: disabled
+    Service mesh: disabled
+
+📋 k3s Installation Plan:
+  Version: v1.28.2+k3s1
+  Channel: stable
+  Data Directory: /var/lib/rancher/k3s
+  Node Name: demon-smoke-node
+  Extra Arguments: --disable=traefik --disable=servicelb
+
+🔧 Install Command that would be executed:
+  curl -sfL https://get.k3s.io | \
+    INSTALL_K3S_VERSION='v1.28.2+k3s1' \
+    sh -s - \
+      server \
+      --data-dir \
+      /var/lib/rancher/k3s \
+      --node-name \
+      demon-smoke-node \
+      --disable=traefik \
+      --disable=servicelb \
+
+Manifests to be applied:
+  - demon-secrets (Secret)
+  - namespace.yaml
+  - nats.yaml
+  - runtime.yaml
+  - engine.yaml
+  - operate-ui.yaml
+
+Generated manifests:
+---
+apiVersion: v1
+data:
+  admin_token: UkVEQUNURUQ=
+  database_url: UkVEQUNURUQ=
+  github_token: UkVEQUNURUQ=
+  jwt_secret: UkVEQUNURUQ=
+  nats_password: UkVEQUNURUQ=
+kind: Secret
+metadata:
+  labels:
+    app.kubernetes.io/component: secrets
+    app.kubernetes.io/managed-by: demon-bootstrapper
+  name: demon-secrets
+  namespace: demon-system
+type: Opaque
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demon-system
+  labels:
+    app.kubernetes.io/name: demon
+    app.kubernetes.io/component: system
+---
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nats
+  namespace: demon-system
+  labels:
+    app.kubernetes.io/name: nats
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/part-of: demon
+spec:
+  selector:
+    app.kubernetes.io/name: nats
+  ports:
+    - name: client
+      port: 4222
+      targetPort: 4222
+    - name: monitor
+      port: 8222
+      targetPort: 8222
+    - name: routing
+      port: 6222
+      targetPort: 6222
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nats
+  namespace: demon-system
+  labels:
+    app.kubernetes.io/name: nats
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/part-of: demon
+spec:
+  serviceName: nats
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nats
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nats
+        app.kubernetes.io/component: messaging
+        app.kubernetes.io/part-of: demon
+    spec:
+      containers:
+      - name: nats
+        image: nats:2.10-alpine
+        args:
+          - "-js"
+          - "-sd"
+          - "/data"
+          - "-m"
+          - "8222"
+        ports:
+        - containerPort: 4222
+          name: client
+        - containerPort: 8222
+          name: monitor
+        - containerPort: 6222
+          name: routing
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        livenessProbe:
+          httpGet:
+            path: /varz
+            port: 8222
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /varz
+            port: 8222
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: local-path
+      resources:
+        requests:
+          storage: 5Gi
+---
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demon-runtime
+  namespace: demon-system
+  labels:
+    app.kubernetes.io/name: demon-runtime
+    app.kubernetes.io/component: runtime
+    app.kubernetes.io/part-of: demon
+spec:
+  selector:
+    app.kubernetes.io/name: demon-runtime
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demon-runtime
+  namespace: demon-system
+  labels:
+    app.kubernetes.io/name: demon-runtime
+    app.kubernetes.io/component: runtime
+    app.kubernetes.io/part-of: demon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: demon-runtime
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: demon-runtime
+        app.kubernetes.io/component: runtime
+        app.kubernetes.io/part-of: demon
+    spec:
+      containers:
+      - name: runtime
+        # TEMPORARY: Using nginx as placeholder until GHCR images are built
+        # TODO: Replace with ghcr.io/demon-project/runtime:latest once Docker infrastructure is implemented
+        image: nginx:alpine
+        command: ["/bin/sh", "-c", "while true; do echo 'Runtime placeholder running'; sleep 30; done"]
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: NATS_URL
+          value: "nats://nats.demon-system.svc.cluster.local:4222"
+        - name: STREAM_NAME
+          value: "RITUAL_EVENTS"
+        # TEMPORARY: Disabled health checks for placeholder image
+        # livenessProbe:
+        #   httpGet:
+        #     path: /health
+        #     port: 8080
+        #   initialDelaySeconds: 30
+        #   periodSeconds: 10
+        # readinessProbe:
+        #   httpGet:
+        #     path: /ready
+        #     port: 8080
+        #   initialDelaySeconds: 5
+        #   periodSeconds: 5
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+---
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demon-engine
+  namespace: demon-system
+  labels:
+    app.kubernetes.io/name: demon-engine
+    app.kubernetes.io/component: engine
+    app.kubernetes.io/part-of: demon
+spec:
+  selector:
+    app.kubernetes.io/name: demon-engine
+  ports:
+    - name: http
+      port: 8081
+      targetPort: 8081
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demon-engine
+  namespace: demon-system
+  labels:
+    app.kubernetes.io/name: demon-engine
+    app.kubernetes.io/component: engine
+    app.kubernetes.io/part-of: demon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: demon-engine
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: demon-engine
+        app.kubernetes.io/component: engine
+        app.kubernetes.io/part-of: demon
+    spec:
+      containers:
+      - name: engine
+        # TEMPORARY: Using nginx as placeholder until GHCR images are built
+        # TODO: Replace with ghcr.io/demon-project/engine:latest once Docker infrastructure is implemented
+        image: nginx:alpine
+        command: ["/bin/sh", "-c", "while true; do echo 'Engine placeholder running'; sleep 30; done"]
+        ports:
+        - containerPort: 8081
+          name: http
+        env:
+        - name: NATS_URL
+          value: "nats://nats.demon-system.svc.cluster.local:4222"
+        - name: STREAM_NAME
+          value: "RITUAL_EVENTS"
+        - name: SUBJECTS
+          value: "ritual.>,approval.>,smoke-test.>"
+        - name: DEDUPE_WINDOW_SECS
+          value: "30"
+        # TEMPORARY: Disabled health checks for placeholder image
+        # livenessProbe:
+        #   httpGet:
+        #     path: /health
+        #     port: 8081
+        #   initialDelaySeconds: 30
+        #   periodSeconds: 10
+        # readinessProbe:
+        #   httpGet:
+        #     path: /ready
+        #     port: 8081
+        #   initialDelaySeconds: 5
+        #   periodSeconds: 5
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+---
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: operate-ui
+  namespace: demon-system
+  labels:
+    app.kubernetes.io/name: operate-ui
+    app.kubernetes.io/component: ui
+    app.kubernetes.io/part-of: demon
+spec:
+  selector:
+    app.kubernetes.io/name: operate-ui
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: operate-ui
+  namespace: demon-system
+  labels:
+    app.kubernetes.io/name: operate-ui
+    app.kubernetes.io/component: ui
+    app.kubernetes.io/part-of: demon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: operate-ui
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: operate-ui
+        app.kubernetes.io/component: ui
+        app.kubernetes.io/part-of: demon
+    spec:
+      containers:
+      - name: ui
+        # TEMPORARY: Using nginx as placeholder until GHCR images are built
+        # TODO: Replace with ghcr.io/demon-project/operate-ui:latest once Docker infrastructure is implemented
+        image: nginx:alpine
+        command: ["/bin/sh", "-c", "while true; do echo 'Operate UI placeholder running'; sleep 30; done"]
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: NATS_URL
+          value: "nats://nats.demon-system.svc.cluster.local:4222"
+        - name: STREAM_NAME
+          value: "RITUAL_EVENTS"
+        - name: API_BASE_URL
+          value: "http://demon-engine.demon-system.svc.cluster.local:8081"
+        # TEMPORARY: Disabled health checks for placeholder image
+        # livenessProbe:
+        #   httpGet:
+        #     path: /api/health
+        #     port: 3000
+        #   initialDelaySeconds: 30
+        #   periodSeconds: 10
+        # readinessProbe:
+        #   httpGet:
+        #     path: /api/health
+        #     port: 3000
+        #   initialDelaySeconds: 5
+        #   periodSeconds: 5
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"

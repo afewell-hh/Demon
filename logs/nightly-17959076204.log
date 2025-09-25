@@ -1,0 +1,503 @@
+k8s-bootstrapper-smoke-full	Set up job	﻿2025-09-23T21:06:48.0931583Z Current runner version: '2.328.0'
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0965386Z ##[group]Runner Image Provisioner
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0966795Z Hosted Compute Agent
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0967657Z Version: 20250829.383
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0968611Z Commit: 27cb235aab5b0e52e153a26cd86b4742e89dac5d
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0969828Z Build Date: 2025-08-29T13:48:48Z
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0970769Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0971597Z ##[group]Operating System
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0972819Z Ubuntu
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0973625Z 24.04.3
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0974335Z LTS
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0975118Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0975888Z ##[group]Runner Image
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0976777Z Image: ubuntu-24.04
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0977652Z Version: 20250907.24.1
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0979302Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20250907.24/images/ubuntu/Ubuntu2404-Readme.md
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0981659Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20250907.24
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0983809Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0985613Z ##[group]GITHUB_TOKEN Permissions
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0988035Z Contents: read
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0988824Z Metadata: read
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0989827Z Packages: read
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0990569Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0993603Z Secret source: Actions
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.0994670Z Prepare workflow directory
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.1450386Z Prepare all required actions
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.1505878Z Getting action download info
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.5091327Z Download action repository 'actions/checkout@v4' (SHA:08eba0b27e820071cde6df949e0beb9ba4906955)
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.5832208Z Download action repository 'dtolnay/rust-toolchain@v1' (SHA:e97e2d8cc328f1b50210efc529dca0028893a2d9)
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:48.8135136Z Download action repository 'Swatinem/rust-cache@v2' (SHA:98c8021b550208e191a6a3145459bfc9fb29c4c0)
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:49.0721718Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+k8s-bootstrapper-smoke-full	Set up job	2025-09-23T21:06:49.2999098Z Complete job name: k8s-bootstrapper-smoke-full
+k8s-bootstrapper-smoke-full	Checkout	﻿2025-09-23T21:06:49.3690933Z ##[group]Run actions/checkout@v4
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.3692056Z with:
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.3692522Z   repository: afewell-hh/Demon
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.3693190Z   token: ***
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.3693588Z   ssh-strict: true
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.3694008Z   ssh-user: git
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.3694420Z   persist-credentials: true
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.3694905Z   clean: true
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.3695318Z   sparse-checkout-cone-mode: true
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.3695827Z   fetch-depth: 1
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.3696238Z   fetch-tags: false
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.3696660Z   show-progress: true
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.3697082Z   lfs: false
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.3697459Z   submodules: false
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.3697882Z   set-safe-directory: true
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.3698605Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.4785039Z Syncing repository: afewell-hh/Demon
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.4788044Z ##[group]Getting Git version info
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.4788999Z Working directory is '/home/runner/work/Demon/Demon'
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.4790032Z [command]/usr/bin/git version
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.4833962Z git version 2.51.0
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.4860245Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.4876064Z Temporarily overriding HOME='/home/runner/work/_temp/a8c9e20d-550d-436a-8407-853df974d6a7' before making global git config changes
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.4878796Z Adding repository directory to the temporary git global config as a safe directory
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.4889493Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Demon/Demon
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.4925146Z Deleting the contents of '/home/runner/work/Demon/Demon'
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.4929104Z ##[group]Initializing the repository
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.4933944Z [command]/usr/bin/git init /home/runner/work/Demon/Demon
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5006653Z hint: Using 'master' as the name for the initial branch. This default branch name
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5008295Z hint: is subject to change. To configure the initial branch name to use in all
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5010223Z hint: of your new repositories, which will suppress this warning, call:
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5011489Z hint:
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5012693Z hint: 	git config --global init.defaultBranch <name>
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5014105Z hint:
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5015231Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5017117Z hint: 'development'. The just-created branch can be renamed via this command:
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5018529Z hint:
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5019232Z hint: 	git branch -m <name>
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5020071Z hint:
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5021283Z hint: Disable this message with "git config set advice.defaultBranchName false"
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5023468Z Initialized empty Git repository in /home/runner/work/Demon/Demon/.git/
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5026356Z [command]/usr/bin/git remote add origin https://github.com/afewell-hh/Demon
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5059589Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5060919Z ##[group]Disabling automatic garbage collection
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5064523Z [command]/usr/bin/git config --local gc.auto 0
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5092974Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5094382Z ##[group]Setting up auth
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5100250Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5130725Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5408754Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5438859Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5656880Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5690342Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5692245Z ##[group]Fetching the repository
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.5700576Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +656a11cd93d483e88a45a97cd0f1d2875e0d1496:refs/remotes/origin/main
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.9366417Z From https://github.com/afewell-hh/Demon
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.9369076Z  * [new ref]         656a11cd93d483e88a45a97cd0f1d2875e0d1496 -> origin/main
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.9396845Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.9398158Z ##[group]Determining the checkout info
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.9399408Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.9403794Z [command]/usr/bin/git sparse-checkout disable
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.9443292Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.9470212Z ##[group]Checking out the ref
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:49.9473911Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:50.0043668Z Switched to a new branch 'main'
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:50.0045534Z branch 'main' set up to track 'origin/main'.
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:50.0055490Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:50.0093855Z [command]/usr/bin/git log -1 --format=%H
+k8s-bootstrapper-smoke-full	Checkout	2025-09-23T21:06:50.0115678Z 656a11cd93d483e88a45a97cd0f1d2875e0d1496
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	﻿2025-09-23T21:06:50.0615861Z ##[group]Run dtolnay/rust-toolchain@v1
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0617089Z with:
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0617946Z   toolchain: 1.82.0
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0618827Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0764877Z ##[group]Run : parse toolchain version
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0766165Z [36;1m: parse toolchain version[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0767260Z [36;1mif [[ -z $toolchain ]]; then[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0769129Z [36;1m  # GitHub does not enforce `required: true` inputs itself. https://github.com/actions/runner/issues/1070[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0771131Z [36;1m  echo "'toolchain' is a required input" >&2[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0772457Z [36;1m  exit 1[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0773699Z [36;1melif [[ $toolchain =~ ^stable' '[0-9]+' '(year|month|week|day)s?' 'ago$ ]]; then[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0775498Z [36;1m  if [[ Linux == macOS ]]; then[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0777371Z [36;1m    echo "toolchain=1.$((($(date -v-$(sed 's/stable \([0-9]*\) \(.\).*/\1\2/' <<< $toolchain) +%s)/60/60/24-16569)/7/6))" >> $GITHUB_OUTPUT[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0779306Z [36;1m  else[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0780826Z [36;1m    echo "toolchain=1.$((($(date --date "${toolchain#stable }" +%s)/60/60/24-16569)/7/6))" >> $GITHUB_OUTPUT[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0782687Z [36;1m  fi[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0783849Z [36;1melif [[ $toolchain =~ ^stable' 'minus' '[0-9]+' 'releases?$ ]]; then[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0786283Z [36;1m  echo "toolchain=1.$((($(date +%s)/60/60/24-16569)/7/6-${toolchain//[^0-9]/}))" >> $GITHUB_OUTPUT[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0788319Z [36;1melif [[ $toolchain =~ ^1\.[0-9]+$ ]]; then[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0790657Z [36;1m  echo "toolchain=1.$((i=${toolchain#1.}, c=($(date +%s)/60/60/24-16569)/7/6, i+9*i*(10*i<=c)+90*i*(100*i<=c)))" >> $GITHUB_OUTPUT[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0792968Z [36;1melse[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0793941Z [36;1m  echo "toolchain=$toolchain" >> $GITHUB_OUTPUT[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0795110Z [36;1mfi[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0859371Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0860725Z env:
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0861452Z   toolchain: 1.82.0
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.0862459Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1152051Z ##[group]Run : construct rustup command line
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1154176Z [36;1m: construct rustup command line[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1157077Z [36;1mecho "targets=$(for t in ${targets//,/ }; do echo -n ' --target' $t; done)" >> $GITHUB_OUTPUT[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1161082Z [36;1mecho "components=$(for c in ${components//,/ }; do echo -n ' --component' $c; done)" >> $GITHUB_OUTPUT[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1164529Z [36;1mecho "downgrade=" >> $GITHUB_OUTPUT[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1214429Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1216619Z env:
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1217922Z   targets: 
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1219224Z   components: 
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1220567Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1372775Z ##[group]Run : set $CARGO_HOME
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1374433Z [36;1m: set $CARGO_HOME[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1376549Z [36;1mecho CARGO_HOME=${CARGO_HOME:-"$HOME/.cargo"} >> $GITHUB_ENV[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1422285Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1424411Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1546467Z ##[group]Run : install rustup if needed
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1547596Z [36;1m: install rustup if needed[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1548725Z [36;1mif ! command -v rustup &>/dev/null; then[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1551367Z [36;1m  curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused --location --silent --show-error --fail https://sh.rustup.rs | sh -s -- --default-toolchain none -y[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1554274Z [36;1m  echo "$CARGO_HOME/bin" >> $GITHUB_PATH[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1555399Z [36;1mfi[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1586491Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1587760Z env:
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1588518Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1589491Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1704932Z ##[group]Run rustup toolchain install 1.82.0 --profile minimal --no-self-update
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1707184Z [36;1mrustup toolchain install 1.82.0 --profile minimal --no-self-update[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1744684Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1746769Z env:
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1748013Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.1749616Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.3060681Z info: syncing channel updates for '1.82.0-x86_64-unknown-linux-gnu'
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.4997576Z info: latest update on 2024-10-17, rust version 1.82.0 (f6e511eec 2024-10-15)
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.5000500Z info: downloading component 'cargo'
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.5805573Z info: downloading component 'rust-std'
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:50.7449890Z info: downloading component 'rustc'
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:51.3984923Z info: installing component 'cargo'
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:52.0175629Z info: installing component 'rust-std'
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:53.7832463Z info: installing component 'rustc'
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.1371993Z 
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.1477379Z   1.82.0-x86_64-unknown-linux-gnu installed - rustc 1.82.0 (f6e511eec 2024-10-15)
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.1478024Z 
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.1532784Z ##[group]Run rustup default 1.82.0
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.1533118Z [36;1mrustup default 1.82.0[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.1563464Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.1563834Z env:
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.1564056Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.1564316Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.1665940Z info: using existing install for '1.82.0-x86_64-unknown-linux-gnu'
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.1961693Z info: default toolchain set to '1.82.0-x86_64-unknown-linux-gnu'
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.1962449Z 
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2067381Z   1.82.0-x86_64-unknown-linux-gnu unchanged - rustc 1.82.0 (f6e511eec 2024-10-15)
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2067852Z 
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2068508Z info: note that the toolchain 'stable-x86_64-unknown-linux-gnu' is currently in use (overridden by '/home/runner/work/Demon/Demon/rust-toolchain.toml')
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2110758Z ##[group]Run : create cachekey
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2111069Z [36;1m: create cachekey[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2111523Z [36;1mDATE=$(rustc +1.82.0 --version --verbose | sed -ne 's/^commit-date: \(20[0-9][0-9]\)-\([01][0-9]\)-\([0-3][0-9]\)$/\1\2\3/p')[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2112645Z [36;1mHASH=$(rustc +1.82.0 --version --verbose | sed -ne 's/^commit-hash: //p')[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2113161Z [36;1mecho "cachekey=$(echo $DATE$HASH | head -c12)" >> $GITHUB_OUTPUT[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2143437Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2143811Z env:
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2144027Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2144282Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2569226Z ##[group]Run : disable incremental compilation
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2569614Z [36;1m: disable incremental compilation[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2569969Z [36;1mif [ -z "${CARGO_INCREMENTAL+set}" ]; then[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2570315Z [36;1m  echo CARGO_INCREMENTAL=0 >> $GITHUB_ENV[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2570607Z [36;1mfi[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2600618Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2600986Z env:
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2601233Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2601496Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2668354Z ##[group]Run : enable colors in Cargo output
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2668697Z [36;1m: enable colors in Cargo output[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2669013Z [36;1mif [ -z "${CARGO_TERM_COLOR+set}" ]; then[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2669354Z [36;1m  echo CARGO_TERM_COLOR=always >> $GITHUB_ENV[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2669644Z [36;1mfi[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2696717Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2697087Z env:
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2697298Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2697560Z   CARGO_INCREMENTAL: 0
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2697786Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2764464Z ##[group]Run : enable Cargo sparse registry
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2764818Z [36;1m: enable Cargo sparse registry[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2765378Z [36;1m# implemented in 1.66, stabilized in 1.68, made default in 1.70[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2766040Z [36;1mif [ -z "${CARGO_REGISTRIES_CRATES_IO_PROTOCOL+set}" -o -f "/home/runner/work/_temp"/.implicit_cargo_registries_crates_io_protocol ]; then[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2766701Z [36;1m  if rustc +1.82.0 --version --verbose | grep -q '^release: 1\.6[89]\.'; then[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2767228Z [36;1m    touch "/home/runner/work/_temp"/.implicit_cargo_registries_crates_io_protocol || true[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2767750Z [36;1m    echo CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse >> $GITHUB_ENV[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2768226Z [36;1m  elif rustc +1.82.0 --version --verbose | grep -q '^release: 1\.6[67]\.'; then[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2768900Z [36;1m    touch "/home/runner/work/_temp"/.implicit_cargo_registries_crates_io_protocol || true[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2769397Z [36;1m    echo CARGO_REGISTRIES_CRATES_IO_PROTOCOL=git >> $GITHUB_ENV[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2769738Z [36;1m  fi[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2769947Z [36;1mfi[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2797430Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2797791Z env:
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2798003Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2798268Z   CARGO_INCREMENTAL: 0
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2798501Z   CARGO_TERM_COLOR: always
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.2798732Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3183829Z ##[group]Run : work around spurious network errors in curl 8.0
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3184310Z [36;1m: work around spurious network errors in curl 8.0[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3185035Z [36;1m# https://rust-lang.zulipchat.com/#narrow/stream/246057-t-cargo/topic/timeout.20investigation[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3185649Z [36;1mif rustc +1.82.0 --version --verbose | grep -q '^release: 1\.7[01]\.'; then[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3186087Z [36;1m  echo CARGO_HTTP_MULTIPLEXING=false >> $GITHUB_ENV[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3186407Z [36;1mfi[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3216762Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3217118Z env:
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3217541Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3217988Z   CARGO_INCREMENTAL: 0
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3218373Z   CARGO_TERM_COLOR: always
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3218741Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3455399Z ##[group]Run rustc +1.82.0 --version --verbose
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3455786Z [36;1mrustc +1.82.0 --version --verbose[0m
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3486617Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3486980Z env:
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3487198Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3487459Z   CARGO_INCREMENTAL: 0
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3487699Z   CARGO_TERM_COLOR: always
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3487953Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3678276Z rustc 1.82.0 (f6e511eec 2024-10-15)
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3679121Z binary: rustc
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3679678Z commit-hash: f6e511eec7342f59a25f7c0534f1dbea00d01b14
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3680301Z commit-date: 2024-10-15
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3680782Z host: x86_64-unknown-linux-gnu
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3681218Z release: 1.82.0
+k8s-bootstrapper-smoke-full	Install Rust (pinned toolchain)	2025-09-23T21:06:58.3681650Z LLVM version: 19.1.1
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	﻿2025-09-23T21:06:58.3802296Z ##[group]Run Swatinem/rust-cache@v2
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:58.3802630Z with:
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:58.3802840Z   workspaces: .
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:58.3803078Z   cache-on-failure: true
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:58.3803318Z   prefix-key: v0-rust
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:58.3824504Z   cache-targets: true
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:58.3824807Z   cache-all-crates: false
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:58.3825077Z   cache-workspace-crates: false
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:58.3825344Z   save-if: true
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:58.3825572Z   cache-provider: github
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:58.3825825Z   cache-bin: true
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:58.3826072Z   lookup-only: false
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:58.3826291Z env:
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:58.3826508Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:58.3826773Z   CARGO_INCREMENTAL: 0
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:58.3827011Z   CARGO_TERM_COLOR: always
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:58.3827244Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9624765Z ##[group]Cache Configuration
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9625300Z Cache Provider:
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9625641Z     github
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9625990Z Workspaces:
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9626403Z     /home/runner/work/Demon/Demon
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9626817Z Cache Paths:
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9627150Z     /home/runner/.cargo/bin
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9627568Z     /home/runner/.cargo/.crates.toml
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9628014Z     /home/runner/.cargo/.crates2.json
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9628482Z     /home/runner/.cargo/registry
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9628913Z     /home/runner/.cargo/git
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9629319Z     /home/runner/work/Demon/Demon/target
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9629818Z Restore Key:
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9630751Z     v0-rust-k8s-bootstrapper-smoke-full-Linux-x64-e4b5b4e2
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9631290Z Cache Key:
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9631785Z     v0-rust-k8s-bootstrapper-smoke-full-Linux-x64-e4b5b4e2-1df8841a
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9632617Z .. Prefix:
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9633032Z   - v0-rust-k8s-bootstrapper-smoke-full-Linux-x64
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9633595Z .. Environment considered:
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9634238Z   - Rust Version: 1.89.0 x86_64-unknown-linux-gnu (29483883eed69d5fb4db01964cdf2af4d86e9cb2)
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9634941Z   - CARGO_HOME
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9635290Z   - CARGO_INCREMENTAL
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9635643Z   - CARGO_TERM_COLOR
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9636011Z .. Lockfiles considered:
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9636447Z   - /home/runner/work/Demon/Demon/.cargo/config.toml
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9637137Z   - /home/runner/work/Demon/Demon/bootstrapper/demonctl/Cargo.toml
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9637860Z   - /home/runner/work/Demon/Demon/capsules/echo/Cargo.toml
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9638462Z   - /home/runner/work/Demon/Demon/Cargo.lock
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9639100Z   - /home/runner/work/Demon/Demon/crates/config-loader/Cargo.toml
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9639933Z   - /home/runner/work/Demon/Demon/crates/envelope-derive/Cargo.toml
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9640658Z   - /home/runner/work/Demon/Demon/crates/envelope/Cargo.toml
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9641265Z   - /home/runner/work/Demon/Demon/demonctl/Cargo.toml
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9642028Z   - /home/runner/work/Demon/Demon/engine/Cargo.toml
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9642664Z   - /home/runner/work/Demon/Demon/operate-ui/Cargo.toml
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9643277Z   - /home/runner/work/Demon/Demon/runtime/Cargo.toml
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9643882Z   - /home/runner/work/Demon/Demon/rust-toolchain.toml
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9644459Z   - /home/runner/work/Demon/Demon/wards/Cargo.toml
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9645273Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9645472Z 
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:06:59.9645619Z ... Restoring cache ...
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:07:00.1003424Z Cache hit for: v0-rust-k8s-bootstrapper-smoke-full-Linux-x64-e4b5b4e2-1df8841a
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:07:01.1520316Z Received 188743680 of 388553117 (48.6%), 180.0 MBs/sec
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:07:02.0994622Z Received 388553117 of 388553117 (100.0%), 190.2 MBs/sec
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:07:02.0996194Z Cache Size: ~371 MB (388553117 B)
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:07:02.1125834Z [command]/usr/bin/tar -xf /home/runner/work/_temp/dc7da5a4-b0a4-4dc8-b9ee-aff420198c6d/cache.tzst -P -C /home/runner/work/Demon/Demon --use-compress-program unzstd
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:07:04.5451151Z Cache restored successfully
+k8s-bootstrapper-smoke-full	Cache cargo registry + target	2025-09-23T21:07:04.6175068Z Restored from cache key "v0-rust-k8s-bootstrapper-smoke-full-Linux-x64-e4b5b4e2-1df8841a" full match: true.
+k8s-bootstrapper-smoke-full	Install k3d	﻿2025-09-23T21:07:04.6417445Z ##[group]Run curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | sudo TAG=v5.4.6 bash
+k8s-bootstrapper-smoke-full	Install k3d	2025-09-23T21:07:04.6418183Z [36;1mcurl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | sudo TAG=v5.4.6 bash[0m
+k8s-bootstrapper-smoke-full	Install k3d	2025-09-23T21:07:04.6449134Z shell: /usr/bin/bash -e {0}
+k8s-bootstrapper-smoke-full	Install k3d	2025-09-23T21:07:04.6449371Z env:
+k8s-bootstrapper-smoke-full	Install k3d	2025-09-23T21:07:04.6449552Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Install k3d	2025-09-23T21:07:04.6449819Z   CARGO_INCREMENTAL: 0
+k8s-bootstrapper-smoke-full	Install k3d	2025-09-23T21:07:04.6450021Z   CARGO_TERM_COLOR: always
+k8s-bootstrapper-smoke-full	Install k3d	2025-09-23T21:07:04.6450237Z   CACHE_ON_FAILURE: true
+k8s-bootstrapper-smoke-full	Install k3d	2025-09-23T21:07:04.6450434Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install k3d	2025-09-23T21:07:04.9527035Z Preparing to install k3d into /usr/local/bin
+k8s-bootstrapper-smoke-full	Install k3d	2025-09-23T21:07:04.9665669Z k3d installed into /usr/local/bin/k3d
+k8s-bootstrapper-smoke-full	Install k3d	2025-09-23T21:07:04.9666242Z Run 'k3d --help' to see what you can do with it.
+k8s-bootstrapper-smoke-full	Install kubectl	﻿2025-09-23T21:07:04.9746453Z ##[group]Run curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+k8s-bootstrapper-smoke-full	Install kubectl	2025-09-23T21:07:04.9747235Z [36;1mcurl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"[0m
+k8s-bootstrapper-smoke-full	Install kubectl	2025-09-23T21:07:04.9747796Z [36;1msudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl[0m
+k8s-bootstrapper-smoke-full	Install kubectl	2025-09-23T21:07:04.9777269Z shell: /usr/bin/bash -e {0}
+k8s-bootstrapper-smoke-full	Install kubectl	2025-09-23T21:07:04.9777501Z env:
+k8s-bootstrapper-smoke-full	Install kubectl	2025-09-23T21:07:04.9777682Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Install kubectl	2025-09-23T21:07:04.9778108Z   CARGO_INCREMENTAL: 0
+k8s-bootstrapper-smoke-full	Install kubectl	2025-09-23T21:07:04.9778337Z   CARGO_TERM_COLOR: always
+k8s-bootstrapper-smoke-full	Install kubectl	2025-09-23T21:07:04.9778544Z   CACHE_ON_FAILURE: true
+k8s-bootstrapper-smoke-full	Install kubectl	2025-09-23T21:07:04.9778745Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Install kubectl	2025-09-23T21:07:05.4530768Z   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+k8s-bootstrapper-smoke-full	Install kubectl	2025-09-23T21:07:05.4531637Z                                  Dload  Upload   Total   Spent    Left  Speed
+k8s-bootstrapper-smoke-full	Install kubectl	2025-09-23T21:07:05.4532301Z 
+k8s-bootstrapper-smoke-full	Install kubectl	2025-09-23T21:07:05.5186032Z   0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+k8s-bootstrapper-smoke-full	Install kubectl	2025-09-23T21:07:05.5186741Z 100   138  100   138    0     0   2101      0 --:--:-- --:--:-- --:--:--  2123
+k8s-bootstrapper-smoke-full	Install kubectl	2025-09-23T21:07:05.6191283Z 
+k8s-bootstrapper-smoke-full	Install kubectl	2025-09-23T21:07:05.7895882Z  17 57.7M   17 10.3M    0     0  62.0M      0 --:--:-- --:--:-- --:--:-- 62.0M
+k8s-bootstrapper-smoke-full	Install kubectl	2025-09-23T21:07:05.7896524Z 100 57.7M  100 57.7M    0     0   171M      0 --:--:-- --:--:-- --:--:--  279M
+k8s-bootstrapper-smoke-full	Build workspace	﻿2025-09-23T21:07:05.8483168Z ##[group]Run cargo build --workspace
+k8s-bootstrapper-smoke-full	Build workspace	2025-09-23T21:07:05.8483491Z [36;1mcargo build --workspace[0m
+k8s-bootstrapper-smoke-full	Build workspace	2025-09-23T21:07:05.8512401Z shell: /usr/bin/bash -e {0}
+k8s-bootstrapper-smoke-full	Build workspace	2025-09-23T21:07:05.8512626Z env:
+k8s-bootstrapper-smoke-full	Build workspace	2025-09-23T21:07:05.8512811Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Build workspace	2025-09-23T21:07:05.8513047Z   CARGO_INCREMENTAL: 0
+k8s-bootstrapper-smoke-full	Build workspace	2025-09-23T21:07:05.8513252Z   CARGO_TERM_COLOR: always
+k8s-bootstrapper-smoke-full	Build workspace	2025-09-23T21:07:05.8513465Z   CACHE_ON_FAILURE: true
+k8s-bootstrapper-smoke-full	Build workspace	2025-09-23T21:07:05.8513657Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Build workspace	2025-09-23T21:07:07.3690391Z [1m[32m    Updating[0m crates.io index
+k8s-bootstrapper-smoke-full	Build workspace	2025-09-23T21:07:08.7527543Z [1m[32m   Compiling[0m envelope-derive v0.1.0 (/home/runner/work/Demon/Demon/crates/envelope-derive)
+k8s-bootstrapper-smoke-full	Build workspace	2025-09-23T21:07:08.7548346Z [1m[32m   Compiling[0m config-loader v0.1.0 (/home/runner/work/Demon/Demon/crates/config-loader)
+k8s-bootstrapper-smoke-full	Build workspace	2025-09-23T21:07:08.7574936Z [1m[32m   Compiling[0m wards v0.1.0 (/home/runner/work/Demon/Demon/wards)
+k8s-bootstrapper-smoke-full	Build workspace	2025-09-23T21:07:08.7610988Z [1m[32m   Compiling[0m bootstrapper-demonctl v0.1.0 (/home/runner/work/Demon/Demon/bootstrapper/demonctl)
+k8s-bootstrapper-smoke-full	Build workspace	2025-09-23T21:07:14.8038370Z [1m[32m   Compiling[0m envelope v0.1.0 (/home/runner/work/Demon/Demon/crates/envelope)
+k8s-bootstrapper-smoke-full	Build workspace	2025-09-23T21:07:15.2394060Z [1m[32m   Compiling[0m capsules_echo v0.0.1 (/home/runner/work/Demon/Demon/capsules/echo)
+k8s-bootstrapper-smoke-full	Build workspace	2025-09-23T21:07:15.3686767Z [1m[32m   Compiling[0m runtime v0.1.0 (/home/runner/work/Demon/Demon/runtime)
+k8s-bootstrapper-smoke-full	Build workspace	2025-09-23T21:07:16.2673368Z [1m[32m   Compiling[0m engine v0.1.0 (/home/runner/work/Demon/Demon/engine)
+k8s-bootstrapper-smoke-full	Build workspace	2025-09-23T21:07:16.2674923Z [1m[32m   Compiling[0m operate-ui v0.1.0 (/home/runner/work/Demon/Demon/operate-ui)
+k8s-bootstrapper-smoke-full	Build workspace	2025-09-23T21:07:17.6235064Z [1m[32m   Compiling[0m demonctl v0.0.1 (/home/runner/work/Demon/Demon/demonctl)
+k8s-bootstrapper-smoke-full	Build workspace	2025-09-23T21:07:26.9626833Z [1m[32m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 21.06s
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	﻿2025-09-23T21:07:26.9919972Z ##[group]Run make bootstrap-smoke ARGS="--cleanup --verbose"
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:26.9920392Z [36;1mmake bootstrap-smoke ARGS="--cleanup --verbose"[0m
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:26.9949486Z shell: /usr/bin/bash -e {0}
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:26.9949722Z env:
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:26.9949901Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:26.9950151Z   CARGO_INCREMENTAL: 0
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:26.9950350Z   CARGO_TERM_COLOR: always
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:26.9950560Z   CACHE_ON_FAILURE: true
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:26.9950768Z   GITHUB_TOKEN: test-token-value
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:26.9950997Z   ADMIN_TOKEN: test-admin-token
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:26.9951267Z   DATABASE_URL: postgresql://localhost/demon_test
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:26.9951582Z   NATS_PASSWORD: test-nats-password
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:26.9952009Z   JWT_SECRET: test-jwt-secret-12345
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:26.9952298Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:27.0034541Z Running Kubernetes bootstrapper smoke test...
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:27.0112736Z [0;34m[21:07:27][0m Starting Kubernetes bootstrapper smoke test...
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:27.0129316Z [0;34m[21:07:27][0m Mode: FULL
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:27.0142104Z [0;34m[21:07:27][0m Checking dependencies...
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:27.0155221Z [0;34m[21:07:27][0m Found k3d (preferred)
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:27.0156989Z [0;32m[SUCCESS][0m All dependencies available
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:27.0169973Z [0;34m[21:07:27][0m Creating artifacts directory: /home/runner/work/Demon/Demon/dist/bootstrapper-smoke/20250923-210727
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:27.0196331Z [0;34m[21:07:27][0m Provisioning k3d cluster: demon-smoke-test
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:27.0532874Z [36mINFO[0m[0000] Prep: Network                                
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:27.1416748Z [36mINFO[0m[0000] Created network 'k3d-demon-smoke-test'       
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:27.1431728Z [36mINFO[0m[0000] Created image volume k3d-demon-smoke-test-images 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:27.1437946Z [36mINFO[0m[0000] Creating node 'demon-registry'               
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:27.4129343Z [36mINFO[0m[0000] Pulling image 'docker.io/library/registry:2' 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:28.8233004Z [36mINFO[0m[0001] Successfully created registry 'demon-registry' 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:28.8337582Z [36mINFO[0m[0001] Starting new tools node...                   
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:29.2214562Z [36mINFO[0m[0002] Pulling image 'ghcr.io/k3d-io/k3d-tools:5.4.6' 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:29.8394920Z [36mINFO[0m[0002] Creating node 'k3d-demon-smoke-test-server-0' 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:30.0210057Z [36mINFO[0m[0002] Pulling image 'docker.io/rancher/k3s:v1.24.4-k3s1' 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:30.2338635Z [36mINFO[0m[0003] Starting Node 'k3d-demon-smoke-test-tools'   
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:32.4298195Z [36mINFO[0m[0005] Creating LoadBalancer 'k3d-demon-smoke-test-serverlb' 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:33.4854007Z [36mINFO[0m[0006] Pulling image 'ghcr.io/k3d-io/k3d-proxy:5.4.6' 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:34.7045558Z [36mINFO[0m[0007] Using the k3d-tools node to gather environment information 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:34.7893213Z [36mINFO[0m[0007] HostIP: using network gateway 172.18.0.1 address 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:34.7894503Z [36mINFO[0m[0007] Starting cluster 'demon-smoke-test'          
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:34.7895387Z [36mINFO[0m[0007] Starting servers...                          
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:34.8135604Z [36mINFO[0m[0007] Starting Node 'k3d-demon-smoke-test-server-0' 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:38.8303149Z [36mINFO[0m[0011] All agents already running.                  
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:38.8328430Z [36mINFO[0m[0011] Starting helpers...                          
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:38.8345836Z [36mINFO[0m[0011] Starting Node 'demon-registry'               
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:38.8475441Z [36mINFO[0m[0011] Starting Node 'k3d-demon-smoke-test-serverlb' 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:45.2277669Z [36mINFO[0m[0018] Injecting records for hostAliases (incl. host.k3d.internal) and for 3 network members into CoreDNS configmap... 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:48.2412941Z [36mINFO[0m[0021] Cluster 'demon-smoke-test' created successfully! 
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:48.2469068Z [36mINFO[0m[0021] You can now use it like this:                
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:48.2469638Z kubectl cluster-info
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:48.2794858Z [0;34m[21:07:48][0m Waiting for cluster nodes to be ready...
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:48.3366006Z E0923 21:07:48.334152    3580 memcache.go:287] "Unhandled Error" err="couldn't get resource list for metrics.k8s.io/v1beta1: the server is currently unable to handle the request"
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:48.3453347Z E0923 21:07:48.345105    3580 memcache.go:121] "Unhandled Error" err="couldn't get resource list for metrics.k8s.io/v1beta1: the server is currently unable to handle the request"
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:48.3618373Z E0923 21:07:48.361670    3580 memcache.go:121] "Unhandled Error" err="couldn't get resource list for metrics.k8s.io/v1beta1: the server is currently unable to handle the request"
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:48.3637327Z E0923 21:07:48.363562    3580 memcache.go:121] "Unhandled Error" err="couldn't get resource list for metrics.k8s.io/v1beta1: the server is currently unable to handle the request"
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:48.7135633Z node/k3d-demon-smoke-test-server-0 condition met
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:48.7157633Z [0;32m[SUCCESS][0m Cluster demon-smoke-test is ready
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:48.8536362Z [0;34m[21:07:48][0m Running dry-run bootstrap validation...
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:48.8679184Z [0;32m[SUCCESS][0m Dry-run validation completed
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:07:48.8705304Z [0;34m[21:07:48][0m Running live bootstrap deployment...
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:08:29.3238124Z make: *** [Makefile:30: bootstrap-smoke] Error 1
+k8s-bootstrapper-smoke-full	Run full k8s bootstrapper smoke test	2025-09-23T21:08:29.3254552Z ##[error]Process completed with exit code 2.
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	﻿2025-09-23T21:08:29.3316361Z ##[group]Run actions/upload-artifact@v4
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.3316687Z with:
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.3316897Z   name: k8s-bootstrapper-smoke-nightly-5
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.3317296Z   path: dist/bootstrapper-smoke/
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.3317685Z   retention-days: 30
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.3318007Z   if-no-files-found: warn
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.3318258Z   compression-level: 6
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.3318466Z   overwrite: false
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.3318660Z   include-hidden-files: false
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.3318875Z env:
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.3319057Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.3319286Z   CARGO_INCREMENTAL: 0
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.3319487Z   CARGO_TERM_COLOR: always
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.3319694Z   CACHE_ON_FAILURE: true
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.3319897Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.5515478Z With the provided path, there will be 6 files uploaded
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.5522963Z Artifact name is valid!
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.5524435Z Root directory input is valid!
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.6802636Z Beginning upload of artifact content to blob storage
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.8376760Z Uploaded bytes 7901
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.8796985Z Finished uploading artifact content to blob storage!
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.8800066Z SHA256 digest of uploaded artifact zip is 7ea6aba8a3598c67b83f625a99010750ad81b765407b78b93ae51e18d3df93cb
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.8802105Z Finalizing artifact upload
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.9556285Z Artifact k8s-bootstrapper-smoke-nightly-5.zip successfully finalized. Artifact ID 4087430901
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.9557447Z Artifact k8s-bootstrapper-smoke-nightly-5 has been successfully uploaded! Final size is 7901 bytes. Artifact ID is 4087430901
+k8s-bootstrapper-smoke-full	Upload smoke test artifacts	2025-09-23T21:08:29.9565752Z Artifact download URL: https://github.com/afewell-hh/Demon/actions/runs/17959076204/artifacts/4087430901
+k8s-bootstrapper-smoke-full	Generate summary	﻿2025-09-23T21:08:29.9681306Z ##[group]Run echo "## K8s Bootstrapper Smoke Test Summary" >> $GITHUB_STEP_SUMMARY
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9685020Z [36;1mecho "## K8s Bootstrapper Smoke Test Summary" >> $GITHUB_STEP_SUMMARY[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9685750Z [36;1mecho "" >> $GITHUB_STEP_SUMMARY[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9686316Z [36;1mecho "**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9686933Z [36;1mecho "**Run ID:** 5" >> $GITHUB_STEP_SUMMARY[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9687457Z [36;1mecho "" >> $GITHUB_STEP_SUMMARY[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9687853Z [36;1m[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9688050Z [36;1mif [[ $? -eq 0 ]]; then[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9688366Z [36;1m  echo "✅ **Status:** PASSED" >> $GITHUB_STEP_SUMMARY[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9688689Z [36;1m  echo "" >> $GITHUB_STEP_SUMMARY[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9689029Z [36;1m  echo "- Cluster provisioning completed" >> $GITHUB_STEP_SUMMARY[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9689460Z [36;1m  echo "- Bootstrap deployment successful" >> $GITHUB_STEP_SUMMARY[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9689909Z [36;1m  echo "- Health checks passed" >> $GITHUB_STEP_SUMMARY[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9690325Z [36;1m  echo "- Artifacts captured and cleanup completed" >> $GITHUB_STEP_SUMMARY[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9690673Z [36;1melse[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9690906Z [36;1m  echo "❌ **Status:** FAILED" >> $GITHUB_STEP_SUMMARY[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9691200Z [36;1m  echo "" >> $GITHUB_STEP_SUMMARY[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9691628Z [36;1m  echo "Check the uploaded artifacts for detailed logs and cluster state." >> $GITHUB_STEP_SUMMARY[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9692402Z [36;1mfi[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9692589Z [36;1m[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9692781Z [36;1mecho "" >> $GITHUB_STEP_SUMMARY[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9693217Z [36;1mecho "**Artifacts:** Available as 'k8s-bootstrapper-smoke-nightly-5'" >> $GITHUB_STEP_SUMMARY[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9693666Z [36;1mecho "" >> $GITHUB_STEP_SUMMARY[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9694103Z [36;1mecho "**Next scheduled run:** $(date -d 'tomorrow 02:00 UTC' -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY[0m
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9724223Z shell: /usr/bin/bash -e {0}
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9724462Z env:
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9724652Z   CARGO_HOME: /home/runner/.cargo
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9724893Z   CARGO_INCREMENTAL: 0
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9725096Z   CARGO_TERM_COLOR: always
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9725310Z   CACHE_ON_FAILURE: true
+k8s-bootstrapper-smoke-full	Generate summary	2025-09-23T21:08:29.9725512Z ##[endgroup]
+k8s-bootstrapper-smoke-full	Post Cache cargo registry + target	﻿2025-09-23T21:08:29.9860762Z Post job cleanup.
+k8s-bootstrapper-smoke-full	Post Cache cargo registry + target	2025-09-23T21:08:30.2324316Z Cache up-to-date.
+k8s-bootstrapper-smoke-full	Post Checkout	﻿2025-09-23T21:08:30.2481743Z Post job cleanup.
+k8s-bootstrapper-smoke-full	Post Checkout	2025-09-23T21:08:30.3457784Z [command]/usr/bin/git version
+k8s-bootstrapper-smoke-full	Post Checkout	2025-09-23T21:08:30.3495045Z git version 2.51.0
+k8s-bootstrapper-smoke-full	Post Checkout	2025-09-23T21:08:30.3539635Z Temporarily overriding HOME='/home/runner/work/_temp/6bdd5210-0258-4562-b046-1ce28c43ab21' before making global git config changes
+k8s-bootstrapper-smoke-full	Post Checkout	2025-09-23T21:08:30.3540936Z Adding repository directory to the temporary git global config as a safe directory
+k8s-bootstrapper-smoke-full	Post Checkout	2025-09-23T21:08:30.3546187Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Demon/Demon
+k8s-bootstrapper-smoke-full	Post Checkout	2025-09-23T21:08:30.3585642Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+k8s-bootstrapper-smoke-full	Post Checkout	2025-09-23T21:08:30.3619492Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+k8s-bootstrapper-smoke-full	Post Checkout	2025-09-23T21:08:30.3857661Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+k8s-bootstrapper-smoke-full	Post Checkout	2025-09-23T21:08:30.3879801Z http.https://github.com/.extraheader
+k8s-bootstrapper-smoke-full	Post Checkout	2025-09-23T21:08:30.3893637Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+k8s-bootstrapper-smoke-full	Post Checkout	2025-09-23T21:08:30.3924401Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+k8s-bootstrapper-smoke-full	Complete job	﻿2025-09-23T21:08:30.4258649Z Cleaning up orphan processes
