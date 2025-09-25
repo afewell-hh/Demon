@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::env;
 use tracing::{debug, info, warn};
 
-use super::{SecretsConfig, VaultConfig};
+use super::{RegistryConfig, SecretsConfig, VaultConfig};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecretMaterial {
@@ -201,6 +201,80 @@ pub fn render_secret_manifest(
     }))?;
 
     Ok(secret_manifest)
+}
+
+pub fn create_image_pull_secrets(
+    registries: &[RegistryConfig],
+    namespace: &str,
+    dry_run: bool,
+) -> Result<Vec<String>> {
+    let mut manifests = Vec::new();
+
+    for registry in registries {
+        // Collect credentials from environment variables
+        let username = if dry_run {
+            "[DRY_RUN]".to_string()
+        } else {
+            env::var(&registry.username_env).with_context(|| {
+                format!(
+                    "Missing environment variable '{}' for registry '{}'",
+                    registry.username_env, registry.name
+                )
+            })?
+        };
+
+        let password = if dry_run {
+            "[DRY_RUN]".to_string()
+        } else {
+            env::var(&registry.password_env).with_context(|| {
+                format!(
+                    "Missing environment variable '{}' for registry '{}'",
+                    registry.password_env, registry.name
+                )
+            })?
+        };
+
+        // Create Docker config JSON
+        let docker_config = serde_json::json!({
+            "auths": {
+                registry.registry.clone(): {
+                    "username": username,
+                    "password": password,
+                    "auth": BASE64.encode(format!("{}:{}", username, password).as_bytes())
+                }
+            }
+        });
+
+        let docker_config_json = serde_json::to_string(&docker_config)?;
+
+        // Create the secret manifest
+        let secret_name = format!("registry-{}", registry.name);
+        let secret_manifest = serde_yaml::to_string(&serde_json::json!({
+            "apiVersion": "v1",
+            "kind": "Secret",
+            "metadata": {
+                "name": secret_name,
+                "namespace": namespace,
+                "labels": {
+                    "app.kubernetes.io/managed-by": "demon-bootstrapper",
+                    "app.kubernetes.io/component": "registry-credentials"
+                }
+            },
+            "type": "kubernetes.io/dockerconfigjson",
+            "data": {
+                ".dockerconfigjson": BASE64.encode(docker_config_json.as_bytes())
+            }
+        }))?;
+
+        manifests.push(secret_manifest);
+
+        info!(
+            "Created imagePullSecret '{}' for registry '{}'",
+            secret_name, registry.registry
+        );
+    }
+
+    Ok(manifests)
 }
 
 #[cfg(test)]

@@ -1380,6 +1380,17 @@ async fn handle_k8s_bootstrap_command(cmd: K8sBootstrapCommands) -> Result<()> {
                 &secret_material,
             )?;
 
+            // Create image pull secrets for registries
+            let registry_secrets = if let Some(registries) = &bootstrap_config.registries {
+                k8s_bootstrap::secrets::create_image_pull_secrets(
+                    registries,
+                    &bootstrap_config.demon.namespace,
+                    dry_run,
+                )?
+            } else {
+                Vec::new()
+            };
+
             // Initialize template renderer
             let templates_dir = format!("{}/resources/k8s", env!("CARGO_MANIFEST_DIR"));
             let template_renderer = k8s_bootstrap::templates::TemplateRenderer::new(&templates_dir);
@@ -1390,6 +1401,12 @@ async fn handle_k8s_bootstrap_command(cmd: K8sBootstrapCommands) -> Result<()> {
             // Prepend secret manifest if we have secrets
             if !secret_manifest.is_empty() {
                 manifests = format!("{}\n---\n{}", secret_manifest, manifests);
+            }
+
+            // Add registry secrets if we have any
+            if !registry_secrets.is_empty() {
+                let registry_manifests = registry_secrets.join("\n---\n");
+                manifests = format!("{}\n---\n{}", manifests, registry_manifests);
             }
 
             // Process add-ons

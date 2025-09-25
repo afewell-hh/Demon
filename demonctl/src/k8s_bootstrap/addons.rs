@@ -550,6 +550,7 @@ mod tests {
                     annotations: default_mesh_annotations(),
                 },
             },
+            registries: None,
         }
     }
 

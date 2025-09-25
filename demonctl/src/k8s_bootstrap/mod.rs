@@ -107,6 +107,8 @@ pub struct K8sBootstrapConfig {
     pub secrets: SecretsConfig,
     pub addons: Vec<AddonConfig>,
     pub networking: NetworkingConfig,
+    #[serde(default)]
+    pub registries: Option<Vec<RegistryConfig>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -233,6 +235,18 @@ fn default_mesh_annotations() -> HashMap<String, String> {
     let mut annotations = HashMap::new();
     annotations.insert("sidecar.istio.io/inject".to_string(), "true".to_string());
     annotations
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegistryConfig {
+    pub name: String,
+    pub registry: String,
+    #[serde(rename = "usernameEnv")]
+    pub username_env: String,
+    #[serde(rename = "passwordEnv")]
+    pub password_env: String,
+    #[serde(rename = "appliesTo")]
+    pub applies_to: Vec<String>,
 }
 
 pub fn load_config(config_path: &str) -> Result<K8sBootstrapConfig> {
