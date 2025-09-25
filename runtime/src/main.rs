@@ -47,6 +47,9 @@ async fn main() -> Result<()> {
                             if let Err(e) = stream.write_all(response.as_bytes()).await {
                                 warn!("Failed to write response: {}", e);
                             }
+                            // Flush and shutdown the stream properly
+                            let _ = stream.flush().await;
+                            let _ = stream.shutdown().await;
                         }
                         Err(e) => {
                             warn!("Failed to read from stream: {}", e);
