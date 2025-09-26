@@ -1,5 +1,9 @@
 # Preview Day — One‑Pager (Alpha)
 
+**📍 [Home](../README.md) › [Tutorials](../tutorials/README.md) › Alpha Preview Demo**
+
+![Status: Current](https://img.shields.io/badge/Status-Current-green)
+
 Project: Demon — Meta‑PaaS to build vPaaS platforms
 
 Build SHA (preview-alpha-1 tag): 27e36b21136e

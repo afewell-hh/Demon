@@ -1,8 +1,44 @@
 # Operations Documentation
 
+![Status: Current](https://img.shields.io/badge/Status-Current-green)
+
 This directory contains operational procedures, runbooks, and troubleshooting guides for running Demon in production.
 
 ## Overview
+
+Operations documentation provides the knowledge and procedures needed to deploy, monitor, and maintain Demon in production environments.
+
+## Runbook Index
+
+### Deployment & Setup
+| Procedure | Purpose | Complexity | Last Updated |
+|-----------|---------|------------|--------------|
+| [Bootstrapper Setup](../bootstrapper/) | Initial cluster deployment | Intermediate | Current |
+| [Development Environment](../tutorials/alpha-preview-demo.md) | Local dev setup | Beginner | Current |
+| *Production Deployment* | *Production deployment guide* | *Advanced* | *Coming Soon* |
+
+### Monitoring & Health Checks
+| Procedure | Purpose | Complexity | Last Updated |
+|-----------|---------|------------|--------------|
+| [Health Check Endpoints](../api/README.md) | Service health verification | Beginner | Current |
+| *Metrics & Alerting* | *Monitoring setup* | *Intermediate* | *Coming Soon* |
+| *Log Aggregation* | *Centralized logging* | *Advanced* | *Coming Soon* |
+
+### Troubleshooting
+| Issue Category | Common Problems | Quick Fixes | Escalation |
+|----------------|----------------|-------------|------------|
+| **Runtime Issues** | Pod crashes, memory leaks | Restart services, check logs | Platform team |
+| **Network Issues** | Connection failures, timeouts | Check connectivity, DNS | Network team |
+| **Storage Issues** | Disk full, permission errors | Clean logs, check mounts | Storage team |
+| **Integration Issues** | NATS connection, event delivery | Verify NATS, check queues | Integration team |
+
+### Maintenance
+| Task | Frequency | Complexity | Owner |
+|------|-----------|------------|--------|
+| **Log Rotation** | Daily | Beginner | Ops |
+| **Backup Verification** | Weekly | Intermediate | Ops |
+| **Security Updates** | Monthly | Advanced | Security + Ops |
+| **Capacity Planning** | Quarterly | Advanced | Platform team |
 
 Operations documentation helps platform engineers and operators maintain healthy Demon deployments through:
 

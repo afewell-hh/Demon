@@ -1,8 +1,24 @@
 # Architecture Decision Records (ADRs)
 
+![Status: Current](https://img.shields.io/badge/Status-Current-green)
+
 This directory contains Architecture Decision Records documenting important design decisions made during Demon's development.
 
 ## Overview
+
+ADRs capture the rationale behind architectural choices, providing context for future maintainers and helping teams understand why decisions were made.
+
+## ADR Index
+
+| ADR | Title | Status | Date |
+|-----|-------|--------|------|
+| *No ADRs yet* | *Initial ADRs will be documented here* | *Draft* | *TBD* |
+
+**Status Legend:**
+- **Proposed** - Under consideration
+- **Accepted** - Approved and implemented
+- **Deprecated** - No longer recommended
+- **Superseded** - Replaced by newer ADR
 
 ADRs capture the context, decision, and consequences of significant architectural choices. Each ADR follows a structured format to ensure decisions are well-documented and rationale is preserved for future reference.
 

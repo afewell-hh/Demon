@@ -1,5 +1,9 @@
 # Learning Paths
 
+**📍 [Home](../README.md) › [Getting Started](../getting-started/) › Learning Paths**
+
+![Status: Current](https://img.shields.io/badge/Status-Current-green)
+
 Welcome to Demon! This guide provides structured learning tracks to help you get started and advance your skills. Choose the path that best matches your current experience level and goals.
 
 ## Beginner Track

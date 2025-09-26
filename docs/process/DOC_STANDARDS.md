@@ -86,6 +86,48 @@ Process documents MUST include:
 - **Tools** - Required tools and access
 - **Examples** - Working demonstrations
 
+## Navigation & Status Conventions
+
+### Document Status Indicators
+All documents MUST include a status badge near the title to indicate their current state:
+
+```markdown
+# Document Title
+
+![Status: Current](https://img.shields.io/badge/Status-Current-green)
+
+Document content starts here...
+```
+
+**Available Status Badges:**
+- `![Status: Current](https://img.shields.io/badge/Status-Current-green)` - Up-to-date, actively maintained
+- `![Status: Draft](https://img.shields.io/badge/Status-Draft-yellow)` - Work in progress, may be incomplete
+- `![Status: Deprecated](https://img.shields.io/badge/Status-Deprecated-red)` - No longer maintained, see alternatives
+
+**Usage Guidelines:**
+- **Current**: Default for all production documentation
+- **Draft**: Use during development, include expected completion date
+- **Deprecated**: Include link to replacement or migration path
+
+### Breadcrumb Navigation
+Long-form documents (tutorials, how-to guides, explanations) MUST include breadcrumb navigation:
+
+```markdown
+# Document Title
+
+**📍 [Home](../../README.md) › [Tutorials](../README.md) › Document Title**
+
+![Status: Current](https://img.shields.io/badge/Status-Current-green)
+
+Document content starts here...
+```
+
+**Breadcrumb Rules:**
+- Always start with Home link to docs root
+- Include intermediate category (Tutorials, How-to Guides, etc.)
+- End with current document title (not linked)
+- Use consistent emoji indicators: 📍 for breadcrumbs, 🔗 for related links
+
 ## Writing Standards
 
 ### Language and Tone
@@ -159,8 +201,11 @@ All documentation changes MUST:
 - **Follow PR process** - No direct commits to main branch
 - **Include review** - At least one reviewer for accuracy
 - **Test examples** - Verify all code and instructions work
+- **Run link checker** - Execute `./scripts/check-doc-links.sh` before submitting PR
 - **Check links** - Ensure all internal links are valid
 - **Update indexes** - Modify navigation and TOCs as needed
+
+**Note**: GitHub Actions automatically runs link checking on documentation PRs (currently non-blocking during rollout).
 
 ### Update Triggers
 Documentation MUST be updated when:
