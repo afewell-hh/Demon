@@ -153,6 +153,14 @@ provision_cluster() {
                 --wait \
                 --timeout 60s \
                 --registry-create demon-registry:0.0.0.0:5000
+
+            if [[ -n "${LOCAL_IMAGE_IMPORT:-}" ]]; then
+                log "Importing local images into cluster: ${LOCAL_IMAGE_IMPORT}"
+                if ! k3d image import --cluster "${CLUSTER_NAME}" ${LOCAL_IMAGE_IMPORT}; then
+                    error "Failed to import local images into cluster"
+                    exit 1
+                fi
+            fi
             ;;
         "kind")
             # Create kind cluster
@@ -333,12 +341,22 @@ run_health_checks() {
     log "Running health checks..."
 
     # Check runtime pod health endpoint
-    local runtime_pod
-    runtime_pod=$(kubectl get pods -n "${namespace}" -l app.kubernetes.io/name=demon-runtime -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+    local runtime_pod=""
+    for attempt in {1..5}; do
+        runtime_pod=$(kubectl get pods -n "${namespace}" -l app.kubernetes.io/name=demon-runtime -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+        if [[ -n "${runtime_pod}" ]]; then
+            break
+        fi
+        sleep 2
+    done
+
+    if [[ -z "${runtime_pod}" ]]; then
+        warn "No runtime pod found after retries"
+    fi
 
     if [[ -n "${runtime_pod}" ]]; then
         log "Checking runtime health endpoint: ${runtime_pod}"
-
+    
         # Use kubectl port-forward instead of exec wget (distroless containers don't have wget)
         local local_port=8180
         kubectl port-forward -n "${namespace}" "${runtime_pod}" "${local_port}:8080" >/dev/null 2>&1 &
@@ -360,8 +378,18 @@ run_health_checks() {
     fi
 
     # Check Operate UI pod health endpoint
-    local ui_pod
-    ui_pod=$(kubectl get pods -n "${namespace}" -l app.kubernetes.io/name=operate-ui -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+    local ui_pod=""
+    for attempt in {1..5}; do
+        ui_pod=$(kubectl get pods -n "${namespace}" -l app.kubernetes.io/name=operate-ui -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+        if [[ -n "${ui_pod}" ]]; then
+            break
+        fi
+        sleep 2
+    done
+
+    if [[ -z "${ui_pod}" ]]; then
+        warn "No operate-ui pod found after retries"
+    fi
 
     if [[ -n "${ui_pod}" ]]; then
         log "Checking Operate UI health endpoint: ${ui_pod}"
@@ -387,8 +415,18 @@ run_health_checks() {
     fi
 
     # Check Engine pod health endpoint
-    local engine_pod
-    engine_pod=$(kubectl get pods -n "${namespace}" -l app.kubernetes.io/name=demon-engine -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+    local engine_pod=""
+    for attempt in {1..5}; do
+        engine_pod=$(kubectl get pods -n "${namespace}" -l app.kubernetes.io/name=demon-engine -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+        if [[ -n "${engine_pod}" ]]; then
+            break
+        fi
+        sleep 2
+    done
+
+    if [[ -z "${engine_pod}" ]]; then
+        warn "No engine pod found after retries"
+    fi
 
     if [[ -n "${engine_pod}" ]]; then
         log "Checking Engine health endpoint: ${engine_pod}"

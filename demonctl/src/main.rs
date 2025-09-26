@@ -1,6 +1,9 @@
 use anyhow::Result;
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
+use std::process::{Command, Stdio};
+use std::thread;
+use std::time::Duration;
 use tracing::{info, Level};
 use tracing_subscriber::{fmt, EnvFilter};
 
@@ -1928,7 +1931,8 @@ fn run_health_checks(
     }
 
     // Check runtime health endpoint
-    let runtime_pod = get_pod_by_label(namespace, "app=demon-runtime", executor)?;
+    let runtime_pod =
+        get_pod_by_label(namespace, "app.kubernetes.io/name=demon-runtime", executor)?;
     if let Some(pod_name) = runtime_pod {
         if verbose {
             println!("Checking runtime health endpoint for pod: {}", pod_name);
@@ -1956,7 +1960,7 @@ fn run_health_checks(
     }
 
     // Check Operate UI health
-    let ui_pod = get_pod_by_label(namespace, "app=demon-operate-ui", executor)?;
+    let ui_pod = get_pod_by_label(namespace, "app.kubernetes.io/name=operate-ui", executor)?;
     if let Some(pod_name) = ui_pod {
         if verbose {
             println!("Checking Operate UI health endpoint for pod: {}", pod_name);
@@ -2021,76 +2025,81 @@ fn get_pod_by_label(
 fn check_runtime_health(
     namespace: &str,
     pod_name: &str,
-    executor: &dyn k8s_bootstrap::CommandExecutor,
+    _executor: &dyn k8s_bootstrap::CommandExecutor,
     verbose: bool,
 ) -> Result<()> {
-    // Try to curl the health endpoint from within the pod
-    let output = executor.execute(
-        "k3s",
-        &[
-            "kubectl",
-            "exec",
-            "-n",
-            namespace,
-            pod_name,
-            "--",
-            "curl",
-            "-f",
-            "-s",
-            "http://localhost:8080/health",
-        ],
-        None,
-    )?;
-
-    if output.status == 0 {
-        if verbose {
-            println!("Runtime health response: {}", output.stdout.trim());
-        }
-        Ok(())
-    } else {
-        anyhow::bail!(
-            "Runtime health check failed - status: {}, stderr: {}",
-            output.status,
-            output.stderr
-        );
-    }
+    port_forward_and_check(namespace, pod_name, 8080, "/health", verbose)
 }
 
 fn check_ui_health(
     namespace: &str,
     pod_name: &str,
-    executor: &dyn k8s_bootstrap::CommandExecutor,
+    _executor: &dyn k8s_bootstrap::CommandExecutor,
     verbose: bool,
 ) -> Result<()> {
-    // Try to curl the health/readiness endpoint from within the pod
-    let output = executor.execute(
-        "k3s",
-        &[
+    port_forward_and_check(namespace, pod_name, 3000, "/health", verbose)
+}
+
+fn port_forward_and_check(
+    namespace: &str,
+    pod_name: &str,
+    remote_port: u16,
+    path: &str,
+    verbose: bool,
+) -> Result<()> {
+    let local_port = match remote_port {
+        8080 => 18180,
+        3000 => 13000,
+        other => other + 1000,
+    };
+
+    let port_arg = format!("{}:{}", local_port, remote_port);
+    let pod_ref = format!("pod/{}", pod_name);
+
+    let mut child = Command::new("k3s")
+        .args([
             "kubectl",
-            "exec",
+            "port-forward",
             "-n",
             namespace,
-            pod_name,
-            "--",
-            "curl",
-            "-f",
-            "-s",
-            "http://localhost:3000/api/runs",
-        ],
-        None,
-    )?;
+            &pod_ref,
+            &port_arg,
+        ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()?;
 
-    if output.status == 0 {
-        if verbose {
-            println!("Operate UI health response: {}", output.stdout.trim());
+    thread::sleep(Duration::from_secs(2));
+
+    let url = format!("http://127.0.0.1:{}{}", local_port, path);
+    let output = Command::new("curl").args(["-s", "-f", &url]).output();
+
+    let _ = child.kill();
+    let _ = child.wait();
+
+    match output {
+        Ok(out) if out.status.success() => {
+            if verbose {
+                println!(
+                    "Health check response ({}:{} {}): {}",
+                    pod_name,
+                    remote_port,
+                    path,
+                    String::from_utf8_lossy(&out.stdout).trim()
+                );
+            }
+            Ok(())
         }
-        Ok(())
-    } else {
-        anyhow::bail!(
-            "Operate UI health check failed - status: {}, stderr: {}",
-            output.status,
-            output.stderr
-        );
+        Ok(out) => {
+            anyhow::bail!(
+                "Health check failed for {}:{} {} - stderr: {}",
+                pod_name,
+                remote_port,
+                path,
+                String::from_utf8_lossy(&out.stderr).trim()
+            )
+        }
+        Err(e) => anyhow::bail!("Failed to execute curl for health check: {}", e),
     }
 }
 

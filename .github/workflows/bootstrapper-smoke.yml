@@ -37,6 +37,12 @@ jobs:
       - name: Build workspace
         run: cargo build --workspace
 
+      - name: Build runtime image for smoke test
+        run: docker build -f runtime/Dockerfile -t ghcr.io/afewell-hh/demon-runtime:main .
+
+      - name: Build engine image for smoke test
+        run: docker build -f engine/Dockerfile -t ghcr.io/afewell-hh/demon-engine:main .
+
       - name: Run full k8s bootstrapper smoke test
         env:
           # Set test environment variables
@@ -45,6 +51,7 @@ jobs:
           DATABASE_URL: postgresql://localhost/demon_test
           NATS_PASSWORD: test-nats-password
           JWT_SECRET: test-jwt-secret-12345
+          LOCAL_IMAGE_IMPORT: "ghcr.io/afewell-hh/demon-runtime:main ghcr.io/afewell-hh/demon-engine:main"
         run: |
           make bootstrap-smoke ARGS="--cleanup --verbose"
 
