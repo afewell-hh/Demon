@@ -13,6 +13,11 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY rust-toolchain.toml ./
 
+# Update toolchain to match rust-toolchain.toml and add musl target
+RUN rustup set profile minimal \
+ && rustup update --no-self-update stable \
+ && rustup target add --toolchain stable x86_64-unknown-linux-musl
+
 # Copy all workspace members and contracts (needed for dependencies)
 COPY crates/ ./crates/
 COPY contracts/ ./contracts/
