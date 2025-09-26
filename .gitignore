@@ -27,4 +27,12 @@ lcov.info
 
 # Runtime data
 .demon/
+
+# Temporary files and build artifacts
+logs/
+*_run_*/
+k8s-bootstrapper-smoke-*/
+health-check-*.md
+.markdown-link-check.json
+
 # trigger CI
