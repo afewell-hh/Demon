@@ -33,23 +33,32 @@ async fn main() -> Result<()> {
                         }
                         Ok(n) => {
                             let request = String::from_utf8_lossy(&buffer[..n]);
-                            info!("Received request: {}", request.lines().next().unwrap_or(""));
+                            let request_line = request.lines().next().unwrap_or("");
+                            info!("Received request: {}", request_line);
 
-                            // Simple HTTP response for health checks
-                            let response = if request.contains("GET /health") {
-                                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 15\r\n\r\n{\"status\":\"ok\"}"
-                            } else if request.contains("GET /ready") {
-                                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 17\r\n\r\n{\"ready\":true}"
-                            } else {
-                                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 29\r\n\r\n{\"service\":\"demon-runtime\"}"
+                            let path = request_line.split_whitespace().nth(1).unwrap_or("/");
+
+                            let response_body = match path {
+                                "/health" => r#"{"status":"ok"}"#,
+                                "/ready" => r#"{"ready":true}"#,
+                                _ => r#"{"service":"demon-runtime"}"#,
                             };
+
+                            let response = format!(
+                                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                                response_body.len(),
+                                response_body
+                            );
 
                             if let Err(e) = stream.write_all(response.as_bytes()).await {
                                 warn!("Failed to write response: {}", e);
                             }
-                            // Flush and shutdown the stream properly
-                            let _ = stream.flush().await;
-                            let _ = stream.shutdown().await;
+                            if let Err(e) = stream.flush().await {
+                                warn!("Failed to flush response: {}", e);
+                            }
+                            if let Err(e) = stream.shutdown().await {
+                                warn!("Failed to shutdown stream: {}", e);
+                            }
                         }
                         Err(e) => {
                             warn!("Failed to read from stream: {}", e);
