@@ -31,7 +31,7 @@ See [docs/bootstrapper/README.md](docs/bootstrapper/README.md) for more details.
 
 # Demon — Meta-PaaS (Milestone 0)
 
-[![Preview: Alpha](https://img.shields.io/badge/Preview-Alpha-6f42c1.svg)](https://github.com/afewell-hh/Demon/releases/tag/preview-alpha-1)
+[![Preview: Alpha](https://img.shields.io/badge/Preview-Alpha-6f42c1.svg)](https://github.com/afewell-hh/demon/releases/tag/preview-alpha-1)
 
 Thin-slice bootstrapping of the Demon project.
 
@@ -155,7 +155,7 @@ curl -X POST http://localhost:3000/api/approvals/{run_id}/{gate_id}/deny \
 
 ## Project Process
 
-- One‑pager: docs/process/MVP.md
+- MVP contract: docs/mvp/01-mvp-contract.md
 - Branch protections (MVP): docs/process/branch_protection_mvp.md
 - Project board: https://github.com/users/afewell-hh/projects/1
 
