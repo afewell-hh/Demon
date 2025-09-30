@@ -303,6 +303,8 @@ pub fn create_app(state: AppState) -> Router {
             "/api/contracts/status",
             get(contracts::bundle_status_endpoint),
         )
+        // Graph viewer
+        .route("/graph", get(routes::graph_viewer_html))
         // Legacy routes (redirect to default tenant)
         .route("/runs", get(routes::list_runs_html))
         .route("/runs/:run_id", get(routes::get_run_html))

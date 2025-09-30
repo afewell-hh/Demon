@@ -134,6 +134,32 @@ nats stream info GRAPH_COMMITS
 nats stream view GRAPH_COMMITS --count
 ```
 
+### Viewing Graphs in Operate
+
+The Operate UI provides a minimal read-only graph viewer for inspecting graph commits and tags.
+
+**Access the graph viewer:**
+```
+http://localhost:3000/graph
+```
+
+**Features:**
+- Input form to specify graph scope (tenant, project, namespace, graph ID)
+- List of commits with timestamps, parent commits, and mutation counts
+- List of tags with associated commit IDs
+- Click on any commit to view detailed mutation JSON
+- Auto-loads on page load with default scope parameters
+
+**Query Parameters:**
+```
+http://localhost:3000/graph?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1
+```
+
+**Environment Configuration:**
+- `RUNTIME_API_URL` - Runtime server URL (default: `http://localhost:8080`)
+
+**Note:** The viewer calls the Runtime REST endpoints at `/api/graph/commits` and `/api/graph/tags`. Ensure the runtime server is running and accessible.
+
 ## Runbooks
 
 ### Daily Operations

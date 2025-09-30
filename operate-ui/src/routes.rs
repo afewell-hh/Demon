@@ -14,6 +14,41 @@ use std::time::Duration;
 use tokio_stream::wrappers::IntervalStream;
 use tracing::{debug, error, info, warn};
 
+// Graph viewer types
+#[derive(Deserialize, Debug, Clone)]
+pub struct GraphScopeQuery {
+    #[serde(rename = "tenantId")]
+    pub tenant_id: Option<String>,
+    #[serde(rename = "projectId")]
+    pub project_id: Option<String>,
+    pub namespace: Option<String>,
+    #[serde(rename = "graphId")]
+    pub graph_id: Option<String>,
+    pub limit: Option<usize>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GraphCommit {
+    pub event: String,
+    #[serde(rename = "commitId")]
+    pub commit_id: String,
+    #[serde(rename = "parentCommitId", skip_serializing_if = "Option::is_none")]
+    pub parent_commit_id: Option<String>,
+    pub ts: String,
+    #[serde(rename = "mutationsCount", skip_serializing_if = "Option::is_none")]
+    pub mutations_count: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mutations: Option<Vec<serde_json::Value>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GraphTag {
+    pub tag: String,
+    #[serde(rename = "commitId")]
+    pub commit_id: String,
+    pub timestamp: String,
+}
+
 // Query parameters for list runs API
 #[derive(Deserialize, Debug, Clone)]
 pub struct ListRunsQuery {
@@ -2309,4 +2344,46 @@ pub async fn override_approval_api_tenant(
                 .into_response()
         }
     }
+}
+
+// ---- Graph Viewer Routes ----
+
+/// Graph viewer - HTML page
+#[axum::debug_handler]
+pub async fn graph_viewer_html(
+    State(state): State<AppState>,
+    Query(query): Query<GraphScopeQuery>,
+) -> Html<String> {
+    debug!("Handling graph viewer HTML: {:?}", query);
+
+    // Build scope parameters with defaults
+    let tenant_id = query.tenant_id.unwrap_or_else(|| "tenant-1".to_string());
+    let project_id = query.project_id.unwrap_or_else(|| "proj-1".to_string());
+    let namespace = query.namespace.unwrap_or_else(|| "ns-1".to_string());
+    let graph_id = query.graph_id.unwrap_or_else(|| "graph-1".to_string());
+
+    let mut context = tera::Context::new();
+    context.insert("current_page", &"graph");
+    context.insert("tenant_id", &tenant_id);
+    context.insert("project_id", &project_id);
+    context.insert("namespace", &namespace);
+    context.insert("graph_id", &graph_id);
+    context.insert("runtime_api_url", &get_runtime_api_url());
+
+    let html = state
+        .tera
+        .render("graph_viewer.html", &context)
+        .unwrap_or_else(|e| {
+            error!("Template rendering failed: {}", e);
+            format!(
+                "<h1>Internal Server Error</h1><p>Failed to render page: {}</p>",
+                e
+            )
+        });
+
+    Html(html)
+}
+
+fn get_runtime_api_url() -> String {
+    std::env::var("RUNTIME_API_URL").unwrap_or_else(|_| "http://localhost:8080".to_string())
 }
