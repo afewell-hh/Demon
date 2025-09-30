@@ -26,8 +26,12 @@ chrono = { workspace = true }
 metrics = "0.21"
 reqwest = { version = "0.11", features = ["json"] }
 sha2 = "0.10"
+axum = { version = "0.7", features = ["macros"] }
+tower = "0.5"
+tower-http = { version = "0.5", features = ["trace"] }
+futures-util = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.8"
 uuid = { workspace = true }
-futures-util = { workspace = true }
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }

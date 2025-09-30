@@ -308,6 +308,48 @@ enum GraphCommands {
         #[arg(long)]
         graph_id: String,
     },
+    /// Get a commit by ID via REST API
+    GetCommit {
+        /// Tenant ID
+        #[arg(long)]
+        tenant_id: String,
+        /// Project ID
+        #[arg(long)]
+        project_id: String,
+        /// Namespace
+        #[arg(long)]
+        namespace: String,
+        /// Graph ID
+        #[arg(long)]
+        graph_id: String,
+        /// Commit ID to retrieve
+        #[arg(long)]
+        commit_id: String,
+        /// Runtime API base URL
+        #[arg(long, default_value = "http://localhost:8080")]
+        api_url: String,
+    },
+    /// Get a tag by name via REST API
+    GetTag {
+        /// Tenant ID
+        #[arg(long)]
+        tenant_id: String,
+        /// Project ID
+        #[arg(long)]
+        project_id: String,
+        /// Namespace
+        #[arg(long)]
+        namespace: String,
+        /// Graph ID
+        #[arg(long)]
+        graph_id: String,
+        /// Tag name to retrieve
+        #[arg(long)]
+        tag: String,
+        /// Runtime API base URL
+        #[arg(long, default_value = "http://localhost:8080")]
+        api_url: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -2284,6 +2326,60 @@ async fn handle_graph_command(cmd: GraphCommands) -> Result<()> {
             println!("{}", envelope_json);
 
             if !envelope.result.is_success() {
+                std::process::exit(1);
+            }
+        }
+        GraphCommands::GetCommit {
+            tenant_id,
+            project_id,
+            namespace,
+            graph_id,
+            commit_id,
+            api_url,
+        } => {
+            let client = reqwest::Client::new();
+            let url = format!(
+                "{}/api/graph/commits/{}?tenantId={}&projectId={}&namespace={}&graphId={}",
+                api_url, commit_id, tenant_id, project_id, namespace, graph_id
+            );
+
+            let response = client.get(&url).send().await?;
+
+            if response.status().is_success() {
+                let body = response.text().await?;
+                let json: serde_json::Value = serde_json::from_str(&body)?;
+                println!("{}", serde_json::to_string_pretty(&json)?);
+            } else {
+                let status = response.status();
+                let body = response.text().await.unwrap_or_default();
+                eprintln!("Error: HTTP {} - {}", status, body);
+                std::process::exit(1);
+            }
+        }
+        GraphCommands::GetTag {
+            tenant_id,
+            project_id,
+            namespace,
+            graph_id,
+            tag,
+            api_url,
+        } => {
+            let client = reqwest::Client::new();
+            let url = format!(
+                "{}/api/graph/tags/{}?tenantId={}&projectId={}&namespace={}&graphId={}",
+                api_url, tag, tenant_id, project_id, namespace, graph_id
+            );
+
+            let response = client.get(&url).send().await?;
+
+            if response.status().is_success() {
+                let body = response.text().await?;
+                let json: serde_json::Value = serde_json::from_str(&body)?;
+                println!("{}", serde_json::to_string_pretty(&json)?);
+            } else {
+                let status = response.status();
+                let body = response.text().await.unwrap_or_default();
+                eprintln!("Error: HTTP {} - {}", status, body);
                 std::process::exit(1);
             }
         }
