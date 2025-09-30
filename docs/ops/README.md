@@ -117,6 +117,18 @@ demonctl graph list-tags \
   --namespace ns-1 \
   --graph-id graph-1
 
+# Query graph: get commit by ID
+curl "http://localhost:8080/api/graph/commits/<COMMIT_ID>?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1"
+
+# Query graph: list commits
+curl "http://localhost:8080/api/graph/commits?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1&limit=50"
+
+# Query graph: get tag
+curl "http://localhost:8080/api/graph/tags/v1.0.0?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1"
+
+# Query graph: list all tags
+curl "http://localhost:8080/api/graph/tags?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1"
+
 # Verify graph events in NATS JetStream
 nats stream info GRAPH_COMMITS
 nats stream view GRAPH_COMMITS --count

@@ -274,9 +274,89 @@ All error responses follow this envelope structure:
 
 ---
 
+---
+
+## Graph Query Operations
+
+The graph capsule provides three core query operations for traversing and analyzing the graph structure at a given commit:
+
+### Get Node
+
+Retrieves a node by ID, including its labels, properties, and relationships.
+
+**Mutation:**
+```json
+{
+  "op": "get-node",
+  "nodeId": "node-1"
+}
+```
+
+**CLI Example:**
+```bash
+demonctl graph commit \
+  --tenant-id t1 --project-id p1 --namespace ns1 --graph-id g1 \
+  --parent-ref <COMMIT_ID> \
+  get-node.json
+```
+
+### Find Neighbors
+
+Retrieves all neighbors of a node (nodes connected by edges), optionally filtered by relationship type and direction.
+
+**Mutation:**
+```json
+{
+  "op": "neighbors",
+  "nodeId": "node-1",
+  "relType": "KNOWS",
+  "direction": "outgoing"
+}
+```
+
+**CLI Example:**
+```bash
+demonctl graph commit \
+  --tenant-id t1 --project-id p1 --namespace ns1 --graph-id g1 \
+  --parent-ref <COMMIT_ID> \
+  neighbors.json
+```
+
+### Path Existence
+
+Checks whether a path exists between two nodes, with optional constraints on relationship types and path length.
+
+**Mutation:**
+```json
+{
+  "op": "path-exists",
+  "fromNodeId": "node-1",
+  "toNodeId": "node-2",
+  "relTypes": ["KNOWS", "WORKS_WITH"],
+  "maxDepth": 3
+}
+```
+
+**CLI Example:**
+```bash
+demonctl graph commit \
+  --tenant-id t1 --project-id p1 --namespace ns1 --graph-id g1 \
+  --parent-ref <COMMIT_ID> \
+  path-exists.json
+```
+
+### Query Limitations and Performance
+
+- **Commit Replay**: Query operations replay all commits from genesis to the target commit to reconstruct graph state. For large graphs (thousands of commits), expect replay latency proportional to history depth.
+- **No Caching**: Current implementation does not cache graph state between queries. Each query performs a full replay.
+- **Future Optimizations**: Planned enhancements include commit snapshots, incremental state caching, and indexed storage for sub-linear query performance.
+
+---
+
 ## Future Enhancements
 
 - Pagination tokens for large commit lists
 - Conditional requests (If-None-Match) for cache validation
 - GraphQL endpoint for flexible queries
 - WebSocket support for real-time commit notifications
+- Graph query result caching and snapshot-based replay optimization
