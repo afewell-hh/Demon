@@ -11,4 +11,4 @@
 | Epic | Title | Outcome | Links |
 |------|-------|---------|-------|
 | MVP-E5 | CI/Protections Simplification | MVP-grade protections documented and enforced without blocking velocity | PRs: #53, #64, #65 |
-| #121 | Contract & Schema Registry | Contract bundles publish via CI, versioned/signed, smoke-verified, fetched by tag, runtime ingestion, UI alerts/metrics | Stories: #124-#140; PRs: #132, #135-#137, #140 |
+| #121 | Contract & Schema Registry | Contract bundles publish via CI, versioned/signed, smoke-verified, fetched by tag, runtime ingestion, UI alerts/metrics | Stories: #124-#140; PRs: #132, #135-#137, #140; Follow-up: Graph tag fixture split noted for PR #199 (gh CLI unavailable for direct comment) |

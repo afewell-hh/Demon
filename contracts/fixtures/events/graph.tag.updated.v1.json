@@ -1,0 +1,18 @@
+{
+  "event": "graph.tag.updated:v1",
+  "graphId": "operations/incident-response",
+  "tenantId": "default",
+  "traceId": "trace-graph-tag-set-001",
+  "ts": "2025-01-06T10:30:00Z",
+  "action": "set",
+  "tag": {
+    "key": "severity",
+    "value": "critical",
+    "note": "Raised automatically when pager triggered"
+  },
+  "actor": {
+    "type": "system",
+    "id": "operate-ui",
+    "displayName": "Operate UI"
+  }
+}

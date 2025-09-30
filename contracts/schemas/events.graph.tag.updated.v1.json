@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demon.meta/contracts/events.graph.tag.updated.v1.json",
+  "title": "GraphTagUpdatedV1",
+  "type": "object",
+  "required": ["event", "graphId", "action", "tag", "ts"],
+  "properties": {
+    "event": { "const": "graph.tag.updated:v1" },
+    "graphId": { "type": "string" },
+    "tenantId": { "type": "string" },
+    "traceId": { "type": "string" },
+    "ts": { "type": "string", "format": "date-time" },
+    "action": { "type": "string", "enum": ["set", "delete"] },
+    "tag": {
+      "type": "object",
+      "required": ["key"],
+      "properties": {
+        "key": { "type": "string" },
+        "value": { "type": "string" },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "actor": {
+      "type": "object",
+      "required": ["type", "id"],
+      "properties": {
+        "type": { "type": "string" },
+        "id": { "type": "string" },
+        "displayName": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "properties": { "action": { "const": "set" } } },
+      "then": {
+        "properties": {
+          "tag": {
+            "required": ["key", "value"]
+          }
+        }
+      }
+    }
+  ]
+}
