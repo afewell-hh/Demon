@@ -77,7 +77,7 @@ async fn given_graph_create_via_runtime_when_dispatched_then_commit_event_emitte
 
     let mut found_event = false;
     while let Some(msg) = batch.next().await {
-        let msg = msg?;
+        let msg = msg.map_err(|e| anyhow::anyhow!("batch error: {}", e))?;
         let event: serde_json::Value = serde_json::from_slice(&msg.message.payload)?;
 
         if event["commitId"] == commit_id {
@@ -162,7 +162,7 @@ async fn given_graph_commit_via_runtime_when_dispatched_then_event_has_parent() 
 
     let mut found_event = false;
     while let Some(msg) = batch.next().await {
-        let msg = msg?;
+        let msg = msg.map_err(|e| anyhow::anyhow!("batch error: {}", e))?;
         let event: serde_json::Value = serde_json::from_slice(&msg.message.payload)?;
 
         if event["commitId"] == commit_id {
@@ -232,7 +232,7 @@ async fn given_graph_tag_via_runtime_when_dispatched_then_tag_event_emitted() ->
 
     let mut found_event = false;
     while let Some(msg) = batch.next().await {
-        let msg = msg?;
+        let msg = msg.map_err(|e| anyhow::anyhow!("batch error: {}", e))?;
         let event: serde_json::Value = serde_json::from_slice(&msg.message.payload)?;
 
         if event["event"] == "graph.tag.updated:v1" && event["tag"] == tag {
@@ -248,29 +248,118 @@ async fn given_graph_tag_via_runtime_when_dispatched_then_tag_event_emitted() ->
 }
 
 #[tokio::test]
-async fn given_list_tags_via_runtime_when_dispatched_then_returns_placeholder() -> Result<()> {
+async fn given_list_tags_via_runtime_when_dispatched_then_returns_tags() -> Result<()> {
     // Arrange
     let router = Router::new();
+    let tenant_id = format!("tenant-list-{}", uuid::Uuid::new_v4());
 
+    // Set a tag first
+    let tag_args = json!({
+        "operation": "tag",
+        "scope": {
+            "tenantId": tenant_id,
+            "projectId": "proj-1",
+            "namespace": "ns-1",
+            "graphId": "graph-1"
+        },
+        "tag": "v1.0.0",
+        "commitId": "a".repeat(64)
+    });
+
+    router
+        .dispatch("graph", &tag_args, "test-run", "test-ritual")
+        .await?;
+
+    // Act - list tags
     let args = json!({
         "operation": "list-tags",
         "scope": {
-            "tenantId": "tenant-1",
+            "tenantId": tenant_id,
             "projectId": "proj-1",
             "namespace": "ns-1",
             "graphId": "graph-1"
         }
     });
 
-    // Act
+    tokio::time::sleep(Duration::from_millis(100)).await;
     let result = router
         .dispatch("graph", &args, "test-run", "test-ritual")
         .await?;
 
-    // Assert - should succeed but return empty (placeholder)
+    // Assert - should return tags
     let envelope_value = result;
     assert!(envelope_value["result"]["status"].as_str() == Some("success"));
     assert!(envelope_value["result"]["data"].is_array());
+    let tags = envelope_value["result"]["data"].as_array().unwrap();
+    assert_eq!(tags.len(), 1);
+    assert_eq!(tags[0]["tag"], "v1.0.0");
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn given_delete_tag_via_runtime_when_dispatched_then_tag_removed() -> Result<()> {
+    // Arrange
+    let router = Router::new();
+    let tenant_id = format!("tenant-delete-{}", uuid::Uuid::new_v4());
+
+    // Set a tag first
+    let tag_args = json!({
+        "operation": "tag",
+        "scope": {
+            "tenantId": tenant_id,
+            "projectId": "proj-1",
+            "namespace": "ns-1",
+            "graphId": "graph-1"
+        },
+        "tag": "v1.0.0",
+        "commitId": "b".repeat(64)
+    });
+
+    router
+        .dispatch("graph", &tag_args, "test-run", "test-ritual")
+        .await?;
+
+    // Act - delete tag
+    let delete_args = json!({
+        "operation": "delete-tag",
+        "scope": {
+            "tenantId": tenant_id,
+            "projectId": "proj-1",
+            "namespace": "ns-1",
+            "graphId": "graph-1"
+        },
+        "tag": "v1.0.0"
+    });
+
+    let result = router
+        .dispatch("graph", &delete_args, "test-run", "test-ritual")
+        .await?;
+
+    // Assert - delete succeeded
+    let envelope_value = result;
+    assert!(envelope_value["result"]["status"].as_str() == Some("success"));
+
+    // Verify tag removed from list-tags
+    let list_args = json!({
+        "operation": "list-tags",
+        "scope": {
+            "tenantId": tenant_id,
+            "projectId": "proj-1",
+            "namespace": "ns-1",
+            "graphId": "graph-1"
+        }
+    });
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let list_result = router
+        .dispatch("graph", &list_args, "test-run", "test-ritual")
+        .await?;
+
+    let list_envelope = list_result;
+    assert!(list_envelope["result"]["status"].as_str() == Some("success"));
+    let tags = list_envelope["result"]["data"].as_array().unwrap();
+    assert_eq!(tags.len(), 0, "Tag should be removed");
 
     Ok(())
 }

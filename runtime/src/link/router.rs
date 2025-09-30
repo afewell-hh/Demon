@@ -164,6 +164,16 @@ impl Router {
                 let envelope = capsules_graph::tag(scope, tag, commit_id).await;
                 Ok(serde_json::to_value(envelope)?)
             }
+            "delete-tag" => {
+                let tag = args
+                    .get("tag")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'tag' field for delete-tag operation"))?
+                    .to_string();
+
+                let envelope = capsules_graph::delete_tag(scope, tag).await;
+                Ok(serde_json::to_value(envelope)?)
+            }
             "list-tags" => {
                 let envelope = capsules_graph::list_tags(scope).await;
                 Ok(serde_json::to_value(envelope)?)

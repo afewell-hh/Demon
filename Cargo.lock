@@ -483,6 +483,7 @@ dependencies = [
  "sha2",
  "tokio",
  "tokio-test",
+ "tracing",
  "uuid",
 ]
 

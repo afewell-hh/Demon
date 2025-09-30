@@ -250,6 +250,65 @@ pub async fn tag(scope: GraphScope, tag: String, commit_id: String) -> ResultEnv
     let start = std::time::Instant::now();
     let timestamp = Utc::now();
 
+    // Connect to NATS and get KV store
+    let url = std::env::var("NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".to_string());
+    let client = match async_nats::connect(&url).await {
+        Ok(c) => c,
+        Err(e) => {
+            let builder = ResultEnvelope::builder()
+                .add_diagnostic(Diagnostic::new(
+                    DiagnosticLevel::Error,
+                    format!("Failed to connect to NATS: {}", e),
+                ))
+                .with_source_info("graph-capsule", Some("0.0.1"), None::<String>);
+
+            return builder
+                .error_with_code(
+                    format!("NATS connection error: {}", e),
+                    "NATS_CONNECTION_FAILED",
+                )
+                .build()
+                .expect("Valid envelope");
+        }
+    };
+    let js = async_nats::jetstream::new(client);
+
+    // Ensure KV bucket exists
+    let kv = match storage::ensure_graph_tags_kv(&js).await {
+        Ok(kv) => kv,
+        Err(e) => {
+            let builder = ResultEnvelope::builder()
+                .add_diagnostic(Diagnostic::new(
+                    DiagnosticLevel::Error,
+                    format!("Failed to create KV bucket: {}", e),
+                ))
+                .with_source_info("graph-capsule", Some("0.0.1"), None::<String>);
+
+            return builder
+                .error_with_code(format!("KV bucket error: {}", e), "KV_BUCKET_FAILED")
+                .build()
+                .expect("Valid envelope");
+        }
+    };
+
+    // Store tag in KV (get previous commit if updating)
+    let _previous_commit = match storage::put_tag(&kv, &scope, &tag, &commit_id).await {
+        Ok(prev) => prev,
+        Err(e) => {
+            let builder = ResultEnvelope::builder()
+                .add_diagnostic(Diagnostic::new(
+                    DiagnosticLevel::Error,
+                    format!("Failed to store tag in KV: {}", e),
+                ))
+                .with_source_info("graph-capsule", Some("0.0.1"), None::<String>);
+
+            return builder
+                .error_with_code(format!("Tag storage error: {}", e), "TAG_STORAGE_FAILED")
+                .build()
+                .expect("Valid envelope");
+        }
+    };
+
     // Emit graph.tag.updated:v1 event (action=set)
     if let Err(e) =
         events::emit_tag_updated(&scope, &tag, Some(&commit_id), TagAction::Set, timestamp).await
@@ -296,18 +355,220 @@ pub async fn tag(scope: GraphScope, tag: String, commit_id: String) -> ResultEnv
     builder.build().expect("Valid envelope")
 }
 
-/// List all tags associated with the graph scope
+/// Delete a tag from the graph scope
 ///
-/// TODO: Implement KV scan for tag prefix
-pub async fn list_tags(_scope: GraphScope) -> ResultEnvelope<Vec<TaggedCommit>> {
-    let builder = ResultEnvelope::builder()
+/// This emits a graph.tag.updated:v1 event with action=delete and removes the tag from KV.
+pub async fn delete_tag(scope: GraphScope, tag: String) -> ResultEnvelope<TagResult> {
+    let start = std::time::Instant::now();
+    let timestamp = Utc::now();
+
+    // Connect to NATS and get KV store
+    let url = std::env::var("NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".to_string());
+    let client = match async_nats::connect(&url).await {
+        Ok(c) => c,
+        Err(e) => {
+            let builder = ResultEnvelope::builder()
+                .add_diagnostic(Diagnostic::new(
+                    DiagnosticLevel::Error,
+                    format!("Failed to connect to NATS: {}", e),
+                ))
+                .with_source_info("graph-capsule", Some("0.0.1"), None::<String>);
+
+            return builder
+                .error_with_code(
+                    format!("NATS connection error: {}", e),
+                    "NATS_CONNECTION_FAILED",
+                )
+                .build()
+                .expect("Valid envelope");
+        }
+    };
+    let js = async_nats::jetstream::new(client);
+
+    // Ensure KV bucket exists
+    let kv = match storage::ensure_graph_tags_kv(&js).await {
+        Ok(kv) => kv,
+        Err(e) => {
+            let builder = ResultEnvelope::builder()
+                .add_diagnostic(Diagnostic::new(
+                    DiagnosticLevel::Error,
+                    format!("Failed to get KV bucket: {}", e),
+                ))
+                .with_source_info("graph-capsule", Some("0.0.1"), None::<String>);
+
+            return builder
+                .error_with_code(format!("KV bucket error: {}", e), "KV_BUCKET_FAILED")
+                .build()
+                .expect("Valid envelope");
+        }
+    };
+
+    // Delete tag from KV
+    let deleted_commit = match storage::delete_tag(&kv, &scope, &tag).await {
+        Ok(commit) => commit,
+        Err(e) => {
+            let builder = ResultEnvelope::builder()
+                .add_diagnostic(Diagnostic::new(
+                    DiagnosticLevel::Error,
+                    format!("Failed to delete tag from KV: {}", e),
+                ))
+                .with_source_info("graph-capsule", Some("0.0.1"), None::<String>);
+
+            return builder
+                .error_with_code(format!("Tag deletion error: {}", e), "TAG_DELETION_FAILED")
+                .build()
+                .expect("Valid envelope");
+        }
+    };
+
+    // If tag didn't exist, return error
+    let commit_id = match deleted_commit {
+        Some(id) => id,
+        None => {
+            let builder = ResultEnvelope::builder()
+                .add_diagnostic(Diagnostic::new(
+                    DiagnosticLevel::Error,
+                    format!("Tag '{}' not found", tag),
+                ))
+                .with_source_info("graph-capsule", Some("0.0.1"), None::<String>);
+
+            return builder
+                .error_with_code(format!("Tag '{}' does not exist", tag), "TAG_NOT_FOUND")
+                .build()
+                .expect("Valid envelope");
+        }
+    };
+
+    // Emit graph.tag.updated:v1 event (action=delete)
+    if let Err(e) = events::emit_tag_updated(&scope, &tag, None, TagAction::Delete, timestamp).await
+    {
+        let builder = ResultEnvelope::builder()
+            .add_diagnostic(Diagnostic::new(
+                DiagnosticLevel::Error,
+                format!("Failed to emit tag event: {}", e),
+            ))
+            .with_source_info("graph-capsule", Some("0.0.1"), None::<String>);
+
+        return builder
+            .error_with_code(format!("Tag event error: {}", e), "EVENT_EMISSION_FAILED")
+            .build()
+            .expect("Valid envelope");
+    }
+
+    let result = TagResult {
+        tag,
+        commit_id,
+        timestamp,
+        action: TagAction::Delete,
+    };
+
+    let mut builder = ResultEnvelope::builder()
+        .success(result)
         .add_diagnostic(Diagnostic::new(
-            DiagnosticLevel::Warning,
-            "list_tags not yet implemented - returns empty list".to_string(),
+            DiagnosticLevel::Info,
+            "Tag deleted successfully".to_string(),
         ))
         .with_source_info("graph-capsule", Some("0.0.1"), None::<String>);
 
-    builder.success(vec![]).build().expect("Valid envelope")
+    let duration = start.elapsed();
+    builder = builder.metrics(envelope::Metrics {
+        duration: Some(envelope::DurationMetrics {
+            total_ms: Some(duration.as_secs_f64() * 1000.0),
+            phases: HashMap::new(),
+        }),
+        resources: None,
+        counters: HashMap::new(),
+        custom: None,
+    });
+
+    builder.build().expect("Valid envelope")
+}
+
+/// List all tags associated with the graph scope
+///
+/// Scans the GRAPH_TAGS KV bucket and returns all tags for the given scope.
+pub async fn list_tags(scope: GraphScope) -> ResultEnvelope<Vec<TaggedCommit>> {
+    let start = std::time::Instant::now();
+
+    // Connect to NATS and get KV store
+    let url = std::env::var("NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".to_string());
+    let client = match async_nats::connect(&url).await {
+        Ok(c) => c,
+        Err(e) => {
+            let builder = ResultEnvelope::builder()
+                .add_diagnostic(Diagnostic::new(
+                    DiagnosticLevel::Error,
+                    format!("Failed to connect to NATS: {}", e),
+                ))
+                .with_source_info("graph-capsule", Some("0.0.1"), None::<String>);
+
+            return builder
+                .error_with_code(
+                    format!("NATS connection error: {}", e),
+                    "NATS_CONNECTION_FAILED",
+                )
+                .build()
+                .expect("Valid envelope");
+        }
+    };
+    let js = async_nats::jetstream::new(client);
+
+    // Ensure KV bucket exists
+    let kv = match storage::ensure_graph_tags_kv(&js).await {
+        Ok(kv) => kv,
+        Err(e) => {
+            let builder = ResultEnvelope::builder()
+                .add_diagnostic(Diagnostic::new(
+                    DiagnosticLevel::Error,
+                    format!("Failed to get KV bucket: {}", e),
+                ))
+                .with_source_info("graph-capsule", Some("0.0.1"), None::<String>);
+
+            return builder
+                .error_with_code(format!("KV bucket error: {}", e), "KV_BUCKET_FAILED")
+                .build()
+                .expect("Valid envelope");
+        }
+    };
+
+    // List tags from KV
+    let tags = match storage::list_tags(&kv, &scope).await {
+        Ok(tags) => tags,
+        Err(e) => {
+            let builder = ResultEnvelope::builder()
+                .add_diagnostic(Diagnostic::new(
+                    DiagnosticLevel::Error,
+                    format!("Failed to list tags from KV: {}", e),
+                ))
+                .with_source_info("graph-capsule", Some("0.0.1"), None::<String>);
+
+            return builder
+                .error_with_code(format!("Tag listing error: {}", e), "TAG_LISTING_FAILED")
+                .build()
+                .expect("Valid envelope");
+        }
+    };
+
+    let mut builder = ResultEnvelope::builder()
+        .success(tags)
+        .add_diagnostic(Diagnostic::new(
+            DiagnosticLevel::Info,
+            "Tags listed successfully".to_string(),
+        ))
+        .with_source_info("graph-capsule", Some("0.0.1"), None::<String>);
+
+    let duration = start.elapsed();
+    builder = builder.metrics(envelope::Metrics {
+        duration: Some(envelope::DurationMetrics {
+            total_ms: Some(duration.as_secs_f64() * 1000.0),
+            phases: HashMap::new(),
+        }),
+        resources: None,
+        counters: HashMap::new(),
+        custom: None,
+    });
+
+    builder.build().expect("Valid envelope")
 }
 
 // Query operation placeholders (pending graph materialization design)
