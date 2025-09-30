@@ -2,6 +2,10 @@
 
 Welcome, API consumers! This guide helps you integrate with Demon's REST APIs, consume event streams, and build applications that interact with the Demon platform.
 
+## Notes
+
+- Story tracking for EPIC-4: Graph contracts foundation is pending because the GitHub CLI is unavailable in this environment (`gh --version` → `command not found`).
+
 ## 🚀 Quick Start
 
 Ready to integrate with Demon? Here's your fast path:
