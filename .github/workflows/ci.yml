@@ -137,6 +137,9 @@ jobs:
         run: |
           cargo test -p engine --test per_cap_quota_integration -- --ignored --nocapture
 
+      - name: Graph capsule integration (NATS)
+        run: |
+          cargo test -p capsules_graph --test graph_integration_spec -- --ignored --nocapture
 
       - name: Smoke run (demonctl)
         run: |

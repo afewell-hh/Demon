@@ -17,6 +17,7 @@ fn nats_url() -> String {
 }
 
 #[tokio::test]
+#[ignore] // Requires NATS to be running
 async fn given_graph_create_when_committed_then_event_appears_in_stream() -> Result<()> {
     // Arrange
     let scope = GraphScope {
@@ -130,6 +131,7 @@ async fn given_graph_commit_when_mutations_applied_then_deterministic_commit_id(
 }
 
 #[tokio::test]
+#[ignore] // Requires NATS to be running
 async fn given_tag_operation_when_set_then_event_emitted() -> Result<()> {
     // Arrange
     let scope = GraphScope {
@@ -194,6 +196,7 @@ async fn given_tag_operation_when_set_then_event_emitted() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore] // Requires NATS to be running
 async fn given_commit_with_parent_when_created_then_includes_parent_in_event() -> Result<()> {
     // Arrange
     let scope = GraphScope {
@@ -288,6 +291,7 @@ async fn given_empty_mutations_when_commit_then_returns_error() {
 }
 
 #[tokio::test]
+#[ignore] // Requires NATS to be running
 async fn given_tag_set_when_stored_then_appears_in_kv_and_list_tags() -> Result<()> {
     // Arrange
     let scope = GraphScope {
@@ -323,6 +327,7 @@ async fn given_tag_set_when_stored_then_appears_in_kv_and_list_tags() -> Result<
 }
 
 #[tokio::test]
+#[ignore] // Requires NATS to be running
 async fn given_tag_exists_when_deleted_then_removed_from_kv() -> Result<()> {
     // Arrange
     let scope = GraphScope {
@@ -387,6 +392,7 @@ async fn given_nonexistent_tag_when_deleted_then_returns_error() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore] // Requires NATS to be running
 async fn given_multiple_tags_when_listed_then_sorted_by_name() -> Result<()> {
     // Arrange
     let scope = GraphScope {
@@ -430,6 +436,7 @@ async fn given_multiple_tags_when_listed_then_sorted_by_name() -> Result<()> {
 // Query operation tests
 
 #[tokio::test]
+#[ignore] // Requires NATS to be running
 async fn given_graph_with_node_when_get_node_then_returns_node_snapshot() -> Result<()> {
     // Arrange - create graph with a node
     let scope = GraphScope {
@@ -489,6 +496,7 @@ async fn given_graph_with_node_when_get_node_then_returns_node_snapshot() -> Res
 }
 
 #[tokio::test]
+#[ignore] // Requires NATS to be running
 async fn given_graph_when_get_nonexistent_node_then_returns_none() -> Result<()> {
     // Arrange - create graph
     let scope = GraphScope {
@@ -531,6 +539,7 @@ async fn given_graph_when_get_nonexistent_node_then_returns_none() -> Result<()>
 }
 
 #[tokio::test]
+#[ignore] // Requires NATS to be running
 async fn given_graph_with_edges_when_neighbors_then_returns_connected_nodes() -> Result<()> {
     // Arrange - create graph: A -> B -> C
     let scope = GraphScope {
@@ -616,6 +625,7 @@ async fn given_graph_with_edges_when_neighbors_then_returns_connected_nodes() ->
 }
 
 #[tokio::test]
+#[ignore] // Requires NATS to be running
 async fn given_graph_when_path_exists_then_returns_true() -> Result<()> {
     // Arrange - create graph: A -> B -> C
     let scope = GraphScope {
@@ -704,6 +714,7 @@ async fn given_graph_when_path_exists_then_returns_true() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore] // Requires NATS to be running
 async fn given_graph_when_node_removed_then_query_reflects_removal() -> Result<()> {
     // Arrange - create graph with node, then remove it
     let scope = GraphScope {
