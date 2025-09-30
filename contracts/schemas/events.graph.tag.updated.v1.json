@@ -15,35 +15,77 @@
   ],
   "properties": {
     "event": { "const": "graph.tag.updated:v1" },
-    "graphId": { "$ref": "#/$defs/identifier" },
-    "tenantId": { "$ref": "#/$defs/identifier" },
-    "projectId": { "$ref": "#/$defs/identifier" },
-    "namespace": { "$ref": "#/$defs/identifier" },
-    "tag": { "$ref": "#/$defs/identifier" },
-    "ts": { "type": "string", "format": "date-time" },
+    "graphId": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9._-]{1,64}$"
+    },
+    "tenantId": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9._-]{1,64}$"
+    },
+    "projectId": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9._-]{1,64}$"
+    },
+    "namespace": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9._-]{1,64}$"
+    },
+    "tag": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9._-]{1,64}$"
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time"
+    },
     "action": {
       "type": "string",
       "enum": ["set", "delete"]
     },
-    "commitId": { "$ref": "#/$defs/commit-identifier" },
-    "previousCommitId": { "$ref": "#/$defs/commit-identifier" },
-    "actor": { "type": "object" }
-  },
-  "allOf": [
-    {
-      "if": { "properties": { "action": { "const": "set" } } },
-      "then": { "required": ["commitId"] }
-    }
-  ],
-  "additionalProperties": false,
-  "$defs": {
-    "identifier": {
-      "type": "string",
-      "pattern": "^[a-zA-Z0-9._-]{1,64}$"
-    },
-    "commit-identifier": {
+    "commitId": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
+    },
+    "previousCommitId": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "actor": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["user", "service"]
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9._-]{1,64}$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        }
+      },
+      "additionalProperties": false
     }
-  }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": { "action": { "const": "set" } },
+        "required": ["action"]
+      },
+      "then": {
+        "required": ["commitId"]
+      }
+    }
+  ]
 }
