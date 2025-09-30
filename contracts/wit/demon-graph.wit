@@ -4,7 +4,7 @@
 
 package demon:graph@0.1.0;
 
-use demon:contracts/demon-envelope.result-envelope;
+use demon:contracts/result-envelope;
 
 /// Identifies a graph scope within the Demon platform
 record scope {
