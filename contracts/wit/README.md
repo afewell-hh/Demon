@@ -5,6 +5,7 @@ This folder contains WebAssembly Interface Type (WIT) definitions for Demon cont
 ## Available Interfaces
 
 - `demon-envelope.wit` - Result envelope interface with typed bindings for operation results, diagnostics, suggestions, metrics, and provenance
+- `demon-graph.wit` - Graph store interface for commits, queries, and tag management
 
 ## Usage
 

@@ -1,0 +1,67 @@
+{
+  "event": "graph.commit.created:v1",
+  "graphId": "knowledge-base",
+  "tenantId": "tenant-01",
+  "projectId": "atlas",
+  "namespace": "support",
+  "commitId": "4a7c2f8d0b9e3f5c1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f7081",
+  "parentCommitId": "0f1e2d3c4b5a69788776655443322110ffeeddccbbaa99887766554433221100",
+  "ts": "2025-03-17T12:34:56Z",
+  "mutations": [
+    {
+      "op": "add-node",
+      "nodeId": "article.root",
+      "labels": ["Article", "Root"],
+      "properties": {
+        "title": "Graph Home",
+        "status": "published"
+      }
+    },
+    {
+      "op": "add-node",
+      "nodeId": "article.search",
+      "labels": ["Article"],
+      "properties": {
+        "title": "Search Tips",
+        "status": "draft"
+      }
+    },
+    {
+      "op": "add-edge",
+      "edgeId": "rel.root-search",
+      "from": "article.root",
+      "to": "article.search",
+      "label": "related",
+      "properties": {
+        "weight": 0.8
+      }
+    },
+    {
+      "op": "update-node",
+      "nodeId": "article.search",
+      "labels": ["Article", "Guide"],
+      "properties": {
+        "title": "Search Tips",
+        "status": "published"
+      }
+    },
+    {
+      "op": "update-edge",
+      "edgeId": "rel.root-search",
+      "from": "article.root",
+      "to": "article.search",
+      "label": "linked",
+      "properties": {
+        "weight": 0.9
+      }
+    },
+    {
+      "op": "remove-edge",
+      "edgeId": "rel.legacy-link"
+    }
+  ],
+  "metadata": {
+    "author": "api-user@example.com",
+    "message": "Seeded support graph with search guidance"
+  }
+}

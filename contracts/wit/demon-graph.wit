@@ -1,0 +1,92 @@
+// Demon Graph Store WIT Interface
+// Defines graph storage operations and supporting types for graph contracts
+// Version: v0.1.0
+
+package demon:graph@0.1.0;
+
+use demon:contracts/demon-envelope.result-envelope;
+
+/// Identifies a graph scope within the Demon platform
+record scope {
+    tenant-id: string,
+    project-id: string,
+    namespace: string,
+    graph-id: string,
+}
+
+/// Key/value pair stored as a JSON encoded property value
+record property {
+    key: string,
+    value: string,
+}
+
+/// Snapshot of a graph node at a commit
+record node-snapshot {
+    node-id: string,
+    labels: list<string>,
+    properties: list<property>,
+}
+
+/// Snapshot of a graph edge at a commit
+record edge-snapshot {
+    edge-id: string,
+    from-node: string,
+    to-node: string,
+    label: option<string>,
+    properties: list<property>,
+}
+
+/// Graph mutation operations applied within a commit
+variant mutation {
+    add-node(node-snapshot),
+    update-node(node-snapshot),
+    remove-node(record { node-id: string }),
+    add-edge(edge-snapshot),
+    update-edge(edge-snapshot),
+    remove-edge(record { edge-id: string }),
+}
+
+/// Result of creating or committing graph changes
+record commit-result {
+    commit-id: string,
+    parent-commit-id: option<string>,
+    envelope: result-envelope.result-envelope,
+}
+
+/// Association between a tag and commit
+record tagged-commit {
+    tag: string,
+    commit-id: string,
+    timestamp: string,
+}
+
+/// Error returned by graph store operations
+record graph-error {
+    code: string,
+    message: string,
+    details: option<string>,
+}
+
+/// Graph storage interface for commit and query operations
+interface graph-store {
+    /// Create a new graph by seeding an initial commit
+    create: func(scope: scope, seed: list<mutation>) -> result<commit-result, graph-error>;
+
+    /// Commit a new set of mutations referencing an optional parent commit
+    commit: func(scope: scope, parent-ref: option<string>, mutations: list<mutation>) -> result<commit-result, graph-error>;
+
+    /// Retrieve a node snapshot for a given commit and node identifier
+    get-node: func(scope: scope, commit-id: string, node-id: string) -> result<option<node-snapshot>, graph-error>;
+
+    /// List neighboring nodes up to the specified depth from the starting node
+    neighbors: func(scope: scope, commit-id: string, node-id: string, depth: u32) -> result<list<node-snapshot>, graph-error>;
+
+    /// Determine whether a path exists between two nodes within the depth constraint
+    path-exists: func(scope: scope, commit-id: string, from: string, to: string, max-depth: u32) -> result<bool, graph-error>;
+
+    /// Attach or update a tag to point at a commit
+    tag: func(scope: scope, tag: string, commit-id: string) -> result<tagged-commit, graph-error>;
+
+    /// List all tags associated with the graph scope
+    list-tags: func(scope: scope) -> result<list<tagged-commit>, graph-error>;
+}
