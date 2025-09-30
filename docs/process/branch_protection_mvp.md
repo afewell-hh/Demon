@@ -5,10 +5,12 @@ This repository uses a minimal, reliable protection set during MVP to keep progr
 Required status checks on `main`:
 - Bootstrapper bundles — verify (offline, signature ok)
 - Bootstrapper bundles — negative verify (tamper ⇒ failed)
+- contracts-validate
 - review-lock-guard
 
 Non‑required (still runs):
 - review-threads-guard (PR) / guard
+- Additional contract workflows beyond `contracts-validate` continue to run but are not required.
 
 Other protections:
 - Conversation resolution enabled (no open threads at merge).

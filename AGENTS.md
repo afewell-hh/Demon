@@ -71,6 +71,7 @@
 - Required contexts on `main` (names **must** match exactly, including en-dashes “—”):
   - `Bootstrapper bundles — verify (offline, signature ok)`
   - `Bootstrapper bundles — negative verify (tamper ⇒ failed)`
+  - `contracts-validate`
   - `review-lock-guard`
   - `review-threads-guard (PR) / guard`
 - **Review-lock**: PR body MUST contain the current HEAD SHA. Update on every push.  
