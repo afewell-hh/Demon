@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demon.meta/contracts/events.graph.commit.created.v1.json",
+  "title": "GraphCommitCreatedV1",
+  "type": "object",
+  "required": [
+    "event",
+    "graphId",
+    "tenantId",
+    "projectId",
+    "namespace",
+    "commitId",
+    "ts",
+    "mutations"
+  ],
+  "properties": {
+    "event": { "const": "graph.commit.created:v1" },
+    "graphId": { "$ref": "#/$defs/identifier" },
+    "tenantId": { "$ref": "#/$defs/identifier" },
+    "projectId": { "$ref": "#/$defs/identifier" },
+    "namespace": { "$ref": "#/$defs/identifier" },
+    "commitId": { "$ref": "#/$defs/commit-identifier" },
+    "parentCommitId": { "$ref": "#/$defs/commit-identifier" },
+    "ts": { "type": "string", "format": "date-time" },
+    "mutations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["op"],
+        "properties": {
+          "op": {
+            "type": "string",
+            "enum": [
+              "add-node",
+              "update-node",
+              "remove-node",
+              "add-edge",
+              "update-edge",
+              "remove-edge"
+            ]
+          },
+          "nodeId": { "$ref": "#/$defs/identifier" },
+          "labels": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/label" }
+          },
+          "properties": { "$ref": "#/$defs/properties" },
+          "edgeId": { "$ref": "#/$defs/identifier" },
+          "from": { "$ref": "#/$defs/identifier" },
+          "to": { "$ref": "#/$defs/identifier" },
+          "label": { "$ref": "#/$defs/label" }
+        },
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": { "op": { "enum": ["add-node", "update-node", "remove-node"] } }
+            },
+            "then": { "required": ["nodeId"] }
+          },
+          {
+            "if": {
+              "properties": { "op": { "enum": ["add-node", "update-node"] } }
+            },
+            "then": {
+              "properties": {
+                "labels": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/label" }
+                },
+                "properties": { "$ref": "#/$defs/properties" }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": { "op": { "enum": ["add-edge", "update-edge", "remove-edge"] } }
+            },
+            "then": { "required": ["edgeId"] }
+          },
+          {
+            "if": {
+              "properties": { "op": { "enum": ["add-edge", "update-edge"] } }
+            },
+            "then": {
+              "required": ["from", "to"],
+              "properties": {
+                "label": { "$ref": "#/$defs/label" },
+                "properties": { "$ref": "#/$defs/properties" }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "metadata": { "type": "object" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9._-]{1,64}$"
+    },
+    "commit-identifier": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "label": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "properties": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}
