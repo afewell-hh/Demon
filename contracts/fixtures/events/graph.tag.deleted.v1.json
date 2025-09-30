@@ -1,0 +1,15 @@
+{
+  "event": "graph.tag.updated:v1",
+  "graphId": "graph-main",
+  "tenantId": "tenant-alpha",
+  "projectId": "project-ops",
+  "namespace": "default",
+  "tag": "release-2024.09.23",
+  "ts": "2024-09-24T08:00:00Z",
+  "action": "delete",
+  "actor": {
+    "type": "service",
+    "id": "svc.cleanup",
+    "displayName": "Tag Cleanup"
+  }
+}
