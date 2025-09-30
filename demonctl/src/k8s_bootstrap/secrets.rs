@@ -280,9 +280,17 @@ pub fn create_image_pull_secrets(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        ENV_LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     #[test]
     fn test_collect_secrets_env_provider() {
+        let _guard = env_lock().lock().unwrap();
+
         // Set up test environment variables
         env::set_var("TEST_SECRET_1", "value1");
         env::set_var("TEST_SECRET_2", "value2");
@@ -369,6 +377,8 @@ mod tests {
 
     #[test]
     fn test_validate_vault_config_missing_address() {
+        let _guard = env_lock().lock().unwrap();
+
         env::remove_var("VAULT_ADDR");
         env::remove_var("VAULT_TOKEN");
 
@@ -386,6 +396,8 @@ mod tests {
 
     #[test]
     fn test_validate_vault_config_with_env_vars() {
+        let _guard = env_lock().lock().unwrap();
+
         env::set_var("VAULT_ADDR", "http://localhost:8200");
         env::set_var("VAULT_TOKEN", "test-token");
 
