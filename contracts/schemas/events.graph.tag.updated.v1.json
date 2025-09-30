@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demon.meta/contracts/events.graph.tag.updated.v1.json",
+  "title": "GraphTagUpdatedV1",
+  "type": "object",
+  "required": [
+    "event",
+    "graphId",
+    "tenantId",
+    "projectId",
+    "namespace",
+    "tag",
+    "ts",
+    "action"
+  ],
+  "properties": {
+    "event": { "const": "graph.tag.updated:v1" },
+    "graphId": { "$ref": "#/$defs/identifier" },
+    "tenantId": { "$ref": "#/$defs/identifier" },
+    "projectId": { "$ref": "#/$defs/identifier" },
+    "namespace": { "$ref": "#/$defs/identifier" },
+    "tag": { "$ref": "#/$defs/identifier" },
+    "ts": { "type": "string", "format": "date-time" },
+    "action": {
+      "type": "string",
+      "enum": ["set", "delete"]
+    },
+    "commitId": { "$ref": "#/$defs/commit-identifier" },
+    "previousCommitId": { "$ref": "#/$defs/commit-identifier" },
+    "actor": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "action": { "const": "set" } } },
+      "then": { "required": ["commitId"] }
+    }
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9._-]{1,64}$"
+    },
+    "commit-identifier": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}

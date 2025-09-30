@@ -1,0 +1,28 @@
+[
+  {
+    "event": "graph.tag.updated:v1",
+    "graphId": "knowledge-base",
+    "tenantId": "tenant-01",
+    "projectId": "atlas",
+    "namespace": "support",
+    "tag": "production",
+    "ts": "2025-03-17T12:35:10Z",
+    "action": "set",
+    "commitId": "4a7c2f8d0b9e3f5c1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f7081",
+    "previousCommitId": "0f1e2d3c4b5a69788776655443322110ffeeddccbbaa99887766554433221100",
+    "actor": {
+      "id": "svc-deployer",
+      "displayName": "Graph Release Bot"
+    }
+  },
+  {
+    "event": "graph.tag.updated:v1",
+    "graphId": "knowledge-base",
+    "tenantId": "tenant-01",
+    "projectId": "atlas",
+    "namespace": "support",
+    "tag": "staging",
+    "ts": "2025-03-17T12:35:45Z",
+    "action": "delete"
+  }
+]
