@@ -21,6 +21,9 @@ make fmt && make lint
 
 # Quick smoke test
 cargo run -p demonctl -- run examples/rituals/echo.yaml
+
+# Graph capsule tests
+cargo test -p capsules_graph
 ```
 
 ## Docker & Containers

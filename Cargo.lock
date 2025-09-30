@@ -468,6 +468,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "capsules_graph"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "async-nats",
+ "chrono",
+ "envelope",
+ "futures-util",
+ "hex",
+ "jsonschema 0.18.3",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "tokio-test",
+ "uuid",
+]
+
+[[package]]
 name = "cc"
 version = "1.2.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
