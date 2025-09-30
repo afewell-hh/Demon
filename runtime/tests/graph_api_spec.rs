@@ -7,10 +7,6 @@ use capsules_graph::GraphScope;
 use envelope::OperationResult;
 use std::time::Duration;
 
-fn nats_url() -> String {
-    std::env::var("NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".to_string())
-}
-
 /// Helper to start the REST API server in background for testing
 async fn start_test_server() -> Result<tokio::task::JoinHandle<()>> {
     let handle = tokio::spawn(async {

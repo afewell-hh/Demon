@@ -2,7 +2,7 @@
 //!
 //! This capsule provides graph commit and tag operations with event emission
 //! to NATS JetStream. Query operations (get-node, neighbors, path-exists) are
-//! placeholders pending full graph materialization design.
+//! implemented via graph materialization from the commit stream.
 
 use chrono::Utc;
 use envelope::{AsEnvelope, Diagnostic, DiagnosticLevel, ResultEnvelope};
@@ -571,78 +571,203 @@ pub async fn list_tags(scope: GraphScope) -> ResultEnvelope<Vec<TaggedCommit>> {
     builder.build().expect("Valid envelope")
 }
 
-// Query operation placeholders (pending graph materialization design)
+// Query operations using graph materialization
 
 /// Retrieve a node snapshot for a given commit and node identifier
 ///
-/// TODO: Implement graph query layer
+/// Materializes the graph state at the specified commit and returns the node if it exists.
 pub async fn get_node(
-    _scope: GraphScope,
-    _commit_id: String,
-    _node_id: String,
+    scope: GraphScope,
+    commit_id: String,
+    node_id: String,
 ) -> ResultEnvelope<Option<NodeSnapshot>> {
-    let builder = ResultEnvelope::builder()
+    let start = std::time::Instant::now();
+
+    // Materialize graph at commit
+    let graph = match storage::materialize_graph_at_commit(&scope, &commit_id).await {
+        Ok(g) => g,
+        Err(e) => {
+            let builder = ResultEnvelope::builder()
+                .add_diagnostic(Diagnostic::new(
+                    DiagnosticLevel::Error,
+                    format!("Failed to materialize graph: {}", e),
+                ))
+                .with_source_info("graph-capsule", Some("0.0.1"), None::<String>);
+
+            return builder
+                .error_with_code(
+                    format!("Graph materialization error: {}", e),
+                    "MATERIALIZATION_FAILED",
+                )
+                .build()
+                .expect("Valid envelope");
+        }
+    };
+
+    let node = graph.get_node(&node_id);
+
+    let mut builder = ResultEnvelope::builder()
+        .success(node)
         .add_diagnostic(Diagnostic::new(
-            DiagnosticLevel::Error,
-            "get_node not yet implemented - graph query layer pending".to_string(),
+            DiagnosticLevel::Info,
+            format!("Query completed for node '{}'", node_id),
         ))
         .with_source_info("graph-capsule", Some("0.0.1"), None::<String>);
 
-    builder
-        .error_with_code(
-            "Graph query operations not yet implemented",
-            "NOT_IMPLEMENTED",
-        )
-        .build()
-        .expect("Valid envelope")
+    let duration = start.elapsed();
+    let mut counters = HashMap::new();
+    counters.insert("nodes_in_graph".to_string(), graph.nodes.len() as i64);
+    counters.insert("edges_in_graph".to_string(), graph.edges.len() as i64);
+    counters.insert("commits_replayed".to_string(), graph.commit_count as i64);
+
+    builder = builder.metrics(envelope::Metrics {
+        duration: Some(envelope::DurationMetrics {
+            total_ms: Some(duration.as_secs_f64() * 1000.0),
+            phases: HashMap::new(),
+        }),
+        resources: None,
+        counters,
+        custom: None,
+    });
+
+    builder.build().expect("Valid envelope")
 }
 
 /// List neighboring nodes up to the specified depth from the starting node
 ///
-/// TODO: Implement graph traversal
+/// Uses BFS to traverse the graph and find all nodes reachable within the specified depth.
 pub async fn neighbors(
-    _scope: GraphScope,
-    _commit_id: String,
-    _node_id: String,
-    _depth: u32,
+    scope: GraphScope,
+    commit_id: String,
+    node_id: String,
+    depth: u32,
 ) -> ResultEnvelope<Vec<NodeSnapshot>> {
-    let builder = ResultEnvelope::builder()
+    let start = std::time::Instant::now();
+
+    // Materialize graph at commit
+    let graph = match storage::materialize_graph_at_commit(&scope, &commit_id).await {
+        Ok(g) => g,
+        Err(e) => {
+            let builder = ResultEnvelope::builder()
+                .add_diagnostic(Diagnostic::new(
+                    DiagnosticLevel::Error,
+                    format!("Failed to materialize graph: {}", e),
+                ))
+                .with_source_info("graph-capsule", Some("0.0.1"), None::<String>);
+
+            return builder
+                .error_with_code(
+                    format!("Graph materialization error: {}", e),
+                    "MATERIALIZATION_FAILED",
+                )
+                .build()
+                .expect("Valid envelope");
+        }
+    };
+
+    let neighbors = graph.neighbors(&node_id, depth);
+
+    let mut builder = ResultEnvelope::builder()
+        .success(neighbors.clone())
         .add_diagnostic(Diagnostic::new(
-            DiagnosticLevel::Error,
-            "neighbors not yet implemented - graph traversal layer pending".to_string(),
+            DiagnosticLevel::Info,
+            format!(
+                "Found {} neighbors within depth {} from node '{}'",
+                neighbors.len(),
+                depth,
+                node_id
+            ),
         ))
         .with_source_info("graph-capsule", Some("0.0.1"), None::<String>);
 
-    builder
-        .error_with_code(
-            "Graph traversal operations not yet implemented",
-            "NOT_IMPLEMENTED",
-        )
-        .build()
-        .expect("Valid envelope")
+    let duration = start.elapsed();
+    let mut counters = HashMap::new();
+    counters.insert("nodes_in_graph".to_string(), graph.nodes.len() as i64);
+    counters.insert("edges_in_graph".to_string(), graph.edges.len() as i64);
+    counters.insert("commits_replayed".to_string(), graph.commit_count as i64);
+    counters.insert("neighbors_found".to_string(), neighbors.len() as i64);
+    counters.insert("max_depth".to_string(), depth as i64);
+
+    builder = builder.metrics(envelope::Metrics {
+        duration: Some(envelope::DurationMetrics {
+            total_ms: Some(duration.as_secs_f64() * 1000.0),
+            phases: HashMap::new(),
+        }),
+        resources: None,
+        counters,
+        custom: None,
+    });
+
+    builder.build().expect("Valid envelope")
 }
 
 /// Determine whether a path exists between two nodes within the depth constraint
 ///
-/// TODO: Implement graph path finding
+/// Uses BFS to search for a path between the two nodes within the specified maximum depth.
 pub async fn path_exists(
-    _scope: GraphScope,
-    _commit_id: String,
-    _from: String,
-    _to: String,
-    _max_depth: u32,
+    scope: GraphScope,
+    commit_id: String,
+    from: String,
+    to: String,
+    max_depth: u32,
 ) -> ResultEnvelope<bool> {
-    let builder = ResultEnvelope::builder()
+    let start = std::time::Instant::now();
+
+    // Materialize graph at commit
+    let graph = match storage::materialize_graph_at_commit(&scope, &commit_id).await {
+        Ok(g) => g,
+        Err(e) => {
+            let builder = ResultEnvelope::builder()
+                .add_diagnostic(Diagnostic::new(
+                    DiagnosticLevel::Error,
+                    format!("Failed to materialize graph: {}", e),
+                ))
+                .with_source_info("graph-capsule", Some("0.0.1"), None::<String>);
+
+            return builder
+                .error_with_code(
+                    format!("Graph materialization error: {}", e),
+                    "MATERIALIZATION_FAILED",
+                )
+                .build()
+                .expect("Valid envelope");
+        }
+    };
+
+    let exists = graph.path_exists(&from, &to, max_depth);
+
+    let mut builder = ResultEnvelope::builder()
+        .success(exists)
         .add_diagnostic(Diagnostic::new(
-            DiagnosticLevel::Error,
-            "path_exists not yet implemented - graph query layer pending".to_string(),
+            DiagnosticLevel::Info,
+            format!(
+                "Path {} between '{}' and '{}' within depth {}",
+                if exists { "exists" } else { "not found" },
+                from,
+                to,
+                max_depth
+            ),
         ))
         .with_source_info("graph-capsule", Some("0.0.1"), None::<String>);
 
-    builder
-        .error_with_code("Graph path finding not yet implemented", "NOT_IMPLEMENTED")
-        .build()
-        .expect("Valid envelope")
+    let duration = start.elapsed();
+    let mut counters = HashMap::new();
+    counters.insert("nodes_in_graph".to_string(), graph.nodes.len() as i64);
+    counters.insert("edges_in_graph".to_string(), graph.edges.len() as i64);
+    counters.insert("commits_replayed".to_string(), graph.commit_count as i64);
+    counters.insert("max_depth".to_string(), max_depth as i64);
+
+    builder = builder.metrics(envelope::Metrics {
+        duration: Some(envelope::DurationMetrics {
+            total_ms: Some(duration.as_secs_f64() * 1000.0),
+            phases: HashMap::new(),
+        }),
+        resources: None,
+        counters,
+        custom: None,
+    });
+
+    builder.build().expect("Valid envelope")
 }
 
 #[cfg(test)]

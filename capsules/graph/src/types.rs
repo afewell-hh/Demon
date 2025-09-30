@@ -47,7 +47,9 @@ pub enum Mutation {
     AddNode {
         #[serde(rename = "nodeId")]
         node_id: String,
+        #[serde(default)]
         labels: Vec<String>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
         properties: Vec<Property>,
     },
     #[serde(rename = "update-node")]

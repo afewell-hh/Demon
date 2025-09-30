@@ -140,42 +140,24 @@ fn serialize_mutations(mutations: &[Mutation]) -> Vec<serde_json::Value> {
                 labels,
                 properties,
             } => {
-                let mut obj = serde_json::json!({
+                serde_json::json!({
                     "op": "add-node",
                     "nodeId": node_id,
                     "labels": labels,
-                });
-                if !properties.is_empty() {
-                    let props: serde_json::Map<String, serde_json::Value> = properties
-                        .iter()
-                        .map(|p| (p.key.clone(), p.value.clone()))
-                        .collect();
-                    obj.as_object_mut()
-                        .unwrap()
-                        .insert("properties".to_string(), serde_json::Value::Object(props));
-                }
-                obj
+                    "properties": properties,
+                })
             }
             Mutation::UpdateNode {
                 node_id,
                 labels,
                 properties,
             } => {
-                let mut obj = serde_json::json!({
+                serde_json::json!({
                     "op": "update-node",
                     "nodeId": node_id,
                     "labels": labels,
-                });
-                if !properties.is_empty() {
-                    let props: serde_json::Map<String, serde_json::Value> = properties
-                        .iter()
-                        .map(|p| (p.key.clone(), p.value.clone()))
-                        .collect();
-                    obj.as_object_mut()
-                        .unwrap()
-                        .insert("properties".to_string(), serde_json::Value::Object(props));
-                }
-                obj
+                    "properties": properties,
+                })
             }
             Mutation::RemoveNode { node_id } => {
                 serde_json::json!({
@@ -190,27 +172,14 @@ fn serialize_mutations(mutations: &[Mutation]) -> Vec<serde_json::Value> {
                 label,
                 properties,
             } => {
-                let mut obj = serde_json::json!({
+                serde_json::json!({
                     "op": "add-edge",
                     "edgeId": edge_id,
                     "from": from,
                     "to": to,
-                });
-                if let Some(l) = label {
-                    obj.as_object_mut()
-                        .unwrap()
-                        .insert("label".to_string(), serde_json::json!(l));
-                }
-                if !properties.is_empty() {
-                    let props: serde_json::Map<String, serde_json::Value> = properties
-                        .iter()
-                        .map(|p| (p.key.clone(), p.value.clone()))
-                        .collect();
-                    obj.as_object_mut()
-                        .unwrap()
-                        .insert("properties".to_string(), serde_json::Value::Object(props));
-                }
-                obj
+                    "label": label,
+                    "properties": properties,
+                })
             }
             Mutation::UpdateEdge {
                 edge_id,
@@ -219,27 +188,14 @@ fn serialize_mutations(mutations: &[Mutation]) -> Vec<serde_json::Value> {
                 label,
                 properties,
             } => {
-                let mut obj = serde_json::json!({
+                serde_json::json!({
                     "op": "update-edge",
                     "edgeId": edge_id,
                     "from": from,
                     "to": to,
-                });
-                if let Some(l) = label {
-                    obj.as_object_mut()
-                        .unwrap()
-                        .insert("label".to_string(), serde_json::json!(l));
-                }
-                if !properties.is_empty() {
-                    let props: serde_json::Map<String, serde_json::Value> = properties
-                        .iter()
-                        .map(|p| (p.key.clone(), p.value.clone()))
-                        .collect();
-                    obj.as_object_mut()
-                        .unwrap()
-                        .insert("properties".to_string(), serde_json::Value::Object(props));
-                }
-                obj
+                    "label": label,
+                    "properties": properties,
+                })
             }
             Mutation::RemoveEdge { edge_id } => {
                 serde_json::json!({

@@ -426,3 +426,341 @@ async fn given_multiple_tags_when_listed_then_sorted_by_name() -> Result<()> {
 
     Ok(())
 }
+
+// Query operation tests
+
+#[tokio::test]
+async fn given_graph_with_node_when_get_node_then_returns_node_snapshot() -> Result<()> {
+    // Arrange - create graph with a node
+    let scope = GraphScope {
+        tenant_id: format!("tenant-getnode-{}", uuid::Uuid::new_v4()),
+        project_id: "proj-1".to_string(),
+        namespace: "ns-1".to_string(),
+        graph_id: "graph-1".to_string(),
+    };
+
+    let mutations = vec![Mutation::AddNode {
+        node_id: "node-1".to_string(),
+        labels: vec!["Person".to_string()],
+        properties: vec![Property {
+            key: "name".to_string(),
+            value: serde_json::json!("Alice"),
+        }],
+    }];
+
+    let envelope = graph::create(scope.clone(), mutations).await;
+    assert!(envelope.result.is_success());
+
+    let commit_id = if let envelope::OperationResult::Success { data, .. } = &envelope.result {
+        data.commit_id.clone()
+    } else {
+        panic!("Expected success result");
+    };
+
+    // Wait for event propagation
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // Act - query the node
+    let query_envelope = graph::get_node(scope, commit_id.clone(), "node-1".to_string()).await;
+
+    // Assert
+    match &query_envelope.result {
+        envelope::OperationResult::Success { data, .. } => {
+            if data.is_none() {
+                eprintln!("Query succeeded but node not found");
+                eprintln!("Diagnostics: {:?}", query_envelope.diagnostics);
+                eprintln!("Metrics: {:?}", query_envelope.metrics);
+            }
+            assert!(data.is_some(), "Node should be found");
+            let node = data.as_ref().unwrap();
+            assert_eq!(node.node_id, "node-1");
+            assert_eq!(node.labels, vec!["Person"]);
+            assert_eq!(node.properties.len(), 1);
+            assert_eq!(node.properties[0].key, "name");
+        }
+        envelope::OperationResult::Error { error, .. } => {
+            eprintln!("Query failed with error: {:?}", error);
+            eprintln!("Diagnostics: {:?}", query_envelope.diagnostics);
+            panic!("Query should have succeeded");
+        }
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn given_graph_when_get_nonexistent_node_then_returns_none() -> Result<()> {
+    // Arrange - create graph
+    let scope = GraphScope {
+        tenant_id: format!("tenant-getnode-none-{}", uuid::Uuid::new_v4()),
+        project_id: "proj-1".to_string(),
+        namespace: "ns-1".to_string(),
+        graph_id: "graph-1".to_string(),
+    };
+
+    let mutations = vec![Mutation::AddNode {
+        node_id: "node-1".to_string(),
+        labels: vec![],
+        properties: vec![],
+    }];
+
+    let envelope = graph::create(scope.clone(), mutations).await;
+    assert!(envelope.result.is_success());
+
+    let commit_id = if let envelope::OperationResult::Success { data, .. } = &envelope.result {
+        data.commit_id.clone()
+    } else {
+        panic!("Expected success result");
+    };
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    // Act - query non-existent node
+    let query_envelope = graph::get_node(scope, commit_id, "nonexistent".to_string()).await;
+
+    // Assert
+    assert!(query_envelope.result.is_success());
+
+    if let envelope::OperationResult::Success { data, .. } = &query_envelope.result {
+        assert!(data.is_none());
+    } else {
+        panic!("Expected success result for get_node");
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn given_graph_with_edges_when_neighbors_then_returns_connected_nodes() -> Result<()> {
+    // Arrange - create graph: A -> B -> C
+    let scope = GraphScope {
+        tenant_id: format!("tenant-neighbors-{}", uuid::Uuid::new_v4()),
+        project_id: "proj-1".to_string(),
+        namespace: "ns-1".to_string(),
+        graph_id: "graph-1".to_string(),
+    };
+
+    let mutations = vec![
+        Mutation::AddNode {
+            node_id: "A".to_string(),
+            labels: vec![],
+            properties: vec![],
+        },
+        Mutation::AddNode {
+            node_id: "B".to_string(),
+            labels: vec![],
+            properties: vec![],
+        },
+        Mutation::AddNode {
+            node_id: "C".to_string(),
+            labels: vec![],
+            properties: vec![],
+        },
+        Mutation::AddEdge {
+            edge_id: "e1".to_string(),
+            from: "A".to_string(),
+            to: "B".to_string(),
+            label: None,
+            properties: vec![],
+        },
+        Mutation::AddEdge {
+            edge_id: "e2".to_string(),
+            from: "B".to_string(),
+            to: "C".to_string(),
+            label: None,
+            properties: vec![],
+        },
+    ];
+
+    let envelope = graph::create(scope.clone(), mutations).await;
+    assert!(envelope.result.is_success());
+
+    let commit_id = if let envelope::OperationResult::Success { data, .. } = &envelope.result {
+        data.commit_id.clone()
+    } else {
+        panic!("Expected success result");
+    };
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    // Act - find neighbors of A within depth 1
+    let query_envelope =
+        graph::neighbors(scope.clone(), commit_id.clone(), "A".to_string(), 1).await;
+
+    // Assert - should find B
+    assert!(query_envelope.result.is_success());
+
+    if let envelope::OperationResult::Success { data, .. } = &query_envelope.result {
+        assert_eq!(data.len(), 1);
+        assert_eq!(data[0].node_id, "B");
+    } else {
+        panic!("Expected success result for neighbors");
+    }
+
+    // Act - find neighbors of A within depth 2
+    let query_envelope2 = graph::neighbors(scope, commit_id, "A".to_string(), 2).await;
+
+    // Assert - should find B and C
+    assert!(query_envelope2.result.is_success());
+
+    if let envelope::OperationResult::Success { data, .. } = &query_envelope2.result {
+        assert_eq!(data.len(), 2);
+        let node_ids: Vec<String> = data.iter().map(|n| n.node_id.clone()).collect();
+        assert!(node_ids.contains(&"B".to_string()));
+        assert!(node_ids.contains(&"C".to_string()));
+    } else {
+        panic!("Expected success result for neighbors");
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn given_graph_when_path_exists_then_returns_true() -> Result<()> {
+    // Arrange - create graph: A -> B -> C
+    let scope = GraphScope {
+        tenant_id: format!("tenant-pathexists-{}", uuid::Uuid::new_v4()),
+        project_id: "proj-1".to_string(),
+        namespace: "ns-1".to_string(),
+        graph_id: "graph-1".to_string(),
+    };
+
+    let mutations = vec![
+        Mutation::AddNode {
+            node_id: "A".to_string(),
+            labels: vec![],
+            properties: vec![],
+        },
+        Mutation::AddNode {
+            node_id: "B".to_string(),
+            labels: vec![],
+            properties: vec![],
+        },
+        Mutation::AddNode {
+            node_id: "C".to_string(),
+            labels: vec![],
+            properties: vec![],
+        },
+        Mutation::AddEdge {
+            edge_id: "e1".to_string(),
+            from: "A".to_string(),
+            to: "B".to_string(),
+            label: None,
+            properties: vec![],
+        },
+        Mutation::AddEdge {
+            edge_id: "e2".to_string(),
+            from: "B".to_string(),
+            to: "C".to_string(),
+            label: None,
+            properties: vec![],
+        },
+    ];
+
+    let envelope = graph::create(scope.clone(), mutations).await;
+    assert!(envelope.result.is_success());
+
+    let commit_id = if let envelope::OperationResult::Success { data, .. } = &envelope.result {
+        data.commit_id.clone()
+    } else {
+        panic!("Expected success result");
+    };
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    // Act - check if path exists from A to C within depth 2
+    let query_envelope = graph::path_exists(
+        scope.clone(),
+        commit_id.clone(),
+        "A".to_string(),
+        "C".to_string(),
+        2,
+    )
+    .await;
+
+    // Assert
+    assert!(query_envelope.result.is_success());
+
+    if let envelope::OperationResult::Success { data, .. } = &query_envelope.result {
+        assert!(*data, "Path should exist from A to C");
+    } else {
+        panic!("Expected success result for path_exists");
+    }
+
+    // Act - check if path exists from A to C within depth 1 (too short)
+    let query_envelope2 =
+        graph::path_exists(scope, commit_id, "A".to_string(), "C".to_string(), 1).await;
+
+    // Assert
+    assert!(query_envelope2.result.is_success());
+
+    if let envelope::OperationResult::Success { data, .. } = &query_envelope2.result {
+        assert!(!*data, "Path should not exist from A to C within depth 1");
+    } else {
+        panic!("Expected success result for path_exists");
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn given_graph_when_node_removed_then_query_reflects_removal() -> Result<()> {
+    // Arrange - create graph with node, then remove it
+    let scope = GraphScope {
+        tenant_id: format!("tenant-remove-{}", uuid::Uuid::new_v4()),
+        project_id: "proj-1".to_string(),
+        namespace: "ns-1".to_string(),
+        graph_id: "graph-1".to_string(),
+    };
+
+    let mutations = vec![Mutation::AddNode {
+        node_id: "node-1".to_string(),
+        labels: vec![],
+        properties: vec![],
+    }];
+
+    let envelope1 = graph::create(scope.clone(), mutations).await;
+    assert!(envelope1.result.is_success());
+
+    let commit_id_1 = if let envelope::OperationResult::Success { data, .. } = &envelope1.result {
+        data.commit_id.clone()
+    } else {
+        panic!("Expected success result");
+    };
+
+    // Remove the node
+    let remove_mutations = vec![Mutation::RemoveNode {
+        node_id: "node-1".to_string(),
+    }];
+
+    let envelope2 = graph::commit(scope.clone(), Some(commit_id_1.clone()), remove_mutations).await;
+    assert!(envelope2.result.is_success());
+
+    let commit_id_2 = if let envelope::OperationResult::Success { data, .. } = &envelope2.result {
+        data.commit_id.clone()
+    } else {
+        panic!("Expected success result");
+    };
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    // Act - query at first commit (node should exist)
+    let query1 = graph::get_node(scope.clone(), commit_id_1, "node-1".to_string()).await;
+
+    // Assert
+    assert!(query1.result.is_success());
+    if let envelope::OperationResult::Success { data, .. } = &query1.result {
+        assert!(data.is_some(), "Node should exist at first commit");
+    }
+
+    // Act - query at second commit (node should not exist)
+    let query2 = graph::get_node(scope, commit_id_2, "node-1".to_string()).await;
+
+    // Assert
+    assert!(query2.result.is_success());
+    if let envelope::OperationResult::Success { data, .. } = &query2.result {
+        assert!(data.is_none(), "Node should not exist at second commit");
+    }
+
+    Ok(())
+}
