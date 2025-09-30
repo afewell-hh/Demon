@@ -212,6 +212,70 @@ http://localhost:3000/graph?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1
 
 **Note:** The viewer calls the Runtime REST endpoints at `/api/graph/commits` and `/api/graph/tags`. Ensure the runtime server is running and accessible.
 
+### Workflow Viewer
+
+The Workflow Viewer provides a visual representation of Serverless Workflow definitions with support for live state updates via SSE.
+
+**Access the workflow viewer:**
+```bash
+# Via browser
+open http://localhost:3000/ui/workflow
+
+# With a specific local workflow (relative to examples/rituals/)
+open "http://localhost:3000/ui/workflow?workflowPath=echo.yaml"
+
+# With a remote workflow URL
+open "http://localhost:3000/ui/workflow?workflowUrl=https://example.com/workflow.yaml"
+```
+
+**Features:**
+- **Local workflow loading** - Load workflows from `examples/rituals/` directory
+- **Remote workflow loading** - Fetch workflows from URLs (with 1MB size limit and 10s timeout)
+- **YAML/JSON parsing** - Supports both YAML and JSON workflow formats
+- **State visualization** - Displays workflow tasks/states with visual indicators
+- **Live updates** - SSE support for real-time state highlighting (infrastructure for future implementation)
+- **Accessible design** - WCAG-compliant with ARIA labels and keyboard navigation
+- **Minimal bundle** - Under 5 KB gzipped (well below 150 KB budget)
+- **Pause/resume streaming** - Control SSE connection state
+
+**Supported workflow formats:**
+- **CNCF Serverless Workflow 1.0** - `document.do` task definitions
+- **Legacy formats** - `states` array definitions
+
+**Supported task types:**
+call, do, emit, for, fork, listen, raise, run, set, switch, try, wait
+
+**State visualization:**
+- **Pending** - Gray outline (not yet started)
+- **Running** - Blue with pulse animation (currently executing)
+- **Waiting** - Orange with pulse (awaiting event or time)
+- **Completed** - Green (successfully finished)
+- **Faulted** - Red (encountered error)
+- **Suspended** - Orange (paused by user)
+
+**API endpoints:**
+- `GET /ui/workflow` - Workflow viewer page
+- `GET /api/workflow/metadata` - Fetch workflow YAML/JSON
+- `GET /api/workflow/state` - Get current execution state (placeholder)
+
+**Security:**
+- Path traversal protection (sanitizes `..` in paths)
+- Size limits: 1 MB max for workflow files
+- Timeout limits: 10 seconds for remote HTTP fetches
+- Safe HTML escaping in rendered output
+
+**Example:**
+```bash
+# Load echo ritual workflow
+curl "http://localhost:3000/api/workflow/metadata?workflowPath=echo.yaml" | jq .
+
+# Load timer workflow
+open "http://localhost:3000/ui/workflow?workflowPath=timer.yaml"
+
+# View workflow state (placeholder API)
+curl "http://localhost:3000/api/workflow/state?workflowId=echo-ritual" | jq .
+```
+
 ## Runbooks
 
 ### Daily Operations

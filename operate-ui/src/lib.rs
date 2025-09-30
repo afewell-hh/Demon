@@ -309,6 +309,10 @@ pub fn create_app(state: AppState) -> Router {
         .route("/ui/form", get(routes::schema_form_html))
         .route("/api/schema/metadata", get(routes::schema_metadata_api))
         .route("/api/form/submit", post(routes::submit_form_api))
+        // Workflow viewer
+        .route("/ui/workflow", get(routes::workflow_viewer_html))
+        .route("/api/workflow/metadata", get(routes::workflow_metadata_api))
+        .route("/api/workflow/state", get(routes::workflow_state_api))
         // Legacy routes (redirect to default tenant)
         .route("/runs", get(routes::list_runs_html))
         .route("/runs/:run_id", get(routes::get_run_html))

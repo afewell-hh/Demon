@@ -2567,3 +2567,204 @@ async fn fetch_remote_schema(url: &str) -> anyhow::Result<serde_json::Value> {
     let schema: serde_json::Value = serde_json::from_slice(&bytes)?;
     Ok(schema)
 }
+
+// ---- Workflow Viewer Routes ----
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct WorkflowViewerQuery {
+    #[serde(rename = "workflowUrl")]
+    pub workflow_url: Option<String>,
+    #[serde(rename = "workflowPath")]
+    pub workflow_path: Option<String>,
+}
+
+#[derive(Serialize, Debug)]
+pub struct WorkflowMetadata {
+    pub workflow: serde_json::Value,
+    #[serde(rename = "workflowId")]
+    pub workflow_id: String,
+    pub source: String,
+}
+
+/// Workflow viewer - HTML page
+#[axum::debug_handler]
+pub async fn workflow_viewer_html(
+    State(state): State<AppState>,
+    Query(query): Query<WorkflowViewerQuery>,
+) -> Html<String> {
+    debug!("Handling workflow viewer HTML: {:?}", query);
+
+    let mut context = tera::Context::new();
+    context.insert("current_page", &"workflow");
+    context.insert("workflow_url", &query.workflow_url);
+    context.insert("workflow_path", &query.workflow_path);
+    context.insert("runtime_api_url", &get_runtime_api_url());
+
+    let html = state
+        .tera
+        .render("workflow_viewer.html", &context)
+        .unwrap_or_else(|e| {
+            error!("Template rendering failed: {}", e);
+            format!(
+                "<h1>Internal Server Error</h1><p>Failed to render page: {}</p>",
+                e
+            )
+        });
+
+    Html(html)
+}
+
+/// Workflow metadata - JSON API endpoint
+#[axum::debug_handler]
+pub async fn workflow_metadata_api(
+    State(_state): State<AppState>,
+    Query(query): Query<WorkflowViewerQuery>,
+) -> Response {
+    debug!("Handling workflow metadata API: {:?}", query);
+
+    // Determine workflow source and fetch
+    let (workflow, workflow_id, source) = if let Some(path) = query.workflow_path {
+        // Load from local file
+        match load_local_workflow(&path) {
+            Ok((wf, id)) => (wf, id, "local".to_string()),
+            Err(e) => {
+                return (
+                    StatusCode::NOT_FOUND,
+                    Json(serde_json::json!({
+                        "error": format!("Failed to load local workflow: {}", e)
+                    })),
+                )
+                    .into_response()
+            }
+        }
+    } else if let Some(url) = query.workflow_url {
+        // Fetch from remote URL
+        match fetch_remote_workflow(&url).await {
+            Ok(wf) => (wf, url.clone(), format!("remote:{}", url)),
+            Err(e) => {
+                return (
+                    StatusCode::BAD_GATEWAY,
+                    Json(serde_json::json!({
+                        "error": format!("Failed to fetch remote workflow: {}", e)
+                    })),
+                )
+                    .into_response()
+            }
+        }
+    } else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "Either workflowUrl or workflowPath must be provided"
+            })),
+        )
+            .into_response();
+    };
+
+    // Validate it's a valid workflow object
+    if !workflow.is_object() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "Invalid workflow: must be a YAML/JSON object"
+            })),
+        )
+            .into_response();
+    }
+
+    Json(WorkflowMetadata {
+        workflow,
+        workflow_id,
+        source,
+    })
+    .into_response()
+}
+
+/// Workflow state - JSON API endpoint (returns current execution state)
+#[axum::debug_handler]
+pub async fn workflow_state_api(
+    State(_state): State<AppState>,
+    Query(params): Query<serde_json::Value>,
+) -> Response {
+    debug!("Handling workflow state API: {:?}", params);
+
+    // Placeholder: return mock state for now
+    // In real implementation, this would query runtime for current execution state
+    Json(serde_json::json!({
+        "workflowId": params.get("workflowId").and_then(|v| v.as_str()).unwrap_or("unknown"),
+        "currentState": "pending",
+        "currentTasks": [],
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    }))
+    .into_response()
+}
+
+fn load_local_workflow(path: &str) -> anyhow::Result<(serde_json::Value, String)> {
+    use anyhow::Context;
+
+    // Sanitize the path to prevent traversal attacks
+    let safe_path = path.replace("..", "");
+
+    // Construct absolute path
+    let workflow_path = if safe_path.starts_with('/') {
+        safe_path.clone()
+    } else {
+        // Relative to examples/rituals/ by default
+        format!(
+            "{}/../examples/rituals/{}",
+            env!("CARGO_MANIFEST_DIR"),
+            safe_path
+        )
+    };
+
+    info!("Loading local workflow from: {}", workflow_path);
+
+    let content = std::fs::read_to_string(&workflow_path)
+        .with_context(|| format!("Failed to read workflow file: {}", workflow_path))?;
+
+    // Size limit: 1MB
+    if content.len() > 1_000_000 {
+        anyhow::bail!("Workflow file too large (>1MB)");
+    }
+
+    // Try to parse as YAML first (most common for workflows)
+    let workflow: serde_json::Value =
+        serde_yaml::from_str(&content).context("Failed to parse workflow YAML")?;
+
+    // Extract workflow ID from document.name or use filename
+    let workflow_id = workflow
+        .get("document")
+        .and_then(|d| d.get("name"))
+        .and_then(|v| v.as_str())
+        .or_else(|| workflow.get("name").and_then(|v| v.as_str()))
+        .or_else(|| workflow.get("id").and_then(|v| v.as_str()))
+        .unwrap_or(&safe_path)
+        .to_string();
+
+    Ok((workflow, workflow_id))
+}
+
+async fn fetch_remote_workflow(url: &str) -> anyhow::Result<serde_json::Value> {
+    // Simple timeout and size limits for safety
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()?;
+
+    let response = client.get(url).send().await?;
+
+    if !response.status().is_success() {
+        anyhow::bail!("HTTP error: {}", response.status());
+    }
+
+    // Limit response size to 1MB
+    let bytes = response.bytes().await?;
+    if bytes.len() > 1_000_000 {
+        anyhow::bail!("Workflow too large (>1MB)");
+    }
+
+    // Try YAML first, fallback to JSON
+    let workflow: serde_json::Value =
+        serde_yaml::from_slice(&bytes).or_else(|_| serde_json::from_slice(&bytes))?;
+
+    Ok(workflow)
+}
