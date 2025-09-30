@@ -305,6 +305,10 @@ pub fn create_app(state: AppState) -> Router {
         )
         // Graph viewer
         .route("/graph", get(routes::graph_viewer_html))
+        // Schema form renderer
+        .route("/ui/form", get(routes::schema_form_html))
+        .route("/api/schema/metadata", get(routes::schema_metadata_api))
+        .route("/api/form/submit", post(routes::submit_form_api))
         // Legacy routes (redirect to default tenant)
         .route("/runs", get(routes::list_runs_html))
         .route("/runs/:run_id", get(routes::get_run_html))

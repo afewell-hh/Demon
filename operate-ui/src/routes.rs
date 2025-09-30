@@ -2387,3 +2387,183 @@ pub async fn graph_viewer_html(
 fn get_runtime_api_url() -> String {
     std::env::var("RUNTIME_API_URL").unwrap_or_else(|_| "http://localhost:8080".to_string())
 }
+
+// ---- Schema Form Renderer Routes ----
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct SchemaFormQuery {
+    #[serde(rename = "schemaUrl")]
+    pub schema_url: Option<String>,
+    #[serde(rename = "schemaName")]
+    pub schema_name: Option<String>,
+}
+
+#[derive(Serialize, Debug)]
+pub struct SchemaMetadata {
+    pub schema: serde_json::Value,
+    #[serde(rename = "schemaId")]
+    pub schema_id: String,
+    pub source: String,
+}
+
+/// Schema form renderer - HTML page
+#[axum::debug_handler]
+pub async fn schema_form_html(
+    State(state): State<AppState>,
+    Query(query): Query<SchemaFormQuery>,
+) -> Html<String> {
+    debug!("Handling schema form HTML: {:?}", query);
+
+    let mut context = tera::Context::new();
+    context.insert("current_page", &"form");
+    context.insert("schema_url", &query.schema_url);
+    context.insert("schema_name", &query.schema_name);
+
+    let html = state
+        .tera
+        .render("form_renderer.html", &context)
+        .unwrap_or_else(|e| {
+            error!("Template rendering failed: {}", e);
+            format!(
+                "<h1>Internal Server Error</h1><p>Failed to render page: {}</p>",
+                e
+            )
+        });
+
+    Html(html)
+}
+
+/// Schema metadata - JSON API endpoint
+#[axum::debug_handler]
+pub async fn schema_metadata_api(
+    State(_state): State<AppState>,
+    Query(query): Query<SchemaFormQuery>,
+) -> Response {
+    debug!("Handling schema metadata API: {:?}", query);
+
+    // Determine schema source and fetch
+    let (schema, schema_id, source) = if let Some(name) = query.schema_name {
+        // Load from local contracts/schemas
+        match load_local_schema(&name) {
+            Ok((schema, id)) => (schema, id, "local".to_string()),
+            Err(e) => {
+                return (
+                    StatusCode::NOT_FOUND,
+                    Json(serde_json::json!({
+                        "error": format!("Failed to load local schema: {}", e)
+                    })),
+                )
+                    .into_response()
+            }
+        }
+    } else if let Some(url) = query.schema_url {
+        // Fetch from remote URL
+        match fetch_remote_schema(&url).await {
+            Ok(schema) => (schema, url.clone(), format!("remote:{}", url)),
+            Err(e) => {
+                return (
+                    StatusCode::BAD_GATEWAY,
+                    Json(serde_json::json!({
+                        "error": format!("Failed to fetch remote schema: {}", e)
+                    })),
+                )
+                    .into_response()
+            }
+        }
+    } else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "Either schemaUrl or schemaName must be provided"
+            })),
+        )
+            .into_response();
+    };
+
+    // Validate it's a valid JSON Schema
+    if !schema.is_object() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "Invalid schema: must be a JSON object"
+            })),
+        )
+            .into_response();
+    }
+
+    Json(SchemaMetadata {
+        schema,
+        schema_id,
+        source,
+    })
+    .into_response()
+}
+
+/// Submit form data - JSON API endpoint
+#[axum::debug_handler]
+pub async fn submit_form_api(
+    State(_state): State<AppState>,
+    Json(payload): Json<serde_json::Value>,
+) -> Response {
+    debug!("Handling form submission: {:?}", payload);
+
+    // Echo back the form data for now (can be integrated with workflow later)
+    Json(serde_json::json!({
+        "status": "received",
+        "data": payload
+    }))
+    .into_response()
+}
+
+fn load_local_schema(name: &str) -> anyhow::Result<(serde_json::Value, String)> {
+    use anyhow::Context;
+
+    // Sanitize the name to prevent path traversal
+    let safe_name = name.replace("..", "").replace("/", "");
+
+    // Construct path relative to workspace root
+    // operate-ui is in workspace root, so we go up one level to reach contracts/
+    let schema_path = format!(
+        "{}/../contracts/schemas/{}.json",
+        env!("CARGO_MANIFEST_DIR"),
+        safe_name
+    );
+
+    info!("Loading local schema from: {}", schema_path);
+
+    let content = std::fs::read_to_string(&schema_path)
+        .with_context(|| format!("Failed to read schema file: {}", schema_path))?;
+
+    let schema: serde_json::Value =
+        serde_json::from_str(&content).context("Failed to parse schema JSON")?;
+
+    let schema_id = schema
+        .get("$id")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&safe_name)
+        .to_string();
+
+    Ok((schema, schema_id))
+}
+
+async fn fetch_remote_schema(url: &str) -> anyhow::Result<serde_json::Value> {
+    // Simple timeout and size limits for safety
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()?;
+
+    let response = client.get(url).send().await?;
+
+    if !response.status().is_success() {
+        anyhow::bail!("HTTP error: {}", response.status());
+    }
+
+    // Limit response size to 1MB
+    let bytes = response.bytes().await?;
+    if bytes.len() > 1_000_000 {
+        anyhow::bail!("Schema too large (>1MB)");
+    }
+
+    let schema: serde_json::Value = serde_json::from_slice(&bytes)?;
+    Ok(schema)
+}
