@@ -429,10 +429,18 @@ pub async fn materialize_graph_at_commit(
                 if event.event == "graph.commit.created:v1" {
                     // Only include commit events for this graph
                     if event.graph_id == scope.graph_id {
-                        tracing::debug!("Including commit {} for graph {}", event.commit_id, event.graph_id);
+                        tracing::debug!(
+                            "Including commit {} for graph {}",
+                            event.commit_id,
+                            event.graph_id
+                        );
                         commits.push(event);
                     } else {
-                        tracing::debug!("Skipping commit for different graph: {} != {}", event.graph_id, scope.graph_id);
+                        tracing::debug!(
+                            "Skipping commit for different graph: {} != {}",
+                            event.graph_id,
+                            scope.graph_id
+                        );
                     }
                 }
             }
@@ -442,7 +450,11 @@ pub async fn materialize_graph_at_commit(
         }
     }
 
-    tracing::info!("Fetched {} commits from stream for graph {}", commits.len(), scope.graph_id);
+    tracing::info!(
+        "Fetched {} commits from stream for graph {}",
+        commits.len(),
+        scope.graph_id
+    );
 
     if commits.len() >= MAX_COMMITS_TO_REPLAY {
         anyhow::bail!(
