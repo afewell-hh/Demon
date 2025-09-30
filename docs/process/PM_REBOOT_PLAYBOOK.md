@@ -14,6 +14,7 @@ Purpose: enable a fresh PM session (new context window) to regain full mastery q
 - Required checks on `main` (names must match exactly):
   - Bootstrapper bundles — verify (offline, signature ok)
   - Bootstrapper bundles — negative verify (tamper ⇒ failed)
+  - contracts-validate
   - review-lock-guard
 - Replies‑guard: non‑required during MVP (still reply to substantive feedback).
 - Review‑lock: PR body must end with `Review-lock: <40‑char HEAD SHA>`.
@@ -49,7 +50,7 @@ Purpose: enable a fresh PM session (new context window) to regain full mastery q
 ## 6) First Hour In A New Session (Checklist)
 1) Read the files in Section 1 and skim CI workflow jobs.
 2) Validate protections via governance:
-   - Snapshot: .github/snapshots/ — most recent shows exactly 3 required checks, `strict:false`.
+    - Snapshot: .github/snapshots/ — most recent shows exactly 4 required checks, `strict:false`.
    - Run protection audit and check logs (see Section 8).
 3) Inspect open PRs and Issues:
    - Ensure Review‑lock lines present; required checks green or being worked.
