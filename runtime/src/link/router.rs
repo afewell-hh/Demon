@@ -103,7 +103,134 @@ impl Router {
                     }
                 }
             }
+            "graph" => self.dispatch_graph(args).await,
             other => anyhow::bail!("unknown functionRef: {other}"),
+        }
+    }
+
+    /// Dispatch graph capsule operations (create, commit, tag, list-tags, get-node, neighbors, path-exists)
+    async fn dispatch_graph(&self, args: &Value) -> Result<Value> {
+        // Extract operation from args
+        let operation = args
+            .get("operation")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'operation' field in graph args"))?;
+
+        // Extract scope
+        let scope = args
+            .get("scope")
+            .ok_or_else(|| anyhow::anyhow!("Missing 'scope' field in graph args"))?;
+        let scope: capsules_graph::GraphScope =
+            serde_json::from_value(scope.clone()).context("Failed to parse GraphScope")?;
+
+        match operation {
+            "create" => {
+                let seed = args
+                    .get("seed")
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'seed' field for create operation"))?;
+                let mutations: Vec<capsules_graph::Mutation> = serde_json::from_value(seed.clone())
+                    .context("Failed to parse seed mutations")?;
+
+                let envelope = capsules_graph::create(scope, mutations).await;
+                Ok(serde_json::to_value(envelope)?)
+            }
+            "commit" => {
+                let parent_ref = args
+                    .get("parentRef")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                let mutations_value = args.get("mutations").ok_or_else(|| {
+                    anyhow::anyhow!("Missing 'mutations' field for commit operation")
+                })?;
+                let mutations: Vec<capsules_graph::Mutation> =
+                    serde_json::from_value(mutations_value.clone())
+                        .context("Failed to parse mutations")?;
+
+                let envelope = capsules_graph::commit(scope, parent_ref, mutations).await;
+                Ok(serde_json::to_value(envelope)?)
+            }
+            "tag" => {
+                let tag = args
+                    .get("tag")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'tag' field for tag operation"))?
+                    .to_string();
+                let commit_id = args
+                    .get("commitId")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'commitId' field for tag operation"))?
+                    .to_string();
+
+                let envelope = capsules_graph::tag(scope, tag, commit_id).await;
+                Ok(serde_json::to_value(envelope)?)
+            }
+            "list-tags" => {
+                let envelope = capsules_graph::list_tags(scope).await;
+                Ok(serde_json::to_value(envelope)?)
+            }
+            "get-node" => {
+                let commit_id = args
+                    .get("commitId")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'commitId' for get-node operation"))?
+                    .to_string();
+                let node_id = args
+                    .get("nodeId")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'nodeId' for get-node operation"))?
+                    .to_string();
+
+                let envelope = capsules_graph::get_node(scope, commit_id, node_id).await;
+                Ok(serde_json::to_value(envelope)?)
+            }
+            "neighbors" => {
+                let commit_id = args
+                    .get("commitId")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'commitId' for neighbors operation"))?
+                    .to_string();
+                let node_id = args
+                    .get("nodeId")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'nodeId' for neighbors operation"))?
+                    .to_string();
+                let depth = args
+                    .get("depth")
+                    .and_then(|v| v.as_u64())
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'depth' for neighbors operation"))?
+                    as u32;
+
+                let envelope = capsules_graph::neighbors(scope, commit_id, node_id, depth).await;
+                Ok(serde_json::to_value(envelope)?)
+            }
+            "path-exists" => {
+                let commit_id = args
+                    .get("commitId")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'commitId' for path-exists operation"))?
+                    .to_string();
+                let from = args
+                    .get("from")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'from' for path-exists operation"))?
+                    .to_string();
+                let to = args
+                    .get("to")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'to' for path-exists operation"))?
+                    .to_string();
+                let max_depth = args
+                    .get("maxDepth")
+                    .and_then(|v| v.as_u64())
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("Missing 'maxDepth' for path-exists operation")
+                    })? as u32;
+
+                let envelope =
+                    capsules_graph::path_exists(scope, commit_id, from, to, max_depth).await;
+                Ok(serde_json::to_value(envelope)?)
+            }
+            other => anyhow::bail!("Unknown graph operation: {}", other),
         }
     }
 

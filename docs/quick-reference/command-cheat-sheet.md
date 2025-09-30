@@ -24,6 +24,9 @@ cargo run -p demonctl -- run examples/rituals/echo.yaml
 
 # Graph capsule tests
 cargo test -p capsules_graph
+
+# Runtime graph dispatch tests
+cargo test -p runtime --test graph_dispatch_spec
 ```
 
 ## Docker & Containers
@@ -109,6 +112,10 @@ kubectl logs -n demon-system deployment/demon-runtime
 nats-cli stream ls
 nats-cli consumer ls RITUAL_EVENTS
 
+# Graph capsule: Check JetStream events
+nats stream info GRAPH_COMMITS
+nats stream view GRAPH_COMMITS
+
 # Debug networking
 kubectl port-forward -n demon-system svc/demon-engine 3000:3000
 ```
@@ -122,6 +129,43 @@ kubectl port-forward -n demon-system svc/demon-engine 3000:3000
 | **API not responding** | `curl localhost:3000/api/runs` | JSON response |
 | **NATS issues** | `nats-cli stream ls` | Shows RITUAL_EVENTS |
 | **Pod crashes** | `kubectl get pods` | All pods Running |
+
+## Graph Commands
+
+```bash
+# Create graph with seed mutations
+demonctl graph create \
+  --tenant-id tenant-1 \
+  --project-id proj-1 \
+  --namespace ns-1 \
+  --graph-id graph-1 \
+  mutations.json
+
+# Commit mutations
+demonctl graph commit \
+  --tenant-id tenant-1 \
+  --project-id proj-1 \
+  --namespace ns-1 \
+  --graph-id graph-1 \
+  --parent-ref <COMMIT_ID> \
+  mutations.json
+
+# Tag a commit
+demonctl graph tag \
+  --tenant-id tenant-1 \
+  --project-id proj-1 \
+  --namespace ns-1 \
+  --graph-id graph-1 \
+  --tag v1.0.0 \
+  --commit-id <COMMIT_ID>
+
+# List tags
+demonctl graph list-tags \
+  --tenant-id tenant-1 \
+  --project-id proj-1 \
+  --namespace ns-1 \
+  --graph-id graph-1
+```
 
 ## Environment Variables
 

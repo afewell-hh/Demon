@@ -82,6 +82,46 @@ curl http://localhost:3000/api/runs
 cargo run -p demonctl -- contracts bundle
 ```
 
+### Graph Capsule Operations
+```bash
+# Create a new graph with seed mutations
+demonctl graph create \
+  --tenant-id tenant-1 \
+  --project-id proj-1 \
+  --namespace ns-1 \
+  --graph-id graph-1 \
+  mutations.json
+
+# Commit mutations to an existing graph
+demonctl graph commit \
+  --tenant-id tenant-1 \
+  --project-id proj-1 \
+  --namespace ns-1 \
+  --graph-id graph-1 \
+  --parent-ref <COMMIT_ID> \
+  mutations.json
+
+# Tag a commit
+demonctl graph tag \
+  --tenant-id tenant-1 \
+  --project-id proj-1 \
+  --namespace ns-1 \
+  --graph-id graph-1 \
+  --tag v1.0.0 \
+  --commit-id <COMMIT_ID>
+
+# List tags for a graph
+demonctl graph list-tags \
+  --tenant-id tenant-1 \
+  --project-id proj-1 \
+  --namespace ns-1 \
+  --graph-id graph-1
+
+# Verify graph events in NATS JetStream
+nats stream info GRAPH_COMMITS
+nats stream view GRAPH_COMMITS --count
+```
+
 ## Runbooks
 
 ### Daily Operations

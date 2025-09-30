@@ -5,6 +5,7 @@ edition = "2021"
 license.workspace = true
 
 [dependencies]
+capsules_graph = { path = "../capsules/graph" }
 anyhow = { workspace = true }
 clap = { workspace = true }
 tracing = { workspace = true }
