@@ -165,6 +165,23 @@ demonctl graph list-tags \
   --project-id proj-1 \
   --namespace ns-1 \
   --graph-id graph-1
+
+# Get commit by ID (REST)
+curl "http://localhost:8080/api/graph/commits/<COMMIT_ID>?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1"
+
+# List commits (REST)
+curl "http://localhost:8080/api/graph/commits?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1&limit=50"
+
+# Get tag (REST)
+curl "http://localhost:8080/api/graph/tags/v1.0.0?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1"
+
+# List all tags (REST)
+curl "http://localhost:8080/api/graph/tags?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1"
+
+# Query operations (submit as mutations via demonctl graph commit)
+# - get-node: retrieve node by ID with labels/properties/edges
+# - neighbors: find connected nodes (filtered by relType/direction)
+# - path-exists: check if path exists between two nodes
 ```
 
 ## Environment Variables

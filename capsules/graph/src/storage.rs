@@ -1,13 +1,16 @@
 //! Storage utilities for graph capsule
 //!
 //! This module provides helpers to interact with graph storage (GRAPH_COMMITS stream
-//! and GRAPH_TAGS KV bucket).
+//! and GRAPH_TAGS KV bucket), including graph materialization from commit history.
 
-use crate::types::{GraphScope, TaggedCommit};
+use crate::types::{EdgeSnapshot, GraphScope, Mutation, NodeSnapshot, TaggedCommit};
 use anyhow::{Context, Result};
-use async_nats::jetstream::{self, kv::Store};
+use async_nats::jetstream::{self, consumer::DeliverPolicy, kv::Store};
 use chrono::Utc;
-use futures_util::TryStreamExt;
+use futures_util::{StreamExt, TryStreamExt};
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::time::Duration;
 
 /// Ensure GRAPH_TAGS KV bucket exists
 ///
@@ -144,4 +147,374 @@ pub async fn list_tags(kv: &Store, scope: &GraphScope) -> Result<Vec<TaggedCommi
     tags.sort_by(|a, b| a.tag.cmp(&b.tag));
 
     Ok(tags)
+}
+
+/// Commit event payload from GRAPH_COMMITS stream (internal representation)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CommitEvent {
+    pub event: String,
+    pub graph_id: String,
+    pub tenant_id: String,
+    pub project_id: String,
+    pub namespace: String,
+    pub commit_id: String,
+    pub parent_commit_id: Option<String>,
+    pub ts: String,
+    pub mutations: Vec<serde_json::Value>,
+}
+
+/// Materialized graph state reconstructed from commits
+#[derive(Debug, Clone)]
+pub struct GraphStore {
+    pub nodes: HashMap<String, NodeSnapshot>,
+    pub edges: HashMap<String, EdgeSnapshot>,
+    pub commit_count: usize,
+}
+
+impl GraphStore {
+    /// Create a new empty graph store
+    pub fn new() -> Self {
+        Self {
+            nodes: HashMap::new(),
+            edges: HashMap::new(),
+            commit_count: 0,
+        }
+    }
+
+    /// Apply a single mutation to the graph state
+    fn apply_mutation(&mut self, mutation: &Mutation) {
+        match mutation {
+            Mutation::AddNode {
+                node_id,
+                labels,
+                properties,
+            } => {
+                self.nodes.insert(
+                    node_id.clone(),
+                    NodeSnapshot {
+                        node_id: node_id.clone(),
+                        labels: labels.clone(),
+                        properties: properties.clone(),
+                    },
+                );
+            }
+            Mutation::UpdateNode {
+                node_id,
+                labels,
+                properties,
+            } => {
+                self.nodes.insert(
+                    node_id.clone(),
+                    NodeSnapshot {
+                        node_id: node_id.clone(),
+                        labels: labels.clone(),
+                        properties: properties.clone(),
+                    },
+                );
+            }
+            Mutation::RemoveNode { node_id } => {
+                self.nodes.remove(node_id);
+                // Also remove edges connected to this node
+                self.edges
+                    .retain(|_, edge| edge.from_node != *node_id && edge.to_node != *node_id);
+            }
+            Mutation::AddEdge {
+                edge_id,
+                from,
+                to,
+                label,
+                properties,
+            } => {
+                self.edges.insert(
+                    edge_id.clone(),
+                    EdgeSnapshot {
+                        edge_id: edge_id.clone(),
+                        from_node: from.clone(),
+                        to_node: to.clone(),
+                        label: label.clone(),
+                        properties: properties.clone(),
+                    },
+                );
+            }
+            Mutation::UpdateEdge {
+                edge_id,
+                from,
+                to,
+                label,
+                properties,
+            } => {
+                self.edges.insert(
+                    edge_id.clone(),
+                    EdgeSnapshot {
+                        edge_id: edge_id.clone(),
+                        from_node: from.clone(),
+                        to_node: to.clone(),
+                        label: label.clone(),
+                        properties: properties.clone(),
+                    },
+                );
+            }
+            Mutation::RemoveEdge { edge_id } => {
+                self.edges.remove(edge_id);
+            }
+        }
+    }
+
+    /// Get a node by ID
+    pub fn get_node(&self, node_id: &str) -> Option<NodeSnapshot> {
+        self.nodes.get(node_id).cloned()
+    }
+
+    /// Find neighbors of a node up to a given depth using BFS
+    pub fn neighbors(&self, start_node_id: &str, max_depth: u32) -> Vec<NodeSnapshot> {
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+        let mut result = Vec::new();
+
+        // Check if start node exists
+        if !self.nodes.contains_key(start_node_id) {
+            return result;
+        }
+
+        // BFS traversal
+        queue.push_back((start_node_id.to_string(), 0));
+        visited.insert(start_node_id.to_string());
+
+        while let Some((node_id, depth)) = queue.pop_front() {
+            if depth > 0 {
+                // Don't include the start node itself
+                if let Some(node) = self.nodes.get(&node_id) {
+                    result.push(node.clone());
+                }
+            }
+
+            // Explore neighbors if we haven't exceeded depth
+            if depth < max_depth {
+                for edge in self.edges.values() {
+                    let neighbor_id = if edge.from_node == node_id {
+                        Some(&edge.to_node)
+                    } else if edge.to_node == node_id {
+                        Some(&edge.from_node)
+                    } else {
+                        None
+                    };
+
+                    if let Some(neighbor_id) = neighbor_id {
+                        if !visited.contains(neighbor_id) {
+                            visited.insert(neighbor_id.clone());
+                            queue.push_back((neighbor_id.clone(), depth + 1));
+                        }
+                    }
+                }
+            }
+        }
+
+        result
+    }
+
+    /// Check if a path exists between two nodes within max_depth
+    pub fn path_exists(&self, from: &str, to: &str, max_depth: u32) -> bool {
+        if !self.nodes.contains_key(from) || !self.nodes.contains_key(to) {
+            return false;
+        }
+
+        if from == to {
+            return true;
+        }
+
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+
+        queue.push_back((from.to_string(), 0));
+        visited.insert(from.to_string());
+
+        while let Some((node_id, depth)) = queue.pop_front() {
+            if node_id == to {
+                return true;
+            }
+
+            if depth < max_depth {
+                for edge in self.edges.values() {
+                    let neighbor_id = if edge.from_node == node_id {
+                        Some(&edge.to_node)
+                    } else if edge.to_node == node_id {
+                        Some(&edge.from_node)
+                    } else {
+                        None
+                    };
+
+                    if let Some(neighbor_id) = neighbor_id {
+                        if !visited.contains(neighbor_id) {
+                            visited.insert(neighbor_id.clone());
+                            queue.push_back((neighbor_id.clone(), depth + 1));
+                        }
+                    }
+                }
+            }
+        }
+
+        false
+    }
+}
+
+impl Default for GraphStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Maximum number of commits to replay (safety limit)
+const MAX_COMMITS_TO_REPLAY: usize = 10_000;
+
+/// Materialize graph state up to a given commit by replaying all commits in order
+///
+/// This function fetches commits from the GRAPH_COMMITS stream and replays them
+/// in chronological order to reconstruct the graph state at the specified commit.
+pub async fn materialize_graph_at_commit(
+    scope: &GraphScope,
+    target_commit_id: &str,
+) -> Result<GraphStore> {
+    let url = std::env::var("NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".to_string());
+    let client = async_nats::connect(&url).await?;
+    let js = jetstream::new(client);
+
+    let stream = js
+        .get_stream("GRAPH_COMMITS")
+        .await
+        .context("Failed to get GRAPH_COMMITS stream")?;
+
+    let subject = format!(
+        "demon.graph.v1.{}.{}.{}.commit",
+        scope.tenant_id, scope.project_id, scope.namespace
+    );
+
+    tracing::debug!(
+        "Materializing graph for scope {}/{}/{}/{} at commit {}",
+        scope.tenant_id,
+        scope.project_id,
+        scope.namespace,
+        scope.graph_id,
+        target_commit_id
+    );
+
+    // Create consumer to fetch commits
+    let consumer = stream
+        .create_consumer(jetstream::consumer::pull::Config {
+            filter_subject: subject.clone(),
+            deliver_policy: DeliverPolicy::All,
+            ack_policy: jetstream::consumer::AckPolicy::None,
+            ..Default::default()
+        })
+        .await
+        .context("Failed to create consumer for graph materialization")?;
+
+    // Fetch all commits up to limit
+    let mut batch = consumer
+        .batch()
+        .max_messages(MAX_COMMITS_TO_REPLAY)
+        .expires(Duration::from_secs(10))
+        .messages()
+        .await?;
+
+    let mut commits = Vec::new();
+
+    while let Some(result) = batch.next().await {
+        let msg = result.map_err(|e| anyhow::anyhow!("Failed to fetch message: {}", e))?;
+
+        // Parse event
+        match serde_json::from_slice::<CommitEvent>(&msg.payload) {
+            Ok(event) => {
+                tracing::debug!("Found event: {} for graph: {}", event.event, event.graph_id);
+                if event.event == "graph.commit.created:v1" {
+                    // Only include commit events for this graph
+                    if event.graph_id == scope.graph_id {
+                        tracing::debug!(
+                            "Including commit {} for graph {}",
+                            event.commit_id,
+                            event.graph_id
+                        );
+                        commits.push(event);
+                    } else {
+                        tracing::debug!(
+                            "Skipping commit for different graph: {} != {}",
+                            event.graph_id,
+                            scope.graph_id
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Failed to deserialize commit event: {}", e);
+            }
+        }
+    }
+
+    tracing::info!(
+        "Fetched {} commits from stream for graph {}",
+        commits.len(),
+        scope.graph_id
+    );
+
+    if commits.len() >= MAX_COMMITS_TO_REPLAY {
+        anyhow::bail!(
+            "Commit count ({}) exceeds safety limit ({}). Graph too large for replay.",
+            commits.len(),
+            MAX_COMMITS_TO_REPLAY
+        );
+    }
+
+    // Sort commits by timestamp (chronological order)
+    commits.sort_by(|a, b| a.ts.cmp(&b.ts));
+
+    // Build graph state by replaying commits up to target
+    let mut store = GraphStore::new();
+    let mut found_target = false;
+
+    for event in commits {
+        // Parse mutations and apply them
+        for mutation_json in &event.mutations {
+            match serde_json::from_value::<Mutation>(mutation_json.clone()) {
+                Ok(mutation) => {
+                    store.apply_mutation(&mutation);
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to deserialize mutation in commit {}: {}. JSON: {}",
+                        event.commit_id,
+                        e,
+                        mutation_json
+                    );
+                }
+            }
+        }
+
+        store.commit_count += 1;
+
+        // Stop if we've reached the target commit
+        if event.commit_id == target_commit_id {
+            found_target = true;
+            tracing::info!(
+                "Reached target commit {}. Graph state: {} nodes, {} edges",
+                target_commit_id,
+                store.nodes.len(),
+                store.edges.len()
+            );
+            break;
+        }
+    }
+
+    if !found_target {
+        anyhow::bail!("Commit {} not found in stream", target_commit_id);
+    }
+
+    tracing::info!(
+        "Materialized graph at commit {} with {} nodes, {} edges from {} commits",
+        target_commit_id,
+        store.nodes.len(),
+        store.edges.len(),
+        store.commit_count
+    );
+
+    Ok(store)
 }
