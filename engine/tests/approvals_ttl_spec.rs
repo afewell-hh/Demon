@@ -1,4 +1,5 @@
 use chrono::{Duration, Utc};
+use serial_test::serial;
 
 #[test]
 fn expires_after_ttl_if_no_terminal() {
@@ -106,6 +107,7 @@ fn replay_does_not_duplicate() {
 }
 
 #[test]
+#[serial]
 fn cancel_prevents_fire_without_sleep() {
     let t0 = Utc::now();
     let run = "run-ttl-4";
@@ -126,6 +128,7 @@ fn cancel_prevents_fire_without_sleep() {
 }
 
 #[test]
+#[serial]
 fn terminal_preempts_and_cancels_counter() {
     // Arrange
     let t0 = Utc::now();
@@ -133,6 +136,7 @@ fn terminal_preempts_and_cancels_counter() {
     let ritual = "ritual-ttl";
     let gate = "g-5";
     engine::rituals::timers::reset_cancel_counter();
+    let before = engine::rituals::timers::cancel_counter();
 
     // Schedule expiry at +5s with deterministic key
     let key = engine::rituals::approvals::expiry_key(run, gate);
@@ -169,10 +173,12 @@ fn terminal_preempts_and_cancels_counter() {
 
     // Assert: cancellation logged via counter and no fire even after TTL
     assert!(did_cancel, "expected preemption to cancel expiry timer");
+    let after = engine::rituals::timers::cancel_counter();
+    let delta = after.saturating_sub(before);
     assert_eq!(
-        engine::rituals::timers::cancel_counter(),
-        1,
-        "cancel_by_key should be called once"
+        delta, 1,
+        "cancel_by_key should be called once (before={}, after={})",
+        before, after
     );
     assert!(wheel.tick(t0 + Duration::seconds(6)).is_empty());
 }
