@@ -12,6 +12,7 @@ use async_nats::jetstream::{
     },
 };
 use serde::{Deserialize, Serialize};
+use tracing::debug;
 
 /// Default stream name for graph commits
 pub const GRAPH_COMMITS_STREAM: &str = "GRAPH_COMMITS";
@@ -74,11 +75,31 @@ pub async fn ensure_graph_stream(
         ..Default::default()
     };
 
-    // get_or_create will update existing stream if config differs
-    let mut stream = js
-        .get_or_create_stream(stream_config)
-        .await
-        .context("failed to ensure GRAPH_COMMITS stream")?;
+    let mut stream = match js.get_stream(stream_name).await {
+        Ok(mut stream) => {
+            let info = stream.info().await?;
+            if stream_config_differs(&info.config, &stream_config) {
+                debug!(
+                    stream = stream_name,
+                    "updating GRAPH_COMMITS stream configuration"
+                );
+                js.update_stream(stream_config.clone())
+                    .await
+                    .context("failed to update GRAPH_COMMITS stream")?;
+                js.get_stream(stream_name)
+                    .await
+                    .context("failed to fetch GRAPH_COMMITS stream after update")?
+            } else {
+                stream
+            }
+        }
+        Err(_) => {
+            debug!(stream = stream_name, "creating GRAPH_COMMITS stream");
+            js.create_stream(stream_config.clone())
+                .await
+                .context("failed to create GRAPH_COMMITS stream")?
+        }
+    };
 
     Ok(stream.info().await?.clone())
 }
@@ -148,6 +169,15 @@ pub async fn ensure_graph_storage(
     let stream_info = ensure_graph_stream(js, config).await?;
     let tag_store = ensure_graph_tag_store(js, config).await?;
     Ok((stream_info, tag_store))
+}
+
+fn stream_config_differs(existing: &StreamConfig, desired: &StreamConfig) -> bool {
+    existing.subjects != desired.subjects
+        || existing.retention != desired.retention
+        || existing.storage != desired.storage
+        || existing.max_messages_per_subject != desired.max_messages_per_subject
+        || existing.discard != desired.discard
+        || existing.duplicate_window != desired.duplicate_window
 }
 
 #[cfg(test)]
