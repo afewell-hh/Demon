@@ -36,7 +36,7 @@ cargo run -p demonctl -- run examples/rituals/echo.yaml
 ## 📋 How-to Guides
 
 ### Essential Tasks
-- [How to write a ritual YAML](../examples/rituals/)
+- [How to write a ritual YAML](../../examples/rituals/README.md)
 - [How to create approval gates](../contracts/)
 - [How to handle events](../contracts/)
 - [How to integrate with external APIs](../examples/)

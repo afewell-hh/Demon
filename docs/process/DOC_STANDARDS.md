@@ -268,9 +268,7 @@ The script automatically creates a configuration file (`.markdown-link-check.jso
 Standard templates are available for:
 
 - [README files](#readme-template)
-- [API documentation](api-template.md)
 - [ADR format](#architecture-documents)
-- [Process documentation](process-template.md)
 - [See Also sections](#see-also-template)
 
 #### See Also Template
@@ -361,4 +359,4 @@ Before publishing documentation, verify:
 
 **📝 Contributing**: Follow these standards when creating or updating documentation. When in doubt, ask for review.
 
-**🔗 Related**: [Contributing Guidelines](../process/) | [Diataxis Framework](https://diataxis.fr/) | [Markdown Guide](https://www.markdownguide.org/)
+**🔗 Related**: [Contributing Guidelines](../../CONTRIBUTING.md) | [Diataxis Framework](https://diataxis.fr/) | [Markdown Guide](https://www.markdownguide.org/)

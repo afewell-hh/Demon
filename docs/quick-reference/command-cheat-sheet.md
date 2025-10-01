@@ -21,6 +21,12 @@ make fmt && make lint
 
 # Quick smoke test
 cargo run -p demonctl -- run examples/rituals/echo.yaml
+
+# Graph capsule tests
+cargo test -p capsules_graph
+
+# Runtime graph dispatch tests
+cargo test -p runtime --test graph_dispatch_spec
 ```
 
 ## Docker & Containers
@@ -76,6 +82,28 @@ curl -X POST http://localhost:3000/api/approvals/{run_id}/{gate_id}/deny \
   -d '{"reason": "Policy violation"}'
 ```
 
+## Operate UI Viewers
+
+```bash
+# Access Workflow Viewer
+open http://localhost:3000/ui/workflow
+
+# Load a local workflow in the viewer
+open "http://localhost:3000/ui/workflow?workflowPath=echo.yaml"
+
+# Load a remote workflow
+open "http://localhost:3000/ui/workflow?workflowUrl=https://example.com/workflow.yaml"
+
+# Get workflow metadata API
+curl "http://localhost:3000/api/workflow/metadata?workflowPath=echo.yaml" | jq
+
+# Access Schema Form Renderer
+open http://localhost:3000/ui/form
+
+# Access Graph Viewer
+open http://localhost:3000/graph
+```
+
 ## Git & CI
 
 ```bash
@@ -106,6 +134,10 @@ kubectl logs -n demon-system deployment/demon-runtime
 nats-cli stream ls
 nats-cli consumer ls RITUAL_EVENTS
 
+# Graph capsule: Check JetStream events
+nats stream info GRAPH_COMMITS
+nats stream view GRAPH_COMMITS
+
 # Debug networking
 kubectl port-forward -n demon-system svc/demon-engine 3000:3000
 ```
@@ -119,6 +151,65 @@ kubectl port-forward -n demon-system svc/demon-engine 3000:3000
 | **API not responding** | `curl localhost:3000/api/runs` | JSON response |
 | **NATS issues** | `nats-cli stream ls` | Shows RITUAL_EVENTS |
 | **Pod crashes** | `kubectl get pods` | All pods Running |
+
+## Graph Commands
+
+```bash
+# Create graph with seed mutations
+demonctl graph create \
+  --tenant-id tenant-1 \
+  --project-id proj-1 \
+  --namespace ns-1 \
+  --graph-id graph-1 \
+  mutations.json
+
+# Commit mutations
+demonctl graph commit \
+  --tenant-id tenant-1 \
+  --project-id proj-1 \
+  --namespace ns-1 \
+  --graph-id graph-1 \
+  --parent-ref <COMMIT_ID> \
+  mutations.json
+
+# Tag a commit
+demonctl graph tag \
+  --tenant-id tenant-1 \
+  --project-id proj-1 \
+  --namespace ns-1 \
+  --graph-id graph-1 \
+  --tag v1.0.0 \
+  --commit-id <COMMIT_ID>
+
+# List tags
+demonctl graph list-tags \
+  --tenant-id tenant-1 \
+  --project-id proj-1 \
+  --namespace ns-1 \
+  --graph-id graph-1
+
+# Get commit by ID (REST)
+curl "http://localhost:8080/api/graph/commits/<COMMIT_ID>?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1"
+
+# List commits (REST)
+curl "http://localhost:8080/api/graph/commits?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1&limit=50"
+
+# Get tag (REST)
+curl "http://localhost:8080/api/graph/tags/v1.0.0?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1"
+
+# List all tags (REST)
+curl "http://localhost:8080/api/graph/tags?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1"
+
+# Query operations (submit as mutations via demonctl graph commit)
+# - get-node: retrieve node by ID with labels/properties/edges
+# - neighbors: find connected nodes (filtered by relType/direction)
+# - path-exists: check if path exists between two nodes
+
+# View graphs in Operate UI
+open http://localhost:3000/graph
+# Or with specific scope:
+open "http://localhost:3000/graph?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1"
+```
 
 ## Environment Variables
 

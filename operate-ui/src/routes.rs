@@ -14,6 +14,41 @@ use std::time::Duration;
 use tokio_stream::wrappers::IntervalStream;
 use tracing::{debug, error, info, warn};
 
+// Graph viewer types
+#[derive(Deserialize, Debug, Clone)]
+pub struct GraphScopeQuery {
+    #[serde(rename = "tenantId")]
+    pub tenant_id: Option<String>,
+    #[serde(rename = "projectId")]
+    pub project_id: Option<String>,
+    pub namespace: Option<String>,
+    #[serde(rename = "graphId")]
+    pub graph_id: Option<String>,
+    pub limit: Option<usize>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GraphCommit {
+    pub event: String,
+    #[serde(rename = "commitId")]
+    pub commit_id: String,
+    #[serde(rename = "parentCommitId", skip_serializing_if = "Option::is_none")]
+    pub parent_commit_id: Option<String>,
+    pub ts: String,
+    #[serde(rename = "mutationsCount", skip_serializing_if = "Option::is_none")]
+    pub mutations_count: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mutations: Option<Vec<serde_json::Value>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GraphTag {
+    pub tag: String,
+    #[serde(rename = "commitId")]
+    pub commit_id: String,
+    pub timestamp: String,
+}
+
 // Query parameters for list runs API
 #[derive(Deserialize, Debug, Clone)]
 pub struct ListRunsQuery {
@@ -2309,4 +2344,427 @@ pub async fn override_approval_api_tenant(
                 .into_response()
         }
     }
+}
+
+// ---- Graph Viewer Routes ----
+
+/// Graph viewer - HTML page
+#[axum::debug_handler]
+pub async fn graph_viewer_html(
+    State(state): State<AppState>,
+    Query(query): Query<GraphScopeQuery>,
+) -> Html<String> {
+    debug!("Handling graph viewer HTML: {:?}", query);
+
+    // Build scope parameters with defaults
+    let tenant_id = query.tenant_id.unwrap_or_else(|| "tenant-1".to_string());
+    let project_id = query.project_id.unwrap_or_else(|| "proj-1".to_string());
+    let namespace = query.namespace.unwrap_or_else(|| "ns-1".to_string());
+    let graph_id = query.graph_id.unwrap_or_else(|| "graph-1".to_string());
+
+    let mut context = tera::Context::new();
+    context.insert("current_page", &"graph");
+    context.insert("tenant_id", &tenant_id);
+    context.insert("project_id", &project_id);
+    context.insert("namespace", &namespace);
+    context.insert("graph_id", &graph_id);
+    context.insert("runtime_api_url", &get_runtime_api_url());
+
+    let html = state
+        .tera
+        .render("graph_viewer.html", &context)
+        .unwrap_or_else(|e| {
+            error!("Template rendering failed: {}", e);
+            format!(
+                "<h1>Internal Server Error</h1><p>Failed to render page: {}</p>",
+                e
+            )
+        });
+
+    Html(html)
+}
+
+fn get_runtime_api_url() -> String {
+    std::env::var("RUNTIME_API_URL").unwrap_or_else(|_| "http://localhost:8080".to_string())
+}
+
+// ---- Schema Form Renderer Routes ----
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct SchemaFormQuery {
+    #[serde(rename = "schemaUrl")]
+    pub schema_url: Option<String>,
+    #[serde(rename = "schemaName")]
+    pub schema_name: Option<String>,
+}
+
+#[derive(Serialize, Debug)]
+pub struct SchemaMetadata {
+    pub schema: serde_json::Value,
+    #[serde(rename = "schemaId")]
+    pub schema_id: String,
+    pub source: String,
+}
+
+/// Schema form renderer - HTML page
+#[axum::debug_handler]
+pub async fn schema_form_html(
+    State(state): State<AppState>,
+    Query(query): Query<SchemaFormQuery>,
+) -> Html<String> {
+    debug!("Handling schema form HTML: {:?}", query);
+
+    let mut context = tera::Context::new();
+    context.insert("current_page", &"form");
+    context.insert("schema_url", &query.schema_url);
+    context.insert("schema_name", &query.schema_name);
+
+    let html = state
+        .tera
+        .render("form_renderer.html", &context)
+        .unwrap_or_else(|e| {
+            error!("Template rendering failed: {}", e);
+            format!(
+                "<h1>Internal Server Error</h1><p>Failed to render page: {}</p>",
+                e
+            )
+        });
+
+    Html(html)
+}
+
+/// Schema metadata - JSON API endpoint
+#[axum::debug_handler]
+pub async fn schema_metadata_api(
+    State(_state): State<AppState>,
+    Query(query): Query<SchemaFormQuery>,
+) -> Response {
+    debug!("Handling schema metadata API: {:?}", query);
+
+    // Determine schema source and fetch
+    let (schema, schema_id, source) = if let Some(name) = query.schema_name {
+        // Load from local contracts/schemas
+        match load_local_schema(&name) {
+            Ok((schema, id)) => (schema, id, "local".to_string()),
+            Err(e) => {
+                return (
+                    StatusCode::NOT_FOUND,
+                    Json(serde_json::json!({
+                        "error": format!("Failed to load local schema: {}", e)
+                    })),
+                )
+                    .into_response()
+            }
+        }
+    } else if let Some(url) = query.schema_url {
+        // Fetch from remote URL
+        match fetch_remote_schema(&url).await {
+            Ok(schema) => (schema, url.clone(), format!("remote:{}", url)),
+            Err(e) => {
+                return (
+                    StatusCode::BAD_GATEWAY,
+                    Json(serde_json::json!({
+                        "error": format!("Failed to fetch remote schema: {}", e)
+                    })),
+                )
+                    .into_response()
+            }
+        }
+    } else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "Either schemaUrl or schemaName must be provided"
+            })),
+        )
+            .into_response();
+    };
+
+    // Validate it's a valid JSON Schema
+    if !schema.is_object() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "Invalid schema: must be a JSON object"
+            })),
+        )
+            .into_response();
+    }
+
+    Json(SchemaMetadata {
+        schema,
+        schema_id,
+        source,
+    })
+    .into_response()
+}
+
+/// Submit form data - JSON API endpoint
+#[axum::debug_handler]
+pub async fn submit_form_api(
+    State(_state): State<AppState>,
+    Json(payload): Json<serde_json::Value>,
+) -> Response {
+    debug!("Handling form submission: {:?}", payload);
+
+    // Echo back the form data for now (can be integrated with workflow later)
+    Json(serde_json::json!({
+        "status": "received",
+        "data": payload
+    }))
+    .into_response()
+}
+
+fn load_local_schema(name: &str) -> anyhow::Result<(serde_json::Value, String)> {
+    use anyhow::Context;
+
+    // Sanitize the name to prevent path traversal
+    let safe_name = name.replace("..", "").replace("/", "");
+
+    // Construct path relative to workspace root
+    // operate-ui is in workspace root, so we go up one level to reach contracts/
+    let schema_path = format!(
+        "{}/../contracts/schemas/{}.json",
+        env!("CARGO_MANIFEST_DIR"),
+        safe_name
+    );
+
+    info!("Loading local schema from: {}", schema_path);
+
+    let content = std::fs::read_to_string(&schema_path)
+        .with_context(|| format!("Failed to read schema file: {}", schema_path))?;
+
+    let schema: serde_json::Value =
+        serde_json::from_str(&content).context("Failed to parse schema JSON")?;
+
+    let schema_id = schema
+        .get("$id")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&safe_name)
+        .to_string();
+
+    Ok((schema, schema_id))
+}
+
+async fn fetch_remote_schema(url: &str) -> anyhow::Result<serde_json::Value> {
+    // Simple timeout and size limits for safety
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()?;
+
+    let response = client.get(url).send().await?;
+
+    if !response.status().is_success() {
+        anyhow::bail!("HTTP error: {}", response.status());
+    }
+
+    // Limit response size to 1MB
+    let bytes = response.bytes().await?;
+    if bytes.len() > 1_000_000 {
+        anyhow::bail!("Schema too large (>1MB)");
+    }
+
+    let schema: serde_json::Value = serde_json::from_slice(&bytes)?;
+    Ok(schema)
+}
+
+// ---- Workflow Viewer Routes ----
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct WorkflowViewerQuery {
+    #[serde(rename = "workflowUrl")]
+    pub workflow_url: Option<String>,
+    #[serde(rename = "workflowPath")]
+    pub workflow_path: Option<String>,
+}
+
+#[derive(Serialize, Debug)]
+pub struct WorkflowMetadata {
+    pub workflow: serde_json::Value,
+    #[serde(rename = "workflowId")]
+    pub workflow_id: String,
+    pub source: String,
+}
+
+/// Workflow viewer - HTML page
+#[axum::debug_handler]
+pub async fn workflow_viewer_html(
+    State(state): State<AppState>,
+    Query(query): Query<WorkflowViewerQuery>,
+) -> Html<String> {
+    debug!("Handling workflow viewer HTML: {:?}", query);
+
+    let mut context = tera::Context::new();
+    context.insert("current_page", &"workflow");
+    context.insert("workflow_url", &query.workflow_url);
+    context.insert("workflow_path", &query.workflow_path);
+    context.insert("runtime_api_url", &get_runtime_api_url());
+
+    let html = state
+        .tera
+        .render("workflow_viewer.html", &context)
+        .unwrap_or_else(|e| {
+            error!("Template rendering failed: {}", e);
+            format!(
+                "<h1>Internal Server Error</h1><p>Failed to render page: {}</p>",
+                e
+            )
+        });
+
+    Html(html)
+}
+
+/// Workflow metadata - JSON API endpoint
+#[axum::debug_handler]
+pub async fn workflow_metadata_api(
+    State(_state): State<AppState>,
+    Query(query): Query<WorkflowViewerQuery>,
+) -> Response {
+    debug!("Handling workflow metadata API: {:?}", query);
+
+    // Determine workflow source and fetch
+    let (workflow, workflow_id, source) = if let Some(path) = query.workflow_path {
+        // Load from local file
+        match load_local_workflow(&path) {
+            Ok((wf, id)) => (wf, id, "local".to_string()),
+            Err(e) => {
+                return (
+                    StatusCode::NOT_FOUND,
+                    Json(serde_json::json!({
+                        "error": format!("Failed to load local workflow: {}", e)
+                    })),
+                )
+                    .into_response()
+            }
+        }
+    } else if let Some(url) = query.workflow_url {
+        // Fetch from remote URL
+        match fetch_remote_workflow(&url).await {
+            Ok(wf) => (wf, url.clone(), format!("remote:{}", url)),
+            Err(e) => {
+                return (
+                    StatusCode::BAD_GATEWAY,
+                    Json(serde_json::json!({
+                        "error": format!("Failed to fetch remote workflow: {}", e)
+                    })),
+                )
+                    .into_response()
+            }
+        }
+    } else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "Either workflowUrl or workflowPath must be provided"
+            })),
+        )
+            .into_response();
+    };
+
+    // Validate it's a valid workflow object
+    if !workflow.is_object() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "Invalid workflow: must be a YAML/JSON object"
+            })),
+        )
+            .into_response();
+    }
+
+    Json(WorkflowMetadata {
+        workflow,
+        workflow_id,
+        source,
+    })
+    .into_response()
+}
+
+/// Workflow state - JSON API endpoint (returns current execution state)
+#[axum::debug_handler]
+pub async fn workflow_state_api(
+    State(_state): State<AppState>,
+    Query(params): Query<serde_json::Value>,
+) -> Response {
+    debug!("Handling workflow state API: {:?}", params);
+
+    // Placeholder: return mock state for now
+    // In real implementation, this would query runtime for current execution state
+    Json(serde_json::json!({
+        "workflowId": params.get("workflowId").and_then(|v| v.as_str()).unwrap_or("unknown"),
+        "currentState": "pending",
+        "currentTasks": [],
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    }))
+    .into_response()
+}
+
+fn load_local_workflow(path: &str) -> anyhow::Result<(serde_json::Value, String)> {
+    use anyhow::Context;
+
+    // Sanitize the path to prevent traversal attacks
+    let safe_path = path.replace("..", "");
+
+    // Construct absolute path
+    let workflow_path = if safe_path.starts_with('/') {
+        safe_path.clone()
+    } else {
+        // Relative to examples/rituals/ by default
+        format!(
+            "{}/../examples/rituals/{}",
+            env!("CARGO_MANIFEST_DIR"),
+            safe_path
+        )
+    };
+
+    info!("Loading local workflow from: {}", workflow_path);
+
+    let content = std::fs::read_to_string(&workflow_path)
+        .with_context(|| format!("Failed to read workflow file: {}", workflow_path))?;
+
+    // Size limit: 1MB
+    if content.len() > 1_000_000 {
+        anyhow::bail!("Workflow file too large (>1MB)");
+    }
+
+    // Try to parse as YAML first (most common for workflows)
+    let workflow: serde_json::Value =
+        serde_yaml::from_str(&content).context("Failed to parse workflow YAML")?;
+
+    // Extract workflow ID from document.name or use filename
+    let workflow_id = workflow
+        .get("document")
+        .and_then(|d| d.get("name"))
+        .and_then(|v| v.as_str())
+        .or_else(|| workflow.get("name").and_then(|v| v.as_str()))
+        .or_else(|| workflow.get("id").and_then(|v| v.as_str()))
+        .unwrap_or(&safe_path)
+        .to_string();
+
+    Ok((workflow, workflow_id))
+}
+
+async fn fetch_remote_workflow(url: &str) -> anyhow::Result<serde_json::Value> {
+    // Simple timeout and size limits for safety
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()?;
+
+    let response = client.get(url).send().await?;
+
+    if !response.status().is_success() {
+        anyhow::bail!("HTTP error: {}", response.status());
+    }
+
+    // Limit response size to 1MB
+    let bytes = response.bytes().await?;
+    if bytes.len() > 1_000_000 {
+        anyhow::bail!("Workflow too large (>1MB)");
+    }
+
+    // Try YAML first, fallback to JSON
+    let workflow: serde_json::Value =
+        serde_yaml::from_slice(&bytes).or_else(|_| serde_json::from_slice(&bytes))?;
+
+    Ok(workflow)
 }

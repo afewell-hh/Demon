@@ -7,8 +7,8 @@ Welcome, platform engineers! This guide helps you deploy, configure, and operate
 Ready to deploy Demon? Follow this path:
 
 1. **[Bootstrap Setup](../bootstrapper/README.md)** - Zero-config deployment
-2. **[Production Configuration](#production-configuration)** - Security and scaling
-3. **[Monitoring Setup](#monitoring-and-observability)** - Operational visibility
+2. **[Production Configuration](#production-deployment)** - Security and scaling
+3. **[Monitoring Setup](#-monitoring-and-observability)** - Operational visibility
 
 ```bash
 # Quick bootstrap
@@ -110,7 +110,19 @@ nats stream view RITUAL_EVENTS
 make test                          # Verify system health
 cargo run -p demonctl -- contracts bundle  # Export current contracts
 nats stream info RITUAL_EVENTS    # Check stream health
+nats stream info GRAPH_COMMITS    # Check graph commit stream health
 ```
+
+### Graph Query Performance Considerations
+
+**Replay Cost**: Graph query operations (`get-node`, `neighbors`, `path-exists`) replay the full commit history from genesis to the target commit to reconstruct graph state. For graphs with thousands of commits, expect query latency proportional to history depth.
+
+**Operational Impact**:
+- Small graphs (<100 commits): negligible latency
+- Medium graphs (100-1000 commits): seconds to tens of seconds
+- Large graphs (>1000 commits): consider snapshot-based optimization (future roadmap)
+
+**Monitoring**: Track commit history depth via `nats stream info GRAPH_COMMITS` and correlate with query response times from `/api/graph/*` endpoints.
 
 ## 🔐 Security and Compliance
 

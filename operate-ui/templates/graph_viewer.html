@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+
+{% block title %}Graph Viewer - Demon Operate UI{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Graph Viewer</h2>
+    </div>
+
+    <div style="margin-bottom: 1.5rem;">
+        <form id="scopeForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            <div>
+                <label for="tenantId" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Tenant ID:</label>
+                <input type="text" id="tenantId" name="tenantId" value="{{ tenant_id }}"
+                       style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;">
+            </div>
+            <div>
+                <label for="projectId" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Project ID:</label>
+                <input type="text" id="projectId" name="projectId" value="{{ project_id }}"
+                       style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;">
+            </div>
+            <div>
+                <label for="namespace" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Namespace:</label>
+                <input type="text" id="namespace" name="namespace" value="{{ namespace }}"
+                       style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;">
+            </div>
+            <div>
+                <label for="graphId" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Graph ID:</label>
+                <input type="text" id="graphId" name="graphId" value="{{ graph_id }}"
+                       style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;">
+            </div>
+            <div style="display: flex; align-items: flex-end;">
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Load Graph</button>
+            </div>
+        </form>
+    </div>
+
+    <div id="loadingIndicator" style="display: none; text-align: center; padding: 2rem; color: var(--text-secondary);">
+        <p>Loading graph data...</p>
+    </div>
+
+    <div id="errorDisplay" style="display: none;" class="alert alert-error"></div>
+</div>
+
+<div class="card" id="tagsCard" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title">Tags</h3>
+    </div>
+    <div id="tagsContainer"></div>
+</div>
+
+<div class="card" id="commitsCard" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title">Recent Commits</h3>
+    </div>
+    <div id="commitsContainer"></div>
+</div>
+
+<div class="card" id="commitDetailCard" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title">Commit Detail</h3>
+        <button id="closeDetailBtn" class="btn btn-secondary">Close</button>
+    </div>
+    <div id="commitDetailContainer"></div>
+</div>
+
+<script>
+const RUNTIME_API_URL = "{{ runtime_api_url }}";
+
+let currentScope = {
+    tenantId: "{{ tenant_id }}",
+    projectId: "{{ project_id }}",
+    namespace: "{{ namespace }}",
+    graphId: "{{ graph_id }}"
+};
+
+document.getElementById('scopeForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    currentScope = {
+        tenantId: document.getElementById('tenantId').value,
+        projectId: document.getElementById('projectId').value,
+        namespace: document.getElementById('namespace').value,
+        graphId: document.getElementById('graphId').value
+    };
+
+    await loadGraphData();
+});
+
+document.getElementById('closeDetailBtn').addEventListener('click', () => {
+    document.getElementById('commitDetailCard').style.display = 'none';
+});
+
+async function loadGraphData() {
+    showLoading(true);
+    hideError();
+
+    try {
+        // Load tags and commits in parallel
+        const [tags, commits] = await Promise.all([
+            fetchTags(),
+            fetchCommits()
+        ]);
+
+        displayTags(tags);
+        displayCommits(commits);
+        showLoading(false);
+    } catch (err) {
+        showLoading(false);
+        showError(err.message || 'Failed to load graph data');
+    }
+}
+
+async function fetchTags() {
+    const params = new URLSearchParams(currentScope);
+    const url = `${RUNTIME_API_URL}/api/graph/tags?${params}`;
+
+    const response = await fetch(url);
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+    }
+
+    return await response.json();
+}
+
+async function fetchCommits(limit = 50) {
+    const params = new URLSearchParams({ ...currentScope, limit: limit.toString() });
+    const url = `${RUNTIME_API_URL}/api/graph/commits?${params}`;
+
+    const response = await fetch(url);
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+    }
+
+    return await response.json();
+}
+
+async function fetchCommitDetail(commitId) {
+    const params = new URLSearchParams(currentScope);
+    const url = `${RUNTIME_API_URL}/api/graph/commits/${commitId}?${params}`;
+
+    const response = await fetch(url);
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+    }
+
+    return await response.json();
+}
+
+function displayTags(tags) {
+    const container = document.getElementById('tagsContainer');
+    const card = document.getElementById('tagsCard');
+
+    if (!tags || tags.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>No tags found</p></div>';
+        card.style.display = 'block';
+        return;
+    }
+
+    let html = '<table class="table"><thead><tr><th>Tag</th><th>Commit ID</th><th>Timestamp</th><th>Actions</th></tr></thead><tbody>';
+
+    for (const tag of tags) {
+        const shortCommit = tag.commitId.substring(0, 12);
+        const ts = new Date(tag.timestamp).toLocaleString();
+        html += `
+            <tr>
+                <td><strong>${escapeHtml(tag.tag)}</strong></td>
+                <td><code>${escapeHtml(shortCommit)}</code></td>
+                <td>${escapeHtml(ts)}</td>
+                <td><a href="#" onclick="viewCommit('${escapeHtml(tag.commitId)}'); return false;">View</a></td>
+            </tr>
+        `;
+    }
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+    card.style.display = 'block';
+}
+
+function displayCommits(commits) {
+    const container = document.getElementById('commitsContainer');
+    const card = document.getElementById('commitsCard');
+
+    if (!commits || commits.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>No commits found</p></div>';
+        card.style.display = 'block';
+        return;
+    }
+
+    let html = '<table class="table"><thead><tr><th>Commit ID</th><th>Parent</th><th>Timestamp</th><th>Mutations</th><th>Actions</th></tr></thead><tbody>';
+
+    for (const commit of commits) {
+        const shortCommit = commit.commitId.substring(0, 12);
+        const shortParent = commit.parentCommitId ? commit.parentCommitId.substring(0, 12) : 'N/A';
+        const ts = new Date(commit.ts).toLocaleString();
+        const mutCount = commit.mutationsCount || commit.mutations?.length || 0;
+
+        html += `
+            <tr>
+                <td><code>${escapeHtml(shortCommit)}</code></td>
+                <td><code>${escapeHtml(shortParent)}</code></td>
+                <td>${escapeHtml(ts)}</td>
+                <td>${mutCount}</td>
+                <td><a href="#" onclick="viewCommit('${escapeHtml(commit.commitId)}'); return false;">View</a></td>
+            </tr>
+        `;
+    }
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+    card.style.display = 'block';
+}
+
+async function viewCommit(commitId) {
+    try {
+        showLoading(true);
+        const commit = await fetchCommitDetail(commitId);
+        showLoading(false);
+
+        const container = document.getElementById('commitDetailContainer');
+        const card = document.getElementById('commitDetailCard');
+
+        let html = `
+            <div style="margin-bottom: 1rem;">
+                <p><strong>Commit ID:</strong> <code>${escapeHtml(commit.commitId)}</code></p>
+                <p><strong>Parent Commit:</strong> <code>${escapeHtml(commit.parentCommitId || 'N/A')}</code></p>
+                <p><strong>Timestamp:</strong> ${escapeHtml(new Date(commit.ts).toLocaleString())}</p>
+                <p><strong>Event:</strong> ${escapeHtml(commit.event)}</p>
+            </div>
+            <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem;">Mutations</h4>
+        `;
+
+        if (commit.mutations && commit.mutations.length > 0) {
+            html += '<pre style="background: #f5f5f5; padding: 1rem; border-radius: 4px; overflow-x: auto; max-height: 500px;">';
+            html += escapeHtml(JSON.stringify(commit.mutations, null, 2));
+            html += '</pre>';
+        } else {
+            html += '<p>No mutations in this commit</p>';
+        }
+
+        container.innerHTML = html;
+        card.style.display = 'block';
+        card.scrollIntoView({ behavior: 'smooth' });
+    } catch (err) {
+        showLoading(false);
+        showError('Failed to load commit detail: ' + (err.message || 'Unknown error'));
+    }
+}
+
+function showLoading(show) {
+    document.getElementById('loadingIndicator').style.display = show ? 'block' : 'none';
+}
+
+function showError(message) {
+    const errorDiv = document.getElementById('errorDisplay');
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+}
+
+function hideError() {
+    document.getElementById('errorDisplay').style.display = 'none';
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Load data on page load
+window.addEventListener('DOMContentLoaded', () => {
+    loadGraphData();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,536 @@
+{% extends "base.html" %}
+
+{% block title %}Schema Form Renderer - Demon Operate UI{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">JSON Schema Form Renderer</h2>
+    </div>
+
+    <div style="margin-bottom: 1.5rem;">
+        <form id="schemaSelectionForm" style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: end;">
+            <div>
+                <label for="schemaName" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Local Schema Name:</label>
+                <input type="text" id="schemaName" name="schemaName"
+                       value="{% if schema_name %}{{ schema_name }}{% else %}approval.requested.v1{% endif %}"
+                       placeholder="e.g., approval.requested.v1"
+                       style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;">
+            </div>
+            <div>
+                <label for="schemaUrl" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Remote Schema URL:</label>
+                <input type="text" id="schemaUrl" name="schemaUrl"
+                       value="{% if schema_url %}{{ schema_url }}{% endif %}"
+                       placeholder="https://example.com/schema.json"
+                       style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;">
+            </div>
+            <div>
+                <button type="submit" class="btn btn-primary">Load Schema</button>
+            </div>
+        </form>
+        <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.875rem;">
+            Enter either a local schema name or remote URL, then click Load Schema.
+        </p>
+    </div>
+
+    <div id="loadingIndicator" style="display: none; text-align: center; padding: 2rem; color: var(--text-secondary);">
+        <p>Loading schema...</p>
+    </div>
+
+    <div id="errorDisplay" style="display: none;" class="alert alert-error"></div>
+</div>
+
+<div class="card" id="formCard" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title">Form</h3>
+        <div style="display: flex; gap: 0.5rem;">
+            <button id="viewSchemaBtn" class="btn btn-secondary">View Schema</button>
+            <button id="viewJsonBtn" class="btn btn-secondary">View JSON</button>
+        </div>
+    </div>
+    <div id="formContainer" role="form" aria-live="polite"></div>
+    <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
+        <button id="submitBtn" class="btn btn-primary">Submit</button>
+        <button id="resetBtn" class="btn btn-secondary">Reset</button>
+    </div>
+</div>
+
+<div class="card" id="schemaViewCard" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title">Schema Definition</h3>
+        <button id="closeSchemaViewBtn" class="btn btn-secondary">Close</button>
+    </div>
+    <pre id="schemaViewContent" style="background: #f5f5f5; padding: 1rem; border-radius: 4px; overflow-x: auto; max-height: 500px;"></pre>
+</div>
+
+<div class="card" id="jsonViewCard" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title">Form Data (JSON)</h3>
+        <button id="closeJsonViewBtn" class="btn btn-secondary">Close</button>
+    </div>
+    <pre id="jsonViewContent" style="background: #f5f5f5; padding: 1rem; border-radius: 4px; overflow-x: auto; max-height: 500px;"></pre>
+</div>
+
+<div class="card" id="resultCard" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title">Submission Result</h3>
+        <button id="closeResultBtn" class="btn btn-secondary">Close</button>
+    </div>
+    <div id="resultContainer"></div>
+</div>
+
+<style>
+.form-field {
+    margin-bottom: 1rem;
+}
+
+.form-field label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.form-field label.required::after {
+    content: " *";
+    color: var(--error-color);
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 1rem;
+}
+
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1);
+}
+
+.form-field input[type="checkbox"] {
+    width: auto;
+    margin-right: 0.5rem;
+}
+
+.form-field .help-text {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.form-field .error-text {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: var(--error-color);
+}
+
+.form-field.has-error input,
+.form-field.has-error select,
+.form-field.has-error textarea {
+    border-color: var(--error-color);
+}
+
+.form-array {
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 1rem;
+    margin-top: 0.5rem;
+}
+
+.form-array-item {
+    position: relative;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: #fafafa;
+}
+
+.form-array-item-remove {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    background: var(--error-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+}
+
+.form-array-add {
+    margin-top: 0.5rem;
+}
+</style>
+
+<script>
+let currentSchema = null;
+let currentFormData = {};
+let currentSchemaId = null;
+
+// Form state management
+const formState = {
+    schema: null,
+    data: {},
+    errors: {}
+};
+
+document.getElementById('schemaSelectionForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const schemaName = document.getElementById('schemaName').value.trim();
+    const schemaUrl = document.getElementById('schemaUrl').value.trim();
+
+    if (!schemaName && !schemaUrl) {
+        showError('Please provide either a schema name or URL');
+        return;
+    }
+
+    await loadSchema(schemaName, schemaUrl);
+});
+
+document.getElementById('viewSchemaBtn').addEventListener('click', () => {
+    if (currentSchema) {
+        document.getElementById('schemaViewContent').textContent = JSON.stringify(currentSchema, null, 2);
+        document.getElementById('schemaViewCard').style.display = 'block';
+        document.getElementById('schemaViewCard').scrollIntoView({ behavior: 'smooth' });
+    }
+});
+
+document.getElementById('viewJsonBtn').addEventListener('click', () => {
+    document.getElementById('jsonViewContent').textContent = JSON.stringify(currentFormData, null, 2);
+    document.getElementById('jsonViewCard').style.display = 'block';
+    document.getElementById('jsonViewCard').scrollIntoView({ behavior: 'smooth' });
+});
+
+document.getElementById('closeSchemaViewBtn').addEventListener('click', () => {
+    document.getElementById('schemaViewCard').style.display = 'none';
+});
+
+document.getElementById('closeJsonViewBtn').addEventListener('click', () => {
+    document.getElementById('jsonViewCard').style.display = 'none';
+});
+
+document.getElementById('closeResultBtn').addEventListener('click', () => {
+    document.getElementById('resultCard').style.display = 'none';
+});
+
+document.getElementById('submitBtn').addEventListener('click', async () => {
+    await submitForm();
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+    if (currentSchema) {
+        renderForm(currentSchema);
+    }
+});
+
+async function loadSchema(schemaName, schemaUrl) {
+    showLoading(true);
+    hideError();
+
+    try {
+        const params = new URLSearchParams();
+        if (schemaName) params.append('schemaName', schemaName);
+        if (schemaUrl) params.append('schemaUrl', schemaUrl);
+
+        const response = await fetch(`/api/schema/metadata?${params}`);
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+
+        const metadata = await response.json();
+        currentSchema = metadata.schema;
+        currentSchemaId = metadata.schemaId;
+
+        renderForm(currentSchema);
+        showLoading(false);
+        document.getElementById('formCard').style.display = 'block';
+    } catch (err) {
+        showLoading(false);
+        showError('Failed to load schema: ' + (err.message || 'Unknown error'));
+    }
+}
+
+function renderForm(schema) {
+    const container = document.getElementById('formContainer');
+    container.innerHTML = '';
+    currentFormData = {};
+
+    if (!schema || !schema.properties) {
+        container.innerHTML = '<p>No form fields available for this schema.</p>';
+        return;
+    }
+
+    const required = schema.required || [];
+
+    for (const [key, propSchema] of Object.entries(schema.properties)) {
+        const isRequired = required.includes(key);
+        const field = renderField(key, propSchema, isRequired);
+        container.appendChild(field);
+    }
+
+    // Emit initial form.changed event
+    emitFormChanged();
+}
+
+function renderField(name, schema, isRequired = false, path = []) {
+    const fieldDiv = document.createElement('div');
+    fieldDiv.className = 'form-field';
+    fieldDiv.setAttribute('data-field-path', [...path, name].join('.'));
+
+    const label = document.createElement('label');
+    label.setAttribute('for', name);
+    if (isRequired) label.className = 'required';
+    label.textContent = schema.title || name;
+    fieldDiv.appendChild(label);
+
+    if (schema.description) {
+        const helpText = document.createElement('span');
+        helpText.className = 'help-text';
+        helpText.textContent = schema.description;
+        fieldDiv.appendChild(helpText);
+    }
+
+    const input = createInput(name, schema, path);
+    fieldDiv.appendChild(input);
+
+    // Set initial value
+    const fullPath = [...path, name].join('.');
+    const defaultValue = schema.default;
+    if (defaultValue !== undefined) {
+        setFormValue(fullPath, defaultValue);
+        if (input.type === 'checkbox') {
+            input.checked = defaultValue;
+        } else {
+            input.value = defaultValue;
+        }
+    }
+
+    return fieldDiv;
+}
+
+function createInput(name, schema, path = []) {
+    const type = schema.type;
+    const fullPath = [...path, name].join('.');
+
+    if (schema.enum) {
+        const select = document.createElement('select');
+        select.id = name;
+        select.name = name;
+
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = '-- Select --';
+        select.appendChild(placeholder);
+
+        for (const value of schema.enum) {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = value;
+            select.appendChild(option);
+        }
+
+        select.addEventListener('change', (e) => {
+            setFormValue(fullPath, e.target.value);
+            emitFormChanged();
+        });
+
+        return select;
+    }
+
+    switch (type) {
+        case 'boolean':
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = name;
+            checkbox.name = name;
+            checkbox.addEventListener('change', (e) => {
+                setFormValue(fullPath, e.target.checked);
+                emitFormChanged();
+            });
+            return checkbox;
+
+        case 'number':
+        case 'integer':
+            const number = document.createElement('input');
+            number.type = 'number';
+            number.id = name;
+            number.name = name;
+            if (schema.minimum !== undefined) number.min = schema.minimum;
+            if (schema.maximum !== undefined) number.max = schema.maximum;
+            if (type === 'integer') number.step = '1';
+            number.addEventListener('input', (e) => {
+                const value = type === 'integer' ? parseInt(e.target.value, 10) : parseFloat(e.target.value);
+                setFormValue(fullPath, isNaN(value) ? null : value);
+                emitFormChanged();
+            });
+            return number;
+
+        case 'array':
+            const arrayContainer = document.createElement('div');
+            arrayContainer.className = 'form-array';
+            arrayContainer.id = name;
+
+            const addBtn = document.createElement('button');
+            addBtn.textContent = '+ Add Item';
+            addBtn.className = 'btn btn-secondary form-array-add';
+            addBtn.type = 'button';
+            addBtn.addEventListener('click', () => {
+                // TODO: Implement array item management
+                alert('Array support coming soon');
+            });
+            arrayContainer.appendChild(addBtn);
+
+            return arrayContainer;
+
+        case 'object':
+            const objectContainer = document.createElement('div');
+            objectContainer.style.marginLeft = '1rem';
+            objectContainer.style.marginTop = '0.5rem';
+            objectContainer.style.padding = '0.5rem';
+            objectContainer.style.border = '1px solid var(--border-color)';
+            objectContainer.style.borderRadius = '4px';
+
+            if (schema.properties) {
+                const required = schema.required || [];
+                for (const [key, propSchema] of Object.entries(schema.properties)) {
+                    const isRequired = required.includes(key);
+                    const field = renderField(key, propSchema, isRequired, [...path, name]);
+                    objectContainer.appendChild(field);
+                }
+            }
+
+            return objectContainer;
+
+        default:
+            const text = document.createElement('input');
+            text.type = 'text';
+            text.id = name;
+            text.name = name;
+            if (schema.format === 'date-time') {
+                text.type = 'datetime-local';
+            } else if (schema.format === 'email') {
+                text.type = 'email';
+            } else if (schema.format === 'uri') {
+                text.type = 'url';
+            }
+            if (schema.pattern) text.pattern = schema.pattern;
+            if (schema.minLength !== undefined) text.minLength = schema.minLength;
+            if (schema.maxLength !== undefined) text.maxLength = schema.maxLength;
+            text.addEventListener('input', (e) => {
+                setFormValue(fullPath, e.target.value);
+                emitFormChanged();
+            });
+            return text;
+    }
+}
+
+function setFormValue(path, value) {
+    const keys = path.split('.');
+    let obj = currentFormData;
+
+    for (let i = 0; i < keys.length - 1; i++) {
+        if (!(keys[i] in obj)) {
+            obj[keys[i]] = {};
+        }
+        obj = obj[keys[i]];
+    }
+
+    obj[keys[keys.length - 1]] = value;
+}
+
+function emitFormChanged() {
+    const event = new CustomEvent('form.changed', {
+        detail: {
+            schemaId: currentSchemaId,
+            data: currentFormData
+        }
+    });
+    document.dispatchEvent(event);
+}
+
+async function submitForm() {
+    showLoading(true);
+    hideError();
+
+    try {
+        const response = await fetch('/api/form/submit', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                schemaId: currentSchemaId,
+                data: currentFormData
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+        showLoading(false);
+
+        const resultContainer = document.getElementById('resultContainer');
+        resultContainer.innerHTML = `
+            <div class="alert alert-info">
+                <p><strong>Status:</strong> ${escapeHtml(result.status)}</p>
+                <pre style="margin-top: 1rem; background: #f5f5f5; padding: 1rem; border-radius: 4px; overflow-x: auto;">${escapeHtml(JSON.stringify(result, null, 2))}</pre>
+            </div>
+        `;
+        document.getElementById('resultCard').style.display = 'block';
+        document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth' });
+    } catch (err) {
+        showLoading(false);
+        showError('Failed to submit form: ' + (err.message || 'Unknown error'));
+    }
+}
+
+function showLoading(show) {
+    document.getElementById('loadingIndicator').style.display = show ? 'block' : 'none';
+}
+
+function showError(message) {
+    const errorDiv = document.getElementById('errorDisplay');
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+}
+
+function hideError() {
+    document.getElementById('errorDisplay').style.display = 'none';
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Listen for form.changed events for debugging
+document.addEventListener('form.changed', (e) => {
+    console.log('Form changed:', e.detail);
+});
+
+// Load initial schema if provided
+window.addEventListener('DOMContentLoaded', () => {
+    const schemaName = document.getElementById('schemaName').value.trim();
+    if (schemaName) {
+        loadSchema(schemaName, '');
+    }
+});
+</script>
+{% endblock %}

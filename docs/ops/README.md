@@ -83,8 +83,202 @@ cargo run -p demonctl -- run examples/rituals/echo.yaml
 # Check Operate UI health
 curl http://localhost:3000/api/runs
 
+# Access Schema Form Renderer
+open http://localhost:3000/ui/form
+
+# Load a local schema in the form renderer
+open "http://localhost:3000/ui/form?schemaName=approval.requested.v1"
+
 # Export current contracts
 cargo run -p demonctl -- contracts bundle
+```
+
+### Schema Form Renderer Operations
+
+The Schema Form Renderer provides a web-based interface for rendering JSON Schema Draft 2020-12 compliant schemas into accessible HTML forms.
+
+**Access the form renderer:**
+```bash
+# Via browser
+open http://localhost:3000/ui/form
+
+# With a specific local schema
+open "http://localhost:3000/ui/form?schemaName=approval.requested.v1"
+
+# With a remote schema URL
+open "http://localhost:3000/ui/form?schemaUrl=https://example.com/schema.json"
+```
+
+**Features:**
+- **Local schema loading** - Load schemas from `contracts/schemas/`
+- **Remote schema loading** - Fetch schemas from URLs
+- **Form validation** - Draft 2020-12 schema validation
+- **Accessible design** - WCAG-compliant form controls with ARIA labels
+- **Live updates** - `form.changed` events emitted on every field change
+- **JSON preview** - View form data as JSON in real-time
+
+**Supported schema features:**
+- Basic types: string, number, integer, boolean, object
+- Formats: date-time, email, uri
+- Constraints: required, min/max, pattern, enum
+- Nested objects (limited array support)
+
+**API endpoints:**
+- `GET /ui/form` - Form renderer page
+- `GET /api/schema/metadata` - Fetch schema metadata
+- `POST /api/form/submit` - Submit form data
+
+**Example:**
+```bash
+# Load approval request schema
+curl "http://localhost:3000/api/schema/metadata?schemaName=approval.requested.v1" | jq .
+
+# Submit form data
+curl -X POST http://localhost:3000/api/form/submit \
+  -H "Content-Type: application/json" \
+  -d '{"schemaId": "test", "data": {"field": "value"}}'
+```
+
+### Graph Capsule Operations
+```bash
+# Create a new graph with seed mutations
+demonctl graph create \
+  --tenant-id tenant-1 \
+  --project-id proj-1 \
+  --namespace ns-1 \
+  --graph-id graph-1 \
+  mutations.json
+
+# Commit mutations to an existing graph
+demonctl graph commit \
+  --tenant-id tenant-1 \
+  --project-id proj-1 \
+  --namespace ns-1 \
+  --graph-id graph-1 \
+  --parent-ref <COMMIT_ID> \
+  mutations.json
+
+# Tag a commit
+demonctl graph tag \
+  --tenant-id tenant-1 \
+  --project-id proj-1 \
+  --namespace ns-1 \
+  --graph-id graph-1 \
+  --tag v1.0.0 \
+  --commit-id <COMMIT_ID>
+
+# List tags for a graph
+demonctl graph list-tags \
+  --tenant-id tenant-1 \
+  --project-id proj-1 \
+  --namespace ns-1 \
+  --graph-id graph-1
+
+# Query graph: get commit by ID
+curl "http://localhost:8080/api/graph/commits/<COMMIT_ID>?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1"
+
+# Query graph: list commits
+curl "http://localhost:8080/api/graph/commits?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1&limit=50"
+
+# Query graph: get tag
+curl "http://localhost:8080/api/graph/tags/v1.0.0?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1"
+
+# Query graph: list all tags
+curl "http://localhost:8080/api/graph/tags?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1"
+
+# Verify graph events in NATS JetStream
+nats stream info GRAPH_COMMITS
+nats stream view GRAPH_COMMITS --count
+```
+
+### Viewing Graphs in Operate
+
+The Operate UI provides a minimal read-only graph viewer for inspecting graph commits and tags.
+
+**Access the graph viewer:**
+```
+http://localhost:3000/graph
+```
+
+**Features:**
+- Input form to specify graph scope (tenant, project, namespace, graph ID)
+- List of commits with timestamps, parent commits, and mutation counts
+- List of tags with associated commit IDs
+- Click on any commit to view detailed mutation JSON
+- Auto-loads on page load with default scope parameters
+
+**Query Parameters:**
+```
+http://localhost:3000/graph?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1
+```
+
+**Environment Configuration:**
+- `RUNTIME_API_URL` - Runtime server URL (default: `http://localhost:8080`)
+
+**Note:** The viewer calls the Runtime REST endpoints at `/api/graph/commits` and `/api/graph/tags`. Ensure the runtime server is running and accessible.
+
+### Workflow Viewer
+
+The Workflow Viewer provides a visual representation of Serverless Workflow definitions with support for live state updates via SSE.
+
+**Access the workflow viewer:**
+```bash
+# Via browser
+open http://localhost:3000/ui/workflow
+
+# With a specific local workflow (relative to examples/rituals/)
+open "http://localhost:3000/ui/workflow?workflowPath=echo.yaml"
+
+# With a remote workflow URL
+open "http://localhost:3000/ui/workflow?workflowUrl=https://example.com/workflow.yaml"
+```
+
+**Features:**
+- **Local workflow loading** - Load workflows from `examples/rituals/` directory
+- **Remote workflow loading** - Fetch workflows from URLs (with 1MB size limit and 10s timeout)
+- **YAML/JSON parsing** - Supports both YAML and JSON workflow formats
+- **State visualization** - Displays workflow tasks/states with visual indicators
+- **Live updates** - SSE support for real-time state highlighting (infrastructure for future implementation)
+- **Accessible design** - WCAG-compliant with ARIA labels and keyboard navigation
+- **Minimal bundle** - Under 5 KB gzipped (well below 150 KB budget)
+- **Pause/resume streaming** - Control SSE connection state
+
+**Supported workflow formats:**
+- **CNCF Serverless Workflow 1.0** - `document.do` task definitions
+- **Legacy formats** - `states` array definitions
+
+**Supported task types:**
+call, do, emit, for, fork, listen, raise, run, set, switch, try, wait
+
+**State visualization:**
+- **Pending** - Gray outline (not yet started)
+- **Running** - Blue with pulse animation (currently executing)
+- **Waiting** - Orange with pulse (awaiting event or time)
+- **Completed** - Green (successfully finished)
+- **Faulted** - Red (encountered error)
+- **Suspended** - Orange (paused by user)
+
+**API endpoints:**
+- `GET /ui/workflow` - Workflow viewer page
+- `GET /api/workflow/metadata` - Fetch workflow YAML/JSON
+- `GET /api/workflow/state` - Get current execution state (placeholder)
+
+**Security:**
+- Path traversal protection (sanitizes `..` in paths)
+- Size limits: 1 MB max for workflow files
+- Timeout limits: 10 seconds for remote HTTP fetches
+- Safe HTML escaping in rendered output
+
+**Example:**
+```bash
+# Load echo ritual workflow
+curl "http://localhost:3000/api/workflow/metadata?workflowPath=echo.yaml" | jq .
+
+# Load timer workflow
+open "http://localhost:3000/ui/workflow?workflowPath=timer.yaml"
+
+# View workflow state (placeholder API)
+curl "http://localhost:3000/api/workflow/state?workflowId=echo-ritual" | jq .
 ```
 
 ## Runbooks

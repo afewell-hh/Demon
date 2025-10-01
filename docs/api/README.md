@@ -29,18 +29,18 @@ This hub provides centralized access to all API documentation, including REST en
 ### Core Events
 | Event Type | Schema | Description | Status |
 |------------|--------|-------------|--------|
-| `ritual.started:v1` | [schema](../contracts/schemas/) | Ritual execution started | Current |
-| `ritual.completed:v1` | [schema](../contracts/schemas/) | Ritual execution completed | Current |
-| `approval.requested:v1` | [schema](../contracts/schemas/) | Approval gate triggered | Current |
-| `approval.granted:v1` | [schema](../contracts/schemas/) | Approval granted | Current |
-| `approval.denied:v1` | [schema](../contracts/schemas/) | Approval denied | Current |
-| `policy.decision:v1` | [schema](../contracts/schemas/) | Policy decision made | Current |
+| `ritual.started:v1` | [schema](../../contracts/schemas/) | Ritual execution started | Current |
+| `ritual.completed:v1` | [schema](../../contracts/schemas/) | Ritual execution completed | Current |
+| `approval.requested:v1` | [schema](../../contracts/schemas/) | Approval gate triggered | Current |
+| `approval.granted:v1` | [schema](../../contracts/schemas/) | Approval granted | Current |
+| `approval.denied:v1` | [schema](../../contracts/schemas/) | Approval denied | Current |
+| `policy.decision:v1` | [schema](../../contracts/schemas/) | Policy decision made | Current |
 
 ## Contract Specifications
 
-- **[JSON Schemas](../contracts/schemas/)** - Event and API data structures
-- **[Test Fixtures](../contracts/fixtures/)** - Golden files for validation
-- **[WIT Definitions](../contracts/wit/)** - WebAssembly Interface Types
+- **[JSON Schemas](../../contracts/schemas/)** - Event and API data structures
+- **[Test Fixtures](../../contracts/fixtures/)** - Golden files for validation
+- **[WIT Definitions](../../contracts/wit/)** - WebAssembly Interface Types
 
 ## Quick Start
 
@@ -60,6 +60,6 @@ This hub provides centralized access to all API documentation, including REST en
 
 - [Reference](../reference/) - Technical specifications and definitions
 - [How-to Guides](../how-to-guides/) - Problem-solving oriented guides
-- [Contracts](../contracts/) - API schemas and event definitions
+- [Contracts](../../contracts/) - API schemas and event definitions
 
 [← Back to Documentation Home](../README.md)
