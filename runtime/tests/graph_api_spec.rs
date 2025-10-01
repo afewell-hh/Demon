@@ -25,6 +25,7 @@ async fn start_test_server() -> Result<tokio::task::JoinHandle<()>> {
 
 #[tokio::test]
 #[serial]
+#[ignore] // Requires NATS; run via CI with --ignored
 async fn given_commit_exists_when_get_commit_then_returns_commit_data() -> Result<()> {
     // Arrange - create a commit via capsule
     let tenant_id = format!("tenant-api-{}", uuid::Uuid::new_v4());
@@ -74,6 +75,7 @@ async fn given_commit_exists_when_get_commit_then_returns_commit_data() -> Resul
 
 #[tokio::test]
 #[serial]
+#[ignore] // Requires NATS; run via CI with --ignored
 async fn given_commit_missing_when_get_commit_then_returns_404() -> Result<()> {
     // Arrange
     let tenant_id = format!("tenant-404-{}", uuid::Uuid::new_v4());
@@ -107,6 +109,7 @@ async fn given_commit_missing_when_get_commit_then_returns_404() -> Result<()> {
 
 #[tokio::test]
 #[serial]
+#[ignore] // Requires NATS; run via CI with --ignored
 async fn given_tag_exists_when_get_tag_then_returns_tag_data() -> Result<()> {
     // Arrange - create a tag via capsule
     let tenant_id = format!("tenant-tag-api-{}", uuid::Uuid::new_v4());
@@ -152,6 +155,7 @@ async fn given_tag_exists_when_get_tag_then_returns_tag_data() -> Result<()> {
 
 #[tokio::test]
 #[serial]
+#[ignore] // Requires NATS; run via CI with --ignored
 async fn given_tag_missing_when_get_tag_then_returns_404() -> Result<()> {
     // Arrange
     let tenant_id = format!("tenant-tag-404-{}", uuid::Uuid::new_v4());
@@ -183,6 +187,7 @@ async fn given_tag_missing_when_get_tag_then_returns_404() -> Result<()> {
 
 #[tokio::test]
 #[serial]
+#[ignore] // Requires NATS; run via CI with --ignored
 async fn given_commits_exist_when_list_commits_then_returns_array() -> Result<()> {
     // Arrange - create multiple commits
     let tenant_id = format!("tenant-list-{}", uuid::Uuid::new_v4());
