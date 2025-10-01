@@ -82,6 +82,28 @@ curl -X POST http://localhost:3000/api/approvals/{run_id}/{gate_id}/deny \
   -d '{"reason": "Policy violation"}'
 ```
 
+## Operate UI Viewers
+
+```bash
+# Access Workflow Viewer
+open http://localhost:3000/ui/workflow
+
+# Load a local workflow in the viewer
+open "http://localhost:3000/ui/workflow?workflowPath=echo.yaml"
+
+# Load a remote workflow
+open "http://localhost:3000/ui/workflow?workflowUrl=https://example.com/workflow.yaml"
+
+# Get workflow metadata API
+curl "http://localhost:3000/api/workflow/metadata?workflowPath=echo.yaml" | jq
+
+# Access Schema Form Renderer
+open http://localhost:3000/ui/form
+
+# Access Graph Viewer
+open http://localhost:3000/graph
+```
+
 ## Git & CI
 
 ```bash

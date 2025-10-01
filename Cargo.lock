@@ -2189,6 +2189,7 @@ dependencies = [
  "runtime",
  "serde",
  "serde_json",
+ "serde_yaml",
  "tempfile",
  "tera",
  "tokio",
