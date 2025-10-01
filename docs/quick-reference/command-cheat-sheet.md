@@ -182,6 +182,11 @@ curl "http://localhost:8080/api/graph/tags?tenantId=t1&projectId=p1&namespace=ns
 # - get-node: retrieve node by ID with labels/properties/edges
 # - neighbors: find connected nodes (filtered by relType/direction)
 # - path-exists: check if path exists between two nodes
+
+# View graphs in Operate UI
+open http://localhost:3000/graph
+# Or with specific scope:
+open "http://localhost:3000/graph?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1"
 ```
 
 ## Environment Variables
