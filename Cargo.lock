@@ -770,6 +770,7 @@ dependencies = [
  "async-nats",
  "base64 0.22.1",
  "bootstrapper-demonctl",
+ "capsules_graph",
  "clap",
  "config-loader",
  "engine",
@@ -2798,9 +2799,11 @@ dependencies = [
  "anyhow",
  "async-nats",
  "capsules_echo",
+ "capsules_graph",
  "chrono",
  "config-loader",
  "envelope",
+ "futures-util",
  "metrics",
  "once_cell",
  "reqwest 0.11.27",
@@ -2811,6 +2814,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
