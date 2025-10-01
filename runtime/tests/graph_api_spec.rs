@@ -2,16 +2,41 @@
 //!
 //! Tests verify that the REST server correctly exposes graph commit and tag queries.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use capsules_graph::GraphScope;
 use envelope::OperationResult;
 use serial_test::serial;
-use std::time::Duration;
+use std::{net::SocketAddr, time::Duration};
+use tokio::task::JoinHandle;
+
+/// Handle to the background test server. Aborts on drop to avoid leaking tasks.
+struct TestServer {
+    addr: SocketAddr,
+    handle: JoinHandle<()>,
+}
+
+impl TestServer {
+    fn addr(&self) -> SocketAddr {
+        self.addr
+    }
+}
+
+impl Drop for TestServer {
+    fn drop(&mut self) {
+        self.handle.abort();
+    }
+}
 
 /// Helper to start the REST API server in background for testing
-async fn start_test_server() -> Result<tokio::task::JoinHandle<()>> {
-    let handle = tokio::spawn(async {
-        let addr = ([127, 0, 0, 1], 18080).into();
+async fn start_test_server() -> Result<TestServer> {
+    let listener = std::net::TcpListener::bind(("127.0.0.1", 0))
+        .context("failed to bind ephemeral port for test server")?;
+    let addr = listener
+        .local_addr()
+        .context("failed to read bound address for test server")?;
+    drop(listener);
+
+    let handle = tokio::spawn(async move {
         if let Err(e) = runtime::server::serve(addr).await {
             eprintln!("Server error: {}", e);
         }
@@ -20,7 +45,7 @@ async fn start_test_server() -> Result<tokio::task::JoinHandle<()>> {
     // Give server time to start
     tokio::time::sleep(Duration::from_millis(200)).await;
 
-    Ok(handle)
+    Ok(TestServer { addr, handle })
 }
 
 #[tokio::test]
@@ -52,12 +77,13 @@ async fn given_commit_exists_when_get_commit_then_returns_commit_data() -> Resul
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Act - start server and query commit
-    let _server = start_test_server().await?;
+    let server = start_test_server().await?;
 
     let client = reqwest::Client::new();
+    let base_url = format!("http://{}", server.addr());
     let url = format!(
-        "http://localhost:18080/api/graph/commits/{}?tenantId={}&projectId={}&namespace={}&graphId={}",
-        commit_id, scope.tenant_id, scope.project_id, scope.namespace, scope.graph_id
+        "{}/api/graph/commits/{}?tenantId={}&projectId={}&namespace={}&graphId={}",
+        base_url, commit_id, scope.tenant_id, scope.project_id, scope.namespace, scope.graph_id
     );
 
     let response = client.get(&url).send().await?;
@@ -89,12 +115,13 @@ async fn given_commit_missing_when_get_commit_then_returns_404() -> Result<()> {
     let commit_id = "nonexistent".repeat(8); // 64 chars
 
     // Act
-    let _server = start_test_server().await?;
+    let server = start_test_server().await?;
 
     let client = reqwest::Client::new();
+    let base_url = format!("http://{}", server.addr());
     let url = format!(
-        "http://localhost:18080/api/graph/commits/{}?tenantId={}&projectId={}&namespace={}&graphId={}",
-        commit_id, scope.tenant_id, scope.project_id, scope.namespace, scope.graph_id
+        "{}/api/graph/commits/{}?tenantId={}&projectId={}&namespace={}&graphId={}",
+        base_url, commit_id, scope.tenant_id, scope.project_id, scope.namespace, scope.graph_id
     );
 
     let response = client.get(&url).send().await?;
@@ -129,12 +156,13 @@ async fn given_tag_exists_when_get_tag_then_returns_tag_data() -> Result<()> {
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Act - query tag via REST API
-    let _server = start_test_server().await?;
+    let server = start_test_server().await?;
 
     let client = reqwest::Client::new();
+    let base_url = format!("http://{}", server.addr());
     let url = format!(
-        "http://localhost:18080/api/graph/tags/{}?tenantId={}&projectId={}&namespace={}&graphId={}",
-        tag, scope.tenant_id, scope.project_id, scope.namespace, scope.graph_id
+        "{}/api/graph/tags/{}?tenantId={}&projectId={}&namespace={}&graphId={}",
+        base_url, tag, scope.tenant_id, scope.project_id, scope.namespace, scope.graph_id
     );
 
     let response = client.get(&url).send().await?;
@@ -167,12 +195,13 @@ async fn given_tag_missing_when_get_tag_then_returns_404() -> Result<()> {
     };
 
     // Act
-    let _server = start_test_server().await?;
+    let server = start_test_server().await?;
 
     let client = reqwest::Client::new();
+    let base_url = format!("http://{}", server.addr());
     let url = format!(
-        "http://localhost:18080/api/graph/tags/nonexistent?tenantId={}&projectId={}&namespace={}&graphId={}",
-        scope.tenant_id, scope.project_id, scope.namespace, scope.graph_id
+        "{}/api/graph/tags/nonexistent?tenantId={}&projectId={}&namespace={}&graphId={}",
+        base_url, scope.tenant_id, scope.project_id, scope.namespace, scope.graph_id
     );
 
     let response = client.get(&url).send().await?;
@@ -230,12 +259,13 @@ async fn given_commits_exist_when_list_commits_then_returns_array() -> Result<()
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Act - list commits via REST API
-    let _server = start_test_server().await?;
+    let server = start_test_server().await?;
 
     let client = reqwest::Client::new();
+    let base_url = format!("http://{}", server.addr());
     let url = format!(
-        "http://localhost:18080/api/graph/commits?tenantId={}&projectId={}&namespace={}&graphId={}",
-        scope.tenant_id, scope.project_id, scope.namespace, scope.graph_id
+        "{}/api/graph/commits?tenantId={}&projectId={}&namespace={}&graphId={}",
+        base_url, scope.tenant_id, scope.project_id, scope.namespace, scope.graph_id
     );
 
     let response = client.get(&url).send().await?;
@@ -255,10 +285,13 @@ async fn given_commits_exist_when_list_commits_then_returns_array() -> Result<()
 #[serial]
 async fn given_health_endpoint_when_requested_then_returns_ok() -> Result<()> {
     // Act
-    let _server = start_test_server().await?;
+    let server = start_test_server().await?;
 
     let client = reqwest::Client::new();
-    let response = client.get("http://localhost:18080/health").send().await?;
+    let response = client
+        .get(format!("http://{}/health", server.addr()))
+        .send()
+        .await?;
 
     // Assert
     assert_eq!(response.status(), 200);
