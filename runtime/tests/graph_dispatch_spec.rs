@@ -15,6 +15,7 @@ fn nats_url() -> String {
 }
 
 #[tokio::test]
+#[ignore] // Requires NATS; run via CI with --ignored
 async fn given_graph_create_via_runtime_when_dispatched_then_commit_event_emitted() -> Result<()> {
     // Arrange
     let router = Router::new();
@@ -94,6 +95,7 @@ async fn given_graph_create_via_runtime_when_dispatched_then_commit_event_emitte
 }
 
 #[tokio::test]
+#[ignore] // Requires NATS; run via CI with --ignored
 async fn given_graph_commit_via_runtime_when_dispatched_then_event_has_parent() -> Result<()> {
     // Arrange
     let router = Router::new();
@@ -177,6 +179,7 @@ async fn given_graph_commit_via_runtime_when_dispatched_then_event_has_parent() 
 }
 
 #[tokio::test]
+#[ignore] // Requires NATS; run via CI with --ignored
 async fn given_graph_tag_via_runtime_when_dispatched_then_tag_event_emitted() -> Result<()> {
     // Arrange
     let router = Router::new();
@@ -248,6 +251,7 @@ async fn given_graph_tag_via_runtime_when_dispatched_then_tag_event_emitted() ->
 }
 
 #[tokio::test]
+#[ignore] // Requires NATS; run via CI with --ignored
 async fn given_list_tags_via_runtime_when_dispatched_then_returns_tags() -> Result<()> {
     // Arrange
     let router = Router::new();
@@ -298,6 +302,7 @@ async fn given_list_tags_via_runtime_when_dispatched_then_returns_tags() -> Resu
 }
 
 #[tokio::test]
+#[ignore] // Requires NATS; run via CI with --ignored
 async fn given_delete_tag_via_runtime_when_dispatched_then_tag_removed() -> Result<()> {
     // Arrange
     let router = Router::new();
@@ -365,6 +370,7 @@ async fn given_delete_tag_via_runtime_when_dispatched_then_tag_removed() -> Resu
 }
 
 #[tokio::test]
+#[ignore] // Requires NATS; run via CI with --ignored
 async fn given_get_node_via_runtime_when_dispatched_then_returns_not_implemented() -> Result<()> {
     // Arrange
     let router = Router::new();

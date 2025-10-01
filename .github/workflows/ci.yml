@@ -145,6 +145,10 @@ jobs:
         run: |
           cargo test -p runtime --test graph_api_spec -- --ignored --nocapture
 
+      - name: Graph dispatch integration (NATS)
+        run: |
+          cargo test -p runtime --test graph_dispatch_spec -- --ignored --nocapture
+
       - name: Smoke run (demonctl)
         run: |
           set -euo pipefail
