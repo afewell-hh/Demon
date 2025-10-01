@@ -11,9 +11,9 @@
 | Epic | Title | Outcome | Links |
 |------|-------|---------|-------|
 | MVP-E5 | CI/Protections Simplification | MVP-grade protections documented and enforced without blocking velocity | PRs: #53, #64, #65 |
-| #121 | Contract & Schema Registry | Contract bundles publish via CI, versioned/signed, smoke-verified, fetched by tag, runtime ingestion, UI alerts/metrics | Stories: #124-#140; PRs: #132, #135-#137, #140 |
+| #121 | Contract & Schema Registry | Contract bundles publish via CI, versioned/signed, smoke-verified, fetched by tag, runtime ingestion, UI alerts/metrics | Stories: #124-#140; PRs: #132, #135-#137, #140, #217 (Track B: bundle-verify) |
 | EPIC-4 | Graph Capsule MVP | ✅ Complete: Commit/tag engine, KV persistence, REST query API, CLI integration, Operate UI viewer | PRs: #209 (storage), #210 (engine), #211 (runtime), #212 (API), #213 (query), #214 (operate-ui) |
-| EPIC-5 | Workflow Viewer | ✅ Complete: Serverless Workflow renderer, YAML parser, state visualization, SSE infrastructure | PR: (pending - feature/ui-workflow-viewer) |
+| EPIC-5 | Workflow Viewer | ✅ Complete: Serverless Workflow renderer, YAML parser, state visualization, SSE infrastructure | PR: #216 |
 
 > 2025-09-30: EPIC-5 Workflow Viewer implementation complete: Serverless Workflow 1.0 support, legacy format support, state visualization with 6 states (pending/running/waiting/completed/faulted/suspended), SSE infrastructure for live updates, accessible design with ARIA labels, path traversal protection, 4.4 KB gzipped (well under 150 KB budget). Supports both local (examples/rituals/) and remote workflow loading.
 > 2025-09-30: EPIC-4 Graph delivery complete with PRs #209-#214: storage layer, commit/tag engine, runtime wiring, REST API, query operations (get-node, neighbors, path-exists), and Operate UI graph viewer.
