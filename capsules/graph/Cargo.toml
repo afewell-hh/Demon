@@ -17,6 +17,8 @@ async-nats = { workspace = true }
 tokio = { workspace = true }
 sha2 = "0.10"
 hex = "0.4"
+tracing = { workspace = true }
+futures-util = { workspace = true }
 
 [dev-dependencies]
 tokio-test = "0.4"
