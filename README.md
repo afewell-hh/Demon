@@ -9,21 +9,84 @@
 
 Modern platform and security groups are stuck between brittle CI/CD pipelines and manual runbooks that quietly drift. Demon exists to let those teams script complex operations with the same rigor they bring to code: declared once, replayed safely, and inspected afterward. A single ritual capsule can roll out a release, rotate credentials, or steer an incident bridge, yet every action is still gated by explicit policy and human approval where needed. Instead of duct-taping bespoke bots, Demon provides a dependable control plane with transparent audit trails that operations, compliance, and engineering can trust.
 
-Every workflow step emits a signed envelope that captures inputs, outputs, and policy context. The runtime persists those envelopes in NATS JetStream so they can be replayed deterministically, compared across environments, and verified offline. Idempotency is enforced by re-hydrating envelopes before executing a capsule; if the payload matches, Demon proves nothing new happened and skips the duplicate. This lets teams retry failed automation, recover from transient outages, and build “approve once, run many” rituals without fear of double execution. The contract registry keeps schema changes honest, while replies and approval gates ensure humans stay in the loop exactly where their judgment matters.
+### Track C: Contracts, Envelopes & Replay
+
+Every workflow step emits a **signed envelope** that captures inputs, outputs, and policy context. The runtime persists those envelopes in NATS JetStream so they can be replayed deterministically, compared across environments, and verified offline. **Idempotency** is enforced by re-hydrating envelopes before executing a capsule; if the payload matches, Demon proves nothing new happened and skips the duplicate. This lets teams retry failed automation, recover from transient outages, and build "approve once, run many" rituals without fear of double execution.
+
+- **Contracts** (JSON Schemas + WIT) govern capsule interfaces and event shapes, ensuring runtime compatibility across dev, staging, and prod.
+- **Envelopes** wrap each event with metadata (timestamp, nonce, signature), making every step portable, auditable, and reproducible.
+- **Replay guarantees** allow operations teams to re-run rituals from checkpoint or re-verify completed workflows without side effects, powered by fingerprint matching and deterministic execution.
+
+The contract registry keeps schema changes honest, while approval gates ensure humans stay in the loop exactly where their judgment matters.
 
 ## Agent-first Automation
 
-- **Contracts stay ahead of code**: Capsule workflows negotiate via versioned JSON Schemas and WIT definitions stored in `contracts/`, keeping runtime compatibility across environments.
-- **Envelopes make state portable**: Every capsule call, policy decision, and emitted event produces an envelope stored on JetStream, ready for replay, audit, or downstream automation.
-- **Idempotent replays by default**: Rituals hydrate prior envelopes, compare their fingerprints, and only re-execute when inputs change—perfect for “retry without side effects” approvals.
-- **Guardrails are built in**: Policy wards enforce quotas, time windows, and escalation paths, while approval gates provide human checkpoints with first-writer-wins semantics.
+Demon is designed for automated workflows that must survive restarts, handle retries gracefully, and provide audit trails that satisfy compliance requirements. Capsules are agent-like processes that respond to ritual steps, emit events, and declare their capabilities via contracts.
+
+- **Contracts stay ahead of code**: Capsule workflows negotiate via versioned JSON Schemas and WIT definitions stored in `contracts/`, keeping runtime compatibility across environments. Schema validation runs in CI (`contracts-validate` required check) to catch breaking changes before they reach production.
+- **Envelopes make state portable**: Every capsule call, policy decision, and emitted event produces an envelope stored on JetStream, ready for replay, audit, or downstream automation. Each envelope includes a cryptographic signature for offline verification.
+- **Idempotent replays by default**: Rituals hydrate prior envelopes, compare their fingerprints, and only re-execute when inputs change—perfect for "retry without side effects" approvals. This lets operators re-run failed workflows or recover from transient infrastructure issues without double-applying changes.
+- **Guardrails are built in**: Policy wards enforce quotas, time windows, and escalation paths, while approval gates provide human checkpoints with first-writer-wins semantics. All policy decisions emit `policy.decision:v1` events that become part of the audit log.
+
+**Expectations for capsule authors**: Capsules must be idempotent, emit deterministic events given the same envelope inputs, and respect contract schemas. Non-compliant capsules will fail schema validation or produce replay drift.
 
 ## Governance Guardrails
 
-- **Required checks**: `Bootstrapper bundles — verify (offline, signature ok)`, `Bootstrapper bundles — negative verify (tamper ⇒ failed)`, `contracts-validate`, `review-lock-guard`, and `review-threads-guard (PR) / guard` must all stay green on `main`.
-- **Review-lock discipline**: Every pull request body includes `Review-lock: <sha>` with the latest head SHA, updated on each push so provenance can be audited.
-- **Replies policy**: All review comments receive explicit author responses before merge; no open threads remain when the branch lands.
-- **Provenance verification**: Run `scripts/contracts-validate.sh` locally, then use `cargo run -p demonctl -- bootstrap --verify-only` (or the Alpha Preview Kit) to confirm signature integrity before promoting bundles.
+Demon enforces process discipline through required CI checks, code review hygiene, and cryptographic provenance for all contract bundles. These guardrails protect `main` from untested changes, ensure every review comment receives a response, and guarantee that promoted artifacts match their signed manifests.
+
+### Required Checks (DO NOT RENAME)
+
+Five status checks must pass before any PR merges to `main`. Job names are protected and **must** match exactly:
+
+1. **`Bootstrapper bundles — verify (offline, signature ok)`** — Confirms that signed contract bundles can be verified offline without network access.
+2. **`Bootstrapper bundles — negative verify (tamper ⇒ failed)`** — Tests that tampered bundles fail verification, proving signature integrity.
+3. **`contracts-validate`** — Runs `scripts/contracts-validate.sh` to ensure JSON Schemas, fixtures, and WIT definitions are internally consistent and backward-compatible.
+4. **`review-lock-guard`** — Enforces that the PR body contains `Review-lock: <sha>` matching the current HEAD, preventing stale approvals from merging changed code.
+5. **`review-threads-guard (PR) / guard`** — Verifies that every review comment has received an explicit author reply before merge.
+
+If you rename a job or context in `.github/workflows/ci.yml`, branch protection will fail and PRs will be blocked. Always update protection snapshots (`.github/snapshots/branch-protection-YYYY-MM-DD.json`) when changing CI structure.
+
+### Review-lock Discipline
+
+Every pull request body **must** include:
+
+```
+Review-lock: <40-character-sha>
+```
+
+This SHA must match the current HEAD of the PR branch. Update it on every push:
+
+```bash
+PR=123
+HEAD=$(gh pr view $PR --json headRefOid -q .headRefOid)
+gh pr edit $PR -b "$(gh pr view $PR -q .body)\n\nReview-lock: $HEAD"
+```
+
+Review-lock prevents approvals from carrying forward when new commits land, ensuring reviewers always see the final code that will merge.
+
+### Replies Policy
+
+**Every review comment must receive an explicit author reply before merge.** Use one of:
+
+- `"Fixed in <short-sha>"`
+- `"Clarified: …"`
+- `"Won't fix because …"`
+
+Conversation resolution is enabled on `main`; resolve threads **after** replying. Docs-only PRs are exempt from `review-threads-guard` (the guard self-skips), but substantive feedback still deserves a reply.
+
+### Provenance Verification
+
+Contract bundles are signed at build time and verified before deployment:
+
+```bash
+# Local verification
+cargo run -p demonctl -- bootstrap --verify-only
+
+# CI enforcement
+scripts/contracts-validate.sh
+```
+
+Tampered bundles fail verification; only artifacts with valid signatures can be promoted to staging or production. See [docs/bootstrapper/bundles.md](docs/bootstrapper/bundles.md) for offline verification workflows.
 
 ## Quickstart
 
