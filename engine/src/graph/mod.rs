@@ -20,11 +20,11 @@ pub const GRAPH_COMMITS_STREAM: &str = "GRAPH_COMMITS";
 pub const GRAPH_TAGS_BUCKET: &str = "GRAPH_TAGS";
 
 /// Subject pattern for graph commit events:
-/// demon.graph.v1.{tenant}.{project}.{namespace}.commit
+/// demon.graph.v1.<tenant>.<project>.<namespace>.commit
 pub const GRAPH_COMMIT_SUBJECT_PREFIX: &str = "demon.graph.v1";
 
 /// Configuration options for graph storage resources
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct GraphStorageConfig {
     /// Stream name override (defaults to GRAPH_COMMITS_STREAM)
     pub stream_name: Option<String>,
@@ -32,16 +32,6 @@ pub struct GraphStorageConfig {
     pub tag_bucket_name: Option<String>,
     /// Subject prefix override (defaults to GRAPH_COMMIT_SUBJECT_PREFIX)
     pub subject_prefix: Option<String>,
-}
-
-impl Default for GraphStorageConfig {
-    fn default() -> Self {
-        Self {
-            stream_name: None,
-            tag_bucket_name: None,
-            subject_prefix: None,
-        }
-    }
 }
 
 /// Ensure the graph commits stream exists with appropriate retention and backpressure settings.
@@ -52,7 +42,6 @@ impl Default for GraphStorageConfig {
 /// - **Max messages per subject**: 10,000 — caps per-tenant/project/namespace growth
 /// - **Discard policy**: Old — drops oldest commits when limit reached (backpressure)
 /// - **Duplicates window**: 120s — prevents duplicate commit events
-/// - **Ack policy**: Explicit — consumers must acknowledge message receipt
 ///
 /// # Arguments
 /// * `js` - JetStream context for NATS connection
@@ -98,7 +87,8 @@ pub async fn ensure_graph_stream(
 ///
 /// KV bucket configuration:
 /// - **History**: 1 — only keep latest tag version
-/// - **Storage**: Memory — fast lookups for tags (tags are low-volume)
+/// - **Storage**: Memory — chosen for MVP; provides fast lookups for low-volume tag data.
+///   For production workloads with durability requirements, switch to `StorageType::File`.
 /// - **TTL**: 0 (no expiry) — tags persist until explicitly deleted
 /// - **Replicas**: 1 — single replica (can be increased for HA in production)
 ///
@@ -126,7 +116,16 @@ pub async fn ensure_graph_tag_store(
 
     let store = match js.create_key_value(kv_config).await {
         Ok(s) => s,
-        Err(_) => js.get_key_value(bucket_name).await.context("failed to ensure GRAPH_TAGS bucket")?,
+        Err(e) => {
+            tracing::debug!(
+                bucket = bucket_name,
+                err = %e,
+                "create_key_value failed, falling back to get_key_value"
+            );
+            js.get_key_value(bucket_name)
+                .await
+                .context("failed to ensure GRAPH_TAGS bucket")?
+        }
     };
 
     Ok(store)
