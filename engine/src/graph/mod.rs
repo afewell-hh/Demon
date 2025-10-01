@@ -36,6 +36,8 @@ pub struct GraphStorageConfig {
 }
 
 /// Ensure the graph commits stream exists with appropriate retention and backpressure settings.
+/// When the stream already exists, any drift in critical configuration is reconciled via
+/// `update_stream` so operators do not have to delete/recreate resources manually.
 ///
 /// Stream configuration:
 /// - **Retention**: Limits (not interest/work-queue) — keeps all commits for replay
