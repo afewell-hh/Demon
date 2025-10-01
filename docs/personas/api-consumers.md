@@ -10,9 +10,9 @@ Welcome, API consumers! This guide helps you integrate with Demon's REST APIs, c
 
 Ready to integrate with Demon? Here's your fast path:
 
-1. **[Understand the APIs](#api-overview)** - REST endpoints and event streams
-2. **[Set up authentication](#authentication)** - API access and permissions
-3. **[Start with examples](#api-examples)** - Working code samples
+1. **[Understand the APIs](#-api-overview)** - REST endpoints and event streams
+2. **[Set up authentication](#-authentication)** - API access and permissions
+3. **[Testing and Development](#-testing-and-development)** - Working code samples and local setup
 
 ```bash
 # Quick API test

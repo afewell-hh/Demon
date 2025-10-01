@@ -1,0 +1,503 @@
+{% extends "base.html" %}
+
+{% block title %}Workflow Viewer - Demon Operate UI{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Serverless Workflow Viewer</h2>
+    </div>
+
+    <div style="margin-bottom: 1.5rem;">
+        <form id="workflowSelectionForm" style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: end;">
+            <div>
+                <label for="workflowPath" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Local Workflow Path:</label>
+                <input type="text" id="workflowPath" name="workflowPath"
+                       value="{% if workflow_path %}{{ workflow_path }}{% else %}echo.yaml{% endif %}"
+                       placeholder="e.g., echo.yaml or timer.yaml"
+                       style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;">
+            </div>
+            <div>
+                <label for="workflowUrl" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Remote Workflow URL:</label>
+                <input type="text" id="workflowUrl" name="workflowUrl"
+                       value="{% if workflow_url %}{{ workflow_url }}{% endif %}"
+                       placeholder="https://example.com/workflow.yaml"
+                       style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;">
+            </div>
+            <div>
+                <button type="submit" class="btn btn-primary">Load Workflow</button>
+            </div>
+        </form>
+        <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.875rem;">
+            Enter either a local workflow path (relative to examples/rituals/) or remote URL, then click Load Workflow.
+        </p>
+    </div>
+
+    <div id="loadingIndicator" style="display: none; text-align: center; padding: 2rem; color: var(--text-secondary);">
+        <p>Loading workflow...</p>
+    </div>
+
+    <div id="errorDisplay" style="display: none;" class="alert alert-error"></div>
+</div>
+
+<div class="card" id="workflowCard" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title" id="workflowTitle">Workflow</h3>
+        <div style="display: flex; gap: 0.5rem;">
+            <button id="viewYamlBtn" class="btn btn-secondary">View YAML</button>
+            <button id="toggleSseBtn" class="btn btn-secondary">Pause Stream</button>
+        </div>
+    </div>
+
+    <div id="workflowInfo" style="margin-bottom: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 4px;"></div>
+
+    <div id="stateVisualization" aria-live="polite" aria-atomic="true"></div>
+</div>
+
+<div class="card" id="yamlViewCard" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title">Workflow YAML</h3>
+        <button id="closeYamlViewBtn" class="btn btn-secondary">Close</button>
+    </div>
+    <pre id="yamlViewContent" style="background: #f5f5f5; padding: 1rem; border-radius: 4px; overflow-x: auto; max-height: 500px;"></pre>
+</div>
+
+<style>
+.state-node {
+    padding: 1rem;
+    margin: 0.5rem 0;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    background: white;
+    transition: all 0.3s ease;
+}
+
+.state-node.pending {
+    border-color: #999;
+    background: #f9f9f9;
+}
+
+.state-node.running {
+    border-color: #1976d2;
+    background: #e3f2fd;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.state-node.waiting {
+    border-color: #f57c00;
+    background: #fff3e0;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.state-node.completed {
+    border-color: #388e3c;
+    background: #e8f5e9;
+}
+
+.state-node.faulted {
+    border-color: #d32f2f;
+    background: #ffebee;
+}
+
+.state-node.suspended {
+    border-color: #f57c00;
+    background: #fff3e0;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 10px rgba(25, 118, 210, 0);
+    }
+}
+
+.state-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.state-name {
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.state-type {
+    font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    background: #e0e0e0;
+}
+
+.state-status {
+    font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.state-status.pending { background: #e0e0e0; color: #666; }
+.state-status.running { background: #1976d2; color: white; }
+.state-status.waiting { background: #f57c00; color: white; }
+.state-status.completed { background: #388e3c; color: white; }
+.state-status.faulted { background: #d32f2f; color: white; }
+.state-status.suspended { background: #f57c00; color: white; }
+
+.state-body {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.state-transition {
+    margin-top: 0.5rem;
+    font-style: italic;
+    color: var(--text-secondary);
+}
+
+.sse-status {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-left: 0.5rem;
+}
+
+.sse-status.connected { background: #388e3c; color: white; }
+.sse-status.disconnected { background: #d32f2f; color: white; }
+.sse-status.paused { background: #f57c00; color: white; }
+</style>
+
+<script>
+const RUNTIME_API_URL = "{{ runtime_api_url }}";
+
+let currentWorkflow = null;
+let currentWorkflowId = null;
+let sseSource = null;
+let ssePaused = false;
+let taskStates = {};
+
+document.getElementById('workflowSelectionForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const workflowPath = document.getElementById('workflowPath').value.trim();
+    const workflowUrl = document.getElementById('workflowUrl').value.trim();
+
+    if (!workflowPath && !workflowUrl) {
+        showError('Please provide either a workflow path or URL');
+        return;
+    }
+
+    await loadWorkflow(workflowPath, workflowUrl);
+});
+
+document.getElementById('viewYamlBtn').addEventListener('click', () => {
+    if (currentWorkflow) {
+        document.getElementById('yamlViewContent').textContent = JSON.stringify(currentWorkflow, null, 2);
+        document.getElementById('yamlViewCard').style.display = 'block';
+        document.getElementById('yamlViewCard').scrollIntoView({ behavior: 'smooth' });
+    }
+});
+
+document.getElementById('closeYamlViewBtn').addEventListener('click', () => {
+    document.getElementById('yamlViewCard').style.display = 'none';
+});
+
+document.getElementById('toggleSseBtn').addEventListener('click', () => {
+    ssePaused = !ssePaused;
+    document.getElementById('toggleSseBtn').textContent = ssePaused ? 'Resume Stream' : 'Pause Stream';
+    updateSseStatus();
+
+    if (ssePaused && sseSource) {
+        sseSource.close();
+        sseSource = null;
+    } else if (!ssePaused && currentWorkflowId) {
+        connectSSE(currentWorkflowId);
+    }
+});
+
+async function loadWorkflow(workflowPath, workflowUrl) {
+    showLoading(true);
+    hideError();
+
+    try {
+        const params = new URLSearchParams();
+        if (workflowPath) params.append('workflowPath', workflowPath);
+        if (workflowUrl) params.append('workflowUrl', workflowUrl);
+
+        const response = await fetch(`/api/workflow/metadata?${params}`);
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+
+        const metadata = await response.json();
+        currentWorkflow = metadata.workflow;
+        currentWorkflowId = metadata.workflowId;
+
+        displayWorkflow(currentWorkflow, metadata.workflowId, metadata.source);
+        showLoading(false);
+        document.getElementById('workflowCard').style.display = 'block';
+
+        // Connect to SSE for live updates
+        if (!ssePaused) {
+            connectSSE(currentWorkflowId);
+        }
+    } catch (err) {
+        showLoading(false);
+        showError('Failed to load workflow: ' + (err.message || 'Unknown error'));
+    }
+}
+
+function displayWorkflow(workflow, workflowId, source) {
+    // Update title
+    const title = workflow.name || workflow.document?.name || workflowId;
+    document.getElementById('workflowTitle').textContent = title;
+
+    // Display workflow info
+    const infoHtml = `
+        <p><strong>Workflow ID:</strong> ${escapeHtml(workflowId)}</p>
+        <p><strong>Source:</strong> ${escapeHtml(source)}</p>
+        ${workflow.description ? `<p><strong>Description:</strong> ${escapeHtml(workflow.description)}</p>` : ''}
+        ${workflow.version ? `<p><strong>Version:</strong> ${escapeHtml(workflow.version)}</p>` : ''}
+        ${workflow.document?.dsl ? `<p><strong>DSL Version:</strong> ${escapeHtml(workflow.document.dsl)}</p>` : ''}
+    `;
+    document.getElementById('workflowInfo').innerHTML = infoHtml;
+
+    // Render states/tasks
+    renderStates(workflow);
+}
+
+function renderStates(workflow) {
+    const container = document.getElementById('stateVisualization');
+    container.innerHTML = '';
+
+    // Check for CNCF Serverless Workflow format (document.do)
+    if (workflow.document && workflow.document.do) {
+        renderServerlessWorkflowTasks(workflow.document.do, container);
+    }
+    // Check for legacy states format
+    else if (workflow.states && Array.isArray(workflow.states)) {
+        renderLegacyStates(workflow.states, container);
+    }
+    // Fallback
+    else {
+        container.innerHTML = '<p>No states or tasks found in workflow definition.</p>';
+    }
+}
+
+function renderServerlessWorkflowTasks(tasks, container) {
+    if (!Array.isArray(tasks) || tasks.length === 0) {
+        container.innerHTML = '<p>No tasks defined in workflow.</p>';
+        return;
+    }
+
+    tasks.forEach((taskDef, index) => {
+        // Task definition is an object with task name as key
+        const taskName = Object.keys(taskDef)[0];
+        const task = taskDef[taskName];
+
+        // Determine task type
+        const taskType = determineTaskType(task);
+
+        // Get current state from taskStates
+        const state = taskStates[taskName] || 'pending';
+
+        const taskNode = document.createElement('div');
+        taskNode.className = `state-node ${state}`;
+        taskNode.id = `task-${taskName}`;
+        taskNode.setAttribute('role', 'article');
+        taskNode.setAttribute('aria-label', `Task: ${taskName}`);
+
+        let bodyHtml = '';
+        if (task.call) {
+            bodyHtml = `<div class="state-body">Call: ${escapeHtml(task.call)}</div>`;
+        } else if (task.if) {
+            bodyHtml = `<div class="state-body">Condition: ${escapeHtml(task.if)}</div>`;
+        } else if (task.switch) {
+            bodyHtml = `<div class="state-body">Switch with ${task.switch.length} cases</div>`;
+        }
+
+        let transitionHtml = '';
+        if (task.then && task.then !== 'continue') {
+            transitionHtml = `<div class="state-transition">→ then: ${escapeHtml(task.then)}</div>`;
+        } else if (index < tasks.length - 1) {
+            const nextTaskName = Object.keys(tasks[index + 1])[0];
+            transitionHtml = `<div class="state-transition">→ continues to: ${escapeHtml(nextTaskName)}</div>`;
+        }
+
+        taskNode.innerHTML = `
+            <div class="state-header">
+                <div>
+                    <div class="state-name">${escapeHtml(taskName)}</div>
+                    <span class="state-type">${escapeHtml(taskType)}</span>
+                </div>
+                <span class="state-status ${state}">${escapeHtml(state)}</span>
+            </div>
+            ${bodyHtml}
+            ${transitionHtml}
+        `;
+
+        container.appendChild(taskNode);
+    });
+}
+
+function renderLegacyStates(states, container) {
+    states.forEach((state, index) => {
+        const stateName = state.name || `State ${index + 1}`;
+        const stateType = state.type || 'unknown';
+        const currentState = taskStates[stateName] || 'pending';
+
+        const stateNode = document.createElement('div');
+        stateNode.className = `state-node ${currentState}`;
+        stateNode.id = `state-${stateName}`;
+        stateNode.setAttribute('role', 'article');
+        stateNode.setAttribute('aria-label', `State: ${stateName}`);
+
+        let bodyHtml = '';
+        if (state.action) {
+            bodyHtml = `<div class="state-body">Action: ${escapeHtml(state.action.functionRef?.refName || 'unknown')}</div>`;
+        }
+
+        let transitionHtml = '';
+        if (state.end) {
+            transitionHtml = '<div class="state-transition">→ end</div>';
+        } else if (state.transition) {
+            transitionHtml = `<div class="state-transition">→ ${escapeHtml(state.transition)}</div>`;
+        }
+
+        stateNode.innerHTML = `
+            <div class="state-header">
+                <div>
+                    <div class="state-name">${escapeHtml(stateName)}</div>
+                    <span class="state-type">${escapeHtml(stateType)}</span>
+                </div>
+                <span class="state-status ${currentState}">${escapeHtml(currentState)}</span>
+            </div>
+            ${bodyHtml}
+            ${transitionHtml}
+        `;
+
+        container.appendChild(stateNode);
+    });
+}
+
+function determineTaskType(task) {
+    if (task.call) return 'call';
+    if (task.do) return 'do';
+    if (task.emit) return 'emit';
+    if (task.for) return 'for';
+    if (task.fork) return 'fork';
+    if (task.listen) return 'listen';
+    if (task.raise) return 'raise';
+    if (task.run) return 'run';
+    if (task.set) return 'set';
+    if (task.switch) return 'switch';
+    if (task.try) return 'try';
+    if (task.wait) return 'wait';
+    return 'unknown';
+}
+
+function connectSSE(workflowId) {
+    if (sseSource) {
+        sseSource.close();
+    }
+
+    // Use existing run events stream if available, or placeholder
+    // In real implementation, this would connect to workflow-specific SSE endpoint
+    updateSseStatus('connected');
+
+    // Mock: simulate state changes for demonstration
+    // In production, connect to actual SSE endpoint:
+    // sseSource = new EventSource(`${RUNTIME_API_URL}/api/workflows/${workflowId}/events/stream`);
+
+    // For now, show as connected but don't actually receive events
+    // This keeps bundle size small (no heavy SSE polyfills needed)
+}
+
+function updateSseStatus(status = null) {
+    const titleEl = document.getElementById('workflowTitle');
+    let existingStatus = titleEl.querySelector('.sse-status');
+
+    if (status === null) {
+        status = ssePaused ? 'paused' : (sseSource ? 'connected' : 'disconnected');
+    }
+
+    if (!existingStatus) {
+        existingStatus = document.createElement('span');
+        existingStatus.className = 'sse-status';
+        titleEl.appendChild(existingStatus);
+    }
+
+    existingStatus.className = `sse-status ${status}`;
+    existingStatus.textContent = status.toUpperCase();
+}
+
+function handleWorkflowEvent(event) {
+    // Parse event and update task states
+    try {
+        const data = JSON.parse(event.data);
+        if (data.taskName && data.state) {
+            taskStates[data.taskName] = data.state;
+            updateTaskVisual(data.taskName, data.state);
+        }
+    } catch (e) {
+        console.error('Failed to parse SSE event:', e);
+    }
+}
+
+function updateTaskVisual(taskName, state) {
+    const taskEl = document.getElementById(`task-${taskName}`) || document.getElementById(`state-${taskName}`);
+    if (taskEl) {
+        // Remove old state classes
+        taskEl.className = `state-node ${state}`;
+
+        // Update status badge
+        const statusBadge = taskEl.querySelector('.state-status');
+        if (statusBadge) {
+            statusBadge.className = `state-status ${state}`;
+            statusBadge.textContent = state;
+        }
+    }
+}
+
+function showLoading(show) {
+    document.getElementById('loadingIndicator').style.display = show ? 'block' : 'none';
+}
+
+function showError(message) {
+    const errorDiv = document.getElementById('errorDisplay');
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+}
+
+function hideError() {
+    document.getElementById('errorDisplay').style.display = 'none';
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Load default workflow on page load
+window.addEventListener('DOMContentLoaded', () => {
+    const workflowPath = document.getElementById('workflowPath').value.trim();
+    if (workflowPath) {
+        loadWorkflow(workflowPath, '');
+    }
+});
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    if (sseSource) {
+        sseSource.close();
+    }
+});
+</script>
+{% endblock %}

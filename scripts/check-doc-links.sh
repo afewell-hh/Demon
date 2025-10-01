@@ -161,9 +161,8 @@ check_links() {
         # Build markdown-link-check command
         local cmd_args=("--config" "$config_file")
 
-        if [[ "$CHECK_EXTERNAL" != "true" ]]; then
-            cmd_args+=("--disable-external")
-        fi
+        # Note: --disable-external flag was removed in markdown-link-check 3.x
+        # External link checking is now controlled via ignorePatterns in config
 
         if [[ "$QUIET" == "true" ]]; then
             cmd_args+=("--quiet")

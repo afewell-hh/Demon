@@ -8,19 +8,19 @@ Interactive guide to diagnose and resolve common Demon issues.
 
 ### 1. Build/Development Issues
 **Symptoms:** Build fails, tests don't pass, local setup broken
-- ➡️ [Build Issues](#build-issues)
+- ➡️ [Build Issues](#-build-issues)
 
 ### 2. Runtime/Production Issues
 **Symptoms:** Services crash, pods not ready, API errors
-- ➡️ [Runtime Issues](#runtime-issues)
+- ➡️ [Runtime Issues](#-runtime-issues)
 
 ### 3. CI/Documentation Issues
 **Symptoms:** PR checks fail, broken links, review problems
-- ➡️ [CI/Documentation Issues](#cidocumentation-issues)
+- ➡️ [CI/Documentation Issues](#-cidocumentation-issues)
 
 ### 4. Integration Issues
 **Symptoms:** NATS connection problems, event delivery failures
-- ➡️ [Integration Issues](#integration-issues)
+- ➡️ [Integration Issues](#-integration-issues)
 
 ---
 

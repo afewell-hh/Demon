@@ -468,6 +468,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "capsules_graph"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "async-nats",
+ "chrono",
+ "envelope",
+ "futures-util",
+ "hex",
+ "jsonschema 0.18.3",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "tokio-test",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "cc"
 version = "1.2.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -751,6 +771,7 @@ dependencies = [
  "async-nats",
  "base64 0.22.1",
  "bootstrapper-demonctl",
+ "capsules_graph",
  "clap",
  "config-loader",
  "engine",
@@ -914,7 +935,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "serial_test",
+ "serial_test 2.0.0",
  "tokio",
  "tokio-test",
  "tracing",
@@ -2168,6 +2189,7 @@ dependencies = [
  "runtime",
  "serde",
  "serde_json",
+ "serde_yaml",
  "tempfile",
  "tera",
  "tokio",
@@ -2778,20 +2800,27 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-nats",
+ "axum",
  "capsules_echo",
+ "capsules_graph",
  "chrono",
  "config-loader",
  "envelope",
+ "futures-util",
  "metrics",
  "once_cell",
  "reqwest 0.11.27",
  "serde",
  "serde_json",
+ "serial_test 3.2.0",
  "sha2",
  "tempfile",
  "tokio",
+ "tower 0.5.2",
+ "tower-http 0.5.2",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
@@ -2944,6 +2973,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "scc"
+version = "2.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46e6f046b7fef48e2660c57ed794263155d713de679057f2d0c169bfc6e756cc"
+dependencies = [
+ "sdd",
+]
+
+[[package]]
 name = "schannel"
 version = "0.1.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2967,6 +3005,12 @@ dependencies = [
  "ring",
  "untrusted",
 ]
+
+[[package]]
+name = "sdd"
+version = "3.0.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "490dcfcbfef26be6800d11870ff2df8774fa6e86d047e3e8c8a76b25655e41ca"
 
 [[package]]
 name = "security-framework"
@@ -3107,7 +3151,21 @@ dependencies = [
  "lazy_static",
  "log",
  "parking_lot",
- "serial_test_derive",
+ "serial_test_derive 2.0.0",
+]
+
+[[package]]
+name = "serial_test"
+version = "3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b258109f244e1d6891bf1053a55d63a5cd4f8f4c30cf9a1280989f80e7a1fa9"
+dependencies = [
+ "futures",
+ "log",
+ "once_cell",
+ "parking_lot",
+ "scc",
+ "serial_test_derive 3.2.0",
 ]
 
 [[package]]
@@ -3115,6 +3173,17 @@ name = "serial_test_derive"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91d129178576168c589c9ec973feedf7d3126c01ac2bf08795109aa35b69fb8f"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "serial_test_derive"
+version = "3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d69265a08751de7844521fd15003ae0a888e035773ba05695c5c759a6f89eef"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3935,7 +4004,7 @@ dependencies = [
  "chrono-tz 0.8.6",
  "serde",
  "serde_json",
- "serial_test",
+ "serial_test 2.0.0",
 ]
 
 [[package]]

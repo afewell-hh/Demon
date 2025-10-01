@@ -97,6 +97,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: SecretsCommands,
     },
+    /// Graph capsule commands
+    Graph {
+        #[command(subcommand)]
+        cmd: GraphCommands,
+    },
     /// Bootstrap Demon prerequisites (self-host v0)
     Bootstrap {
         /// Profile: local-dev (default) or remote-nats
@@ -223,6 +228,127 @@ enum SecretsCommands {
         /// Secret provider to use (envfile or vault)
         #[arg(long, value_enum, default_value_t = ProviderType::Envfile)]
         provider: ProviderType,
+    },
+}
+
+#[derive(Subcommand)]
+enum GraphCommands {
+    /// Create a new graph with seed mutations
+    Create {
+        /// Tenant ID
+        #[arg(long)]
+        tenant_id: String,
+        /// Project ID
+        #[arg(long)]
+        project_id: String,
+        /// Namespace
+        #[arg(long)]
+        namespace: String,
+        /// Graph ID
+        #[arg(long)]
+        graph_id: String,
+        /// Path to JSON file containing seed mutations
+        #[arg(value_name = "MUTATIONS_FILE")]
+        mutations_file: String,
+    },
+    /// Commit mutations to a graph
+    Commit {
+        /// Tenant ID
+        #[arg(long)]
+        tenant_id: String,
+        /// Project ID
+        #[arg(long)]
+        project_id: String,
+        /// Namespace
+        #[arg(long)]
+        namespace: String,
+        /// Graph ID
+        #[arg(long)]
+        graph_id: String,
+        /// Optional parent commit ID
+        #[arg(long)]
+        parent_ref: Option<String>,
+        /// Path to JSON file containing mutations
+        #[arg(value_name = "MUTATIONS_FILE")]
+        mutations_file: String,
+    },
+    /// Attach or update a tag to point at a commit
+    Tag {
+        /// Tenant ID
+        #[arg(long)]
+        tenant_id: String,
+        /// Project ID
+        #[arg(long)]
+        project_id: String,
+        /// Namespace
+        #[arg(long)]
+        namespace: String,
+        /// Graph ID
+        #[arg(long)]
+        graph_id: String,
+        /// Tag name
+        #[arg(long)]
+        tag: String,
+        /// Commit ID to tag
+        #[arg(long)]
+        commit_id: String,
+    },
+    /// List all tags for a graph
+    ListTags {
+        /// Tenant ID
+        #[arg(long)]
+        tenant_id: String,
+        /// Project ID
+        #[arg(long)]
+        project_id: String,
+        /// Namespace
+        #[arg(long)]
+        namespace: String,
+        /// Graph ID
+        #[arg(long)]
+        graph_id: String,
+    },
+    /// Get a commit by ID via REST API
+    GetCommit {
+        /// Tenant ID
+        #[arg(long)]
+        tenant_id: String,
+        /// Project ID
+        #[arg(long)]
+        project_id: String,
+        /// Namespace
+        #[arg(long)]
+        namespace: String,
+        /// Graph ID
+        #[arg(long)]
+        graph_id: String,
+        /// Commit ID to retrieve
+        #[arg(long)]
+        commit_id: String,
+        /// Runtime API base URL
+        #[arg(long, default_value = "http://localhost:8080")]
+        api_url: String,
+    },
+    /// Get a tag by name via REST API
+    GetTag {
+        /// Tenant ID
+        #[arg(long)]
+        tenant_id: String,
+        /// Project ID
+        #[arg(long)]
+        project_id: String,
+        /// Namespace
+        #[arg(long)]
+        namespace: String,
+        /// Graph ID
+        #[arg(long)]
+        graph_id: String,
+        /// Tag name to retrieve
+        #[arg(long)]
+        tag: String,
+        /// Runtime API base URL
+        #[arg(long, default_value = "http://localhost:8080")]
+        api_url: String,
     },
 }
 
@@ -374,6 +500,9 @@ async fn main() -> Result<()> {
         }
         Commands::Secrets { cmd } => {
             handle_secrets_command(cmd)?;
+        }
+        Commands::Graph { cmd } => {
+            handle_graph_command(cmd).await?;
         }
         Commands::Version => {
             println!("{}", env!("CARGO_PKG_VERSION"));
@@ -2101,6 +2230,161 @@ fn port_forward_and_check(
         }
         Err(e) => anyhow::bail!("Failed to execute curl for health check: {}", e),
     }
+}
+
+async fn handle_graph_command(cmd: GraphCommands) -> Result<()> {
+    match cmd {
+        GraphCommands::Create {
+            tenant_id,
+            project_id,
+            namespace,
+            graph_id,
+            mutations_file,
+        } => {
+            let scope = capsules_graph::GraphScope {
+                tenant_id,
+                project_id,
+                namespace,
+                graph_id,
+            };
+
+            let mutations_json = std::fs::read_to_string(&mutations_file)?;
+            let mutations: Vec<capsules_graph::Mutation> = serde_json::from_str(&mutations_json)?;
+
+            let envelope = capsules_graph::create(scope, mutations).await;
+            let envelope_json = serde_json::to_string_pretty(&envelope)?;
+            println!("{}", envelope_json);
+
+            if !envelope.result.is_success() {
+                std::process::exit(1);
+            }
+        }
+        GraphCommands::Commit {
+            tenant_id,
+            project_id,
+            namespace,
+            graph_id,
+            parent_ref,
+            mutations_file,
+        } => {
+            let scope = capsules_graph::GraphScope {
+                tenant_id,
+                project_id,
+                namespace,
+                graph_id,
+            };
+
+            let mutations_json = std::fs::read_to_string(&mutations_file)?;
+            let mutations: Vec<capsules_graph::Mutation> = serde_json::from_str(&mutations_json)?;
+
+            let envelope = capsules_graph::commit(scope, parent_ref, mutations).await;
+            let envelope_json = serde_json::to_string_pretty(&envelope)?;
+            println!("{}", envelope_json);
+
+            if !envelope.result.is_success() {
+                std::process::exit(1);
+            }
+        }
+        GraphCommands::Tag {
+            tenant_id,
+            project_id,
+            namespace,
+            graph_id,
+            tag,
+            commit_id,
+        } => {
+            let scope = capsules_graph::GraphScope {
+                tenant_id,
+                project_id,
+                namespace,
+                graph_id,
+            };
+
+            let envelope = capsules_graph::tag(scope, tag, commit_id).await;
+            let envelope_json = serde_json::to_string_pretty(&envelope)?;
+            println!("{}", envelope_json);
+
+            if !envelope.result.is_success() {
+                std::process::exit(1);
+            }
+        }
+        GraphCommands::ListTags {
+            tenant_id,
+            project_id,
+            namespace,
+            graph_id,
+        } => {
+            let scope = capsules_graph::GraphScope {
+                tenant_id,
+                project_id,
+                namespace,
+                graph_id,
+            };
+
+            let envelope = capsules_graph::list_tags(scope).await;
+            let envelope_json = serde_json::to_string_pretty(&envelope)?;
+            println!("{}", envelope_json);
+
+            if !envelope.result.is_success() {
+                std::process::exit(1);
+            }
+        }
+        GraphCommands::GetCommit {
+            tenant_id,
+            project_id,
+            namespace,
+            graph_id,
+            commit_id,
+            api_url,
+        } => {
+            let client = reqwest::Client::new();
+            let url = format!(
+                "{}/api/graph/commits/{}?tenantId={}&projectId={}&namespace={}&graphId={}",
+                api_url, commit_id, tenant_id, project_id, namespace, graph_id
+            );
+
+            let response = client.get(&url).send().await?;
+
+            if response.status().is_success() {
+                let body = response.text().await?;
+                let json: serde_json::Value = serde_json::from_str(&body)?;
+                println!("{}", serde_json::to_string_pretty(&json)?);
+            } else {
+                let status = response.status();
+                let body = response.text().await.unwrap_or_default();
+                eprintln!("Error: HTTP {} - {}", status, body);
+                std::process::exit(1);
+            }
+        }
+        GraphCommands::GetTag {
+            tenant_id,
+            project_id,
+            namespace,
+            graph_id,
+            tag,
+            api_url,
+        } => {
+            let client = reqwest::Client::new();
+            let url = format!(
+                "{}/api/graph/tags/{}?tenantId={}&projectId={}&namespace={}&graphId={}",
+                api_url, tag, tenant_id, project_id, namespace, graph_id
+            );
+
+            let response = client.get(&url).send().await?;
+
+            if response.status().is_success() {
+                let body = response.text().await?;
+                let json: serde_json::Value = serde_json::from_str(&body)?;
+                println!("{}", serde_json::to_string_pretty(&json)?);
+            } else {
+                let status = response.status();
+                let body = response.text().await.unwrap_or_default();
+                eprintln!("Error: HTTP {} - {}", status, body);
+                std::process::exit(1);
+            }
+        }
+    }
+    Ok(())
 }
 
 // no-op: exercise replies guard

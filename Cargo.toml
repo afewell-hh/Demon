@@ -4,6 +4,7 @@ members = [
   "runtime",
   "wards",
   "capsules/echo",
+  "capsules/graph",
   "demonctl",
   "operate-ui",
   "bootstrapper/demonctl",
