@@ -17,6 +17,7 @@ fn nats_url() -> String {
 }
 
 #[tokio::test]
+#[ignore]
 async fn given_jetstream_when_ensure_stream_then_creates_with_expected_config() -> Result<()> {
     // Arrange
     let client = async_nats::connect(&nats_url()).await?;
@@ -50,6 +51,7 @@ async fn given_jetstream_when_ensure_stream_then_creates_with_expected_config() 
 }
 
 #[tokio::test]
+#[ignore]
 async fn given_existing_stream_when_ensure_called_twice_then_idempotent() -> Result<()> {
     // Arrange
     let client = async_nats::connect(&nats_url()).await?;
@@ -67,6 +69,7 @@ async fn given_existing_stream_when_ensure_called_twice_then_idempotent() -> Res
 }
 
 #[tokio::test]
+#[ignore]
 async fn given_jetstream_when_ensure_tag_store_then_creates_kv_bucket() -> Result<()> {
     // Arrange
     let client = async_nats::connect(&nats_url()).await?;
@@ -91,6 +94,7 @@ async fn given_jetstream_when_ensure_tag_store_then_creates_kv_bucket() -> Resul
 }
 
 #[tokio::test]
+#[ignore]
 async fn given_jetstream_when_ensure_graph_storage_then_creates_both_resources() -> Result<()> {
     // Arrange
     let client = async_nats::connect(&nats_url()).await?;
@@ -113,6 +117,7 @@ async fn given_jetstream_when_ensure_graph_storage_then_creates_both_resources()
 }
 
 #[tokio::test]
+#[ignore]
 async fn given_commit_published_when_replay_consumer_created_then_fetches_all_commits() -> Result<()>
 {
     // Arrange - ensure stream and publish a commit event
@@ -179,6 +184,7 @@ async fn given_commit_published_when_replay_consumer_created_then_fetches_all_co
 }
 
 #[tokio::test]
+#[ignore]
 async fn given_custom_config_when_ensure_stream_then_respects_overrides() -> Result<()> {
     // Arrange
     let client = async_nats::connect(&nats_url()).await?;
