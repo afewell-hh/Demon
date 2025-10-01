@@ -78,8 +78,60 @@ cargo run -p demonctl -- run examples/rituals/echo.yaml
 # Check Operate UI health
 curl http://localhost:3000/api/runs
 
+# Access Schema Form Renderer
+open http://localhost:3000/ui/form
+
+# Load a local schema in the form renderer
+open "http://localhost:3000/ui/form?schemaName=approval.requested.v1"
+
 # Export current contracts
 cargo run -p demonctl -- contracts bundle
+```
+
+### Schema Form Renderer Operations
+
+The Schema Form Renderer provides a web-based interface for rendering JSON Schema Draft 2020-12 compliant schemas into accessible HTML forms.
+
+**Access the form renderer:**
+```bash
+# Via browser
+open http://localhost:3000/ui/form
+
+# With a specific local schema
+open "http://localhost:3000/ui/form?schemaName=approval.requested.v1"
+
+# With a remote schema URL
+open "http://localhost:3000/ui/form?schemaUrl=https://example.com/schema.json"
+```
+
+**Features:**
+- **Local schema loading** - Load schemas from `contracts/schemas/`
+- **Remote schema loading** - Fetch schemas from URLs
+- **Form validation** - Draft 2020-12 schema validation
+- **Accessible design** - WCAG-compliant form controls with ARIA labels
+- **Live updates** - `form.changed` events emitted on every field change
+- **JSON preview** - View form data as JSON in real-time
+
+**Supported schema features:**
+- Basic types: string, number, integer, boolean, object
+- Formats: date-time, email, uri
+- Constraints: required, min/max, pattern, enum
+- Nested objects (limited array support)
+
+**API endpoints:**
+- `GET /ui/form` - Form renderer page
+- `GET /api/schema/metadata` - Fetch schema metadata
+- `POST /api/form/submit` - Submit form data
+
+**Example:**
+```bash
+# Load approval request schema
+curl "http://localhost:3000/api/schema/metadata?schemaName=approval.requested.v1" | jq .
+
+# Submit form data
+curl -X POST http://localhost:3000/api/form/submit \
+  -H "Content-Type: application/json" \
+  -d '{"schemaId": "test", "data": {"field": "value"}}'
 ```
 
 ### Graph Capsule Operations
