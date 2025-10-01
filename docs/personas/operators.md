@@ -7,8 +7,8 @@ Welcome, platform engineers! This guide helps you deploy, configure, and operate
 Ready to deploy Demon? Follow this path:
 
 1. **[Bootstrap Setup](../bootstrapper/README.md)** - Zero-config deployment
-2. **[Production Configuration](#production-configuration)** - Security and scaling
-3. **[Monitoring Setup](#monitoring-and-observability)** - Operational visibility
+2. **[Production Configuration](#production-deployment)** - Security and scaling
+3. **[Monitoring Setup](#-monitoring-and-observability)** - Operational visibility
 
 ```bash
 # Quick bootstrap
