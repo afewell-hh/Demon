@@ -62,9 +62,14 @@ cargo run -p demonctl -- bootstrap --verify
 
 # Check NATS stream status
 nats stream info RITUAL_EVENTS
+nats stream info GRAPH_COMMITS
 
 # Monitor message counts
 nats stream view RITUAL_EVENTS --count
+
+# Check graph storage resources
+nats stream info GRAPH_COMMITS
+nats kv info GRAPH_TAGS
 ```
 
 ### Common Operations
@@ -312,6 +317,9 @@ curl "http://localhost:3000/api/workflow/state?workflowId=echo-ritual" | jq .
 
 ### Integration Points
 - **NATS Monitoring** - JetStream health and performance
+  - `RITUAL_EVENTS` stream: ritual execution events
+  - `GRAPH_COMMITS` stream: graph commit events with replay support
+  - `GRAPH_TAGS` bucket: KV store for graph tag lookups
 - **Application Logs** - Structured logging for observability
 - **External Monitoring** - Prometheus, Grafana, DataDog
 - **Notification Systems** - Slack, email, PagerDuty
