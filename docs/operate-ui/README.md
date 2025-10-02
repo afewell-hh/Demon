@@ -105,6 +105,48 @@ The UI now supports real-time event streaming via Server-Sent Events (SSE):
    - Presenter Script (60‑sec): `docs/preview/alpha/presenter_script.md`
   - Dry‑Run Checklist: `docs/preview/alpha/dry_run_checklist.md`
 
+## Workflow Viewer
+
+The Operate UI includes an enhanced workflow viewer for visualizing and managing Serverless Workflow 1.0 definitions:
+
+### Features
+- **Workflow Discovery**: Browse all available workflows from the `examples/rituals/` directory
+- **Search & Filter**: Real-time search by workflow name or description
+- **Manual Load**: Load workflows by local path or remote URL
+- **Visual Rendering**: Display workflow tasks/states with current execution status
+- **State Updates**: Polling-based state updates (5-second intervals) for active workflows
+- **YAML Inspection**: View raw workflow YAML/JSON definitions
+
+### Endpoints
+- `/ui/workflow` — Workflow viewer UI page
+- `/api/workflows` — List available local workflows (JSON array)
+- `/api/workflow/metadata?workflowPath=<path>` — Get workflow metadata by local path
+- `/api/workflow/metadata?workflowUrl=<url>` — Get workflow metadata by remote URL
+- `/api/workflow/state?workflowId=<id>` — Get current workflow execution state (placeholder)
+
+### Usage
+
+#### Browse Workflows
+1. Navigate to `/ui/workflow`
+2. Click "Browse Workflows" button
+3. Use the search box to filter workflows by name or description
+4. Click "View" on any workflow to load and visualize it
+
+#### Manual Load
+1. Navigate to `/ui/workflow`
+2. Enter a local path (relative to `examples/rituals/`) or remote URL
+3. Click "Load Workflow" to fetch and display the workflow
+
+### Example Workflows
+- `echo.yaml` — Simple echo ritual demonstrating basic task execution
+- `timer.yaml` — Timer-based workflow example
+
+### Future Enhancements
+- **Real-time SSE**: Connect to graph commit streams for instant state updates (currently uses polling)
+- **Approval Gates**: Display and interact with workflow approval gates
+- **Policy Decisions**: Show policy evaluation results alongside task states
+- **Runtime Integration**: Deep integration with runtime API for execution control
+
 ## Admin Probe (dev-only)
 
 - Endpoint: `/admin/templates/report` returns JSON `{ template_ready, has_filter_tojson, templates }` used by the bootstrapper verify phase.

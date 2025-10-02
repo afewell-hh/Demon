@@ -6,31 +6,52 @@
 <div class="card">
     <div class="card-header">
         <h2 class="card-title">Serverless Workflow Viewer</h2>
+        <div style="display: flex; gap: 0.5rem;">
+            <button id="showListViewBtn" class="btn btn-secondary">Browse Workflows</button>
+            <button id="showLoadViewBtn" class="btn btn-secondary" style="display: none;">Manual Load</button>
+        </div>
     </div>
 
-    <div style="margin-bottom: 1.5rem;">
-        <form id="workflowSelectionForm" style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: end;">
-            <div>
-                <label for="workflowPath" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Local Workflow Path:</label>
-                <input type="text" id="workflowPath" name="workflowPath"
-                       value="{% if workflow_path %}{{ workflow_path }}{% else %}echo.yaml{% endif %}"
-                       placeholder="e.g., echo.yaml or timer.yaml"
-                       style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;">
+    <!-- Workflow List View -->
+    <div id="workflowListView" style="display: none;">
+        <div style="margin-bottom: 1rem;">
+            <input type="text" id="workflowSearchInput" placeholder="Search workflows by name or description..."
+                   style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 4px; font-size: 1rem;">
+        </div>
+
+        <div id="workflowListContainer" style="margin-top: 1rem;">
+            <div id="workflowListLoading" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                <p>Loading workflows...</p>
             </div>
-            <div>
-                <label for="workflowUrl" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Remote Workflow URL:</label>
-                <input type="text" id="workflowUrl" name="workflowUrl"
-                       value="{% if workflow_url %}{{ workflow_url }}{% endif %}"
-                       placeholder="https://example.com/workflow.yaml"
-                       style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;">
-            </div>
-            <div>
-                <button type="submit" class="btn btn-primary">Load Workflow</button>
-            </div>
-        </form>
-        <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.875rem;">
-            Enter either a local workflow path (relative to examples/rituals/) or remote URL, then click Load Workflow.
-        </p>
+        </div>
+    </div>
+
+    <!-- Manual Load View -->
+    <div id="manualLoadView">
+        <div style="margin-bottom: 1.5rem;">
+            <form id="workflowSelectionForm" style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: end;">
+                <div>
+                    <label for="workflowPath" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Local Workflow Path:</label>
+                    <input type="text" id="workflowPath" name="workflowPath"
+                           value="{% if workflow_path %}{{ workflow_path }}{% else %}echo.yaml{% endif %}"
+                           placeholder="e.g., echo.yaml or timer.yaml"
+                           style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;">
+                </div>
+                <div>
+                    <label for="workflowUrl" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Remote Workflow URL:</label>
+                    <input type="text" id="workflowUrl" name="workflowUrl"
+                           value="{% if workflow_url %}{{ workflow_url }}{% endif %}"
+                           placeholder="https://example.com/workflow.yaml"
+                           style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;">
+                </div>
+                <div>
+                    <button type="submit" class="btn btn-primary">Load Workflow</button>
+                </div>
+            </form>
+            <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.875rem;">
+                Enter either a local workflow path (relative to examples/rituals/) or remote URL, then click Load Workflow.
+            </p>
+        </div>
     </div>
 
     <div id="loadingIndicator" style="display: none; text-align: center; padding: 2rem; color: var(--text-secondary);">
@@ -180,6 +201,103 @@ let currentWorkflowId = null;
 let sseSource = null;
 let ssePaused = false;
 let taskStates = {};
+let allWorkflows = [];
+
+// View toggle handlers
+document.getElementById('showListViewBtn').addEventListener('click', () => {
+    document.getElementById('manualLoadView').style.display = 'none';
+    document.getElementById('workflowListView').style.display = 'block';
+    document.getElementById('showListViewBtn').style.display = 'none';
+    document.getElementById('showLoadViewBtn').style.display = 'block';
+    loadWorkflowList();
+});
+
+document.getElementById('showLoadViewBtn').addEventListener('click', () => {
+    document.getElementById('workflowListView').style.display = 'none';
+    document.getElementById('manualLoadView').style.display = 'block';
+    document.getElementById('showLoadViewBtn').style.display = 'none';
+    document.getElementById('showListViewBtn').style.display = 'block';
+});
+
+// Search handler
+document.getElementById('workflowSearchInput').addEventListener('input', (e) => {
+    const searchTerm = e.target.value.toLowerCase();
+    filterWorkflowList(searchTerm);
+});
+
+async function loadWorkflowList() {
+    const container = document.getElementById('workflowListContainer');
+    const loading = document.getElementById('workflowListLoading');
+    loading.style.display = 'block';
+
+    try {
+        const response = await fetch('/api/workflows');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        allWorkflows = await response.json();
+        displayWorkflowList(allWorkflows);
+        loading.style.display = 'none';
+    } catch (err) {
+        loading.style.display = 'none';
+        container.innerHTML = `<div class="alert alert-error">Failed to load workflows: ${escapeHtml(err.message)}</div>`;
+    }
+}
+
+function displayWorkflowList(workflows) {
+    const container = document.getElementById('workflowListContainer');
+
+    if (workflows.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>No workflows found</p></div>';
+        return;
+    }
+
+    let html = '<table class="table"><thead><tr><th>Name</th><th>Workflow ID</th><th>Description</th><th>Actions</th></tr></thead><tbody>';
+
+    for (const wf of workflows) {
+        const workflowId = wf.workflowId || 'N/A';
+        const description = wf.description || 'No description';
+
+        html += `
+            <tr data-workflow-name="${escapeHtml(wf.name.toLowerCase())}" data-workflow-desc="${escapeHtml(description.toLowerCase())}">
+                <td><strong>${escapeHtml(wf.name)}</strong></td>
+                <td><code>${escapeHtml(workflowId)}</code></td>
+                <td>${escapeHtml(description)}</td>
+                <td><a href="#" onclick="loadWorkflowFromList('${escapeHtml(wf.path)}'); return false;" class="btn btn-sm btn-primary">View</a></td>
+            </tr>
+        `;
+    }
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function filterWorkflowList(searchTerm) {
+    const rows = document.querySelectorAll('#workflowListContainer tbody tr');
+
+    rows.forEach(row => {
+        const name = row.getAttribute('data-workflow-name') || '';
+        const desc = row.getAttribute('data-workflow-desc') || '';
+
+        if (name.includes(searchTerm) || desc.includes(searchTerm)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+async function loadWorkflowFromList(path) {
+    // Switch back to manual view and hide list
+    document.getElementById('workflowListView').style.display = 'none';
+    document.getElementById('manualLoadView').style.display = 'block';
+    document.getElementById('showLoadViewBtn').style.display = 'none';
+    document.getElementById('showListViewBtn').style.display = 'block';
+
+    // Load the workflow
+    await loadWorkflow(path, '');
+}
 
 document.getElementById('workflowSelectionForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -407,16 +525,72 @@ function connectSSE(workflowId) {
         sseSource.close();
     }
 
-    // Use existing run events stream if available, or placeholder
-    // In real implementation, this would connect to workflow-specific SSE endpoint
+    // TODO: In production, connect to graph commit SSE stream for workflow state
+    // This would require the runtime API to expose an SSE endpoint for graph commits
+    // For now, we'll use polling as a fallback
+
+    // Example future implementation:
+    // sseSource = new EventSource(`${RUNTIME_API_URL}/api/graph/commits/stream?graphId=${workflowId}`);
+    // sseSource.addEventListener('commit', handleWorkflowCommitEvent);
+    // sseSource.onerror = () => {
+    //     updateSseStatus('disconnected');
+    //     setTimeout(() => connectSSE(workflowId), 5000);
+    // };
+
     updateSseStatus('connected');
 
-    // Mock: simulate state changes for demonstration
-    // In production, connect to actual SSE endpoint:
-    // sseSource = new EventSource(`${RUNTIME_API_URL}/api/workflows/${workflowId}/events/stream`);
+    // Polling fallback: check for state updates every 5 seconds
+    const pollInterval = setInterval(() => {
+        if (ssePaused || !currentWorkflowId) {
+            clearInterval(pollInterval);
+            return;
+        }
+        pollWorkflowState(currentWorkflowId);
+    }, 5000);
+}
 
-    // For now, show as connected but don't actually receive events
-    // This keeps bundle size small (no heavy SSE polyfills needed)
+async function pollWorkflowState(workflowId) {
+    try {
+        const response = await fetch(`/api/workflow/state?workflowId=${encodeURIComponent(workflowId)}`);
+        if (response.ok) {
+            const state = await response.json();
+            updateTaskStatesFromPoll(state);
+        }
+    } catch (err) {
+        // Silently fail - don't disrupt user experience
+        console.debug('State polling failed:', err);
+    }
+}
+
+function updateTaskStatesFromPoll(state) {
+    if (state.currentTasks && Array.isArray(state.currentTasks)) {
+        state.currentTasks.forEach(task => {
+            if (task.taskName && task.state) {
+                taskStates[task.taskName] = task.state;
+                updateTaskVisual(task.taskName, task.state);
+            }
+        });
+    }
+}
+
+function handleWorkflowCommitEvent(event) {
+    // Future: parse graph commit events and update task states
+    try {
+        const data = JSON.parse(event.data);
+        if (data.mutations && Array.isArray(data.mutations)) {
+            data.mutations.forEach(mutation => {
+                if (mutation.op === 'set-property' && mutation.nodeId && mutation.properties) {
+                    // Example: update task state based on graph mutation
+                    if (mutation.properties.state) {
+                        taskStates[mutation.nodeId] = mutation.properties.state;
+                        updateTaskVisual(mutation.nodeId, mutation.properties.state);
+                    }
+                }
+            });
+        }
+    } catch (e) {
+        console.error('Failed to parse workflow commit event:', e);
+    }
 }
 
 function updateSseStatus(status = null) {
