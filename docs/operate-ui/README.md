@@ -141,11 +141,40 @@ The Operate UI includes an enhanced workflow viewer for visualizing and managing
 - `echo.yaml` — Simple echo ritual demonstrating basic task execution
 - `timer.yaml` — Timer-based workflow example
 
+### Live Updates via SSE
+
+The workflow viewer now supports real-time state updates via Server-Sent Events (SSE):
+
+#### Features
+- **Real-time commit streaming**: Connects to runtime's graph commit SSE endpoint
+- **Automatic reconnection**: Exponential backoff (1s → 30s max) with 10 retry limit
+- **Polling fallback**: Falls back to 5-second polling after max retries
+- **Connection status**: Visual indicator showing Connected/Reconnecting/Polling/Paused states
+- **Stream control**: Pause/Resume button to control SSE connection
+
+#### Configuration
+- Runtime SSE endpoint: `${RUNTIME_API_URL}/api/graph/commits/stream`
+- Heartbeat interval: Configurable via `SSE_HEARTBEAT_SECONDS` (default: 25s in runtime)
+- Reconnection policy:
+  - Max retries: 10 attempts
+  - Backoff: 1s, 2s, 4s, 8s, 16s (capped at 30s)
+  - After max retries: switches to 5s polling
+
+#### Event Handling
+- `init`: Receives initial snapshot of recent commits
+- `commit`: Processes new graph commits and updates task states based on mutations
+- `heartbeat`: Maintains connection liveness
+- `warning`: Logs non-fatal issues (e.g., snapshot load failure)
+- `error`: Triggers reconnection logic
+
+#### Implementation
+Connection established via `EventSource` API when workflow is loaded. Graph commit mutations are processed to extract workflow state changes (e.g., task state transitions). Task visuals update in real-time as mutations arrive.
+
 ### Future Enhancements
-- **Real-time SSE**: Connect to graph commit streams for instant state updates (currently uses polling)
 - **Approval Gates**: Display and interact with workflow approval gates
 - **Policy Decisions**: Show policy evaluation results alongside task states
 - **Runtime Integration**: Deep integration with runtime API for execution control
+- **Multi-graph filtering**: Filter SSE stream by specific graphId
 
 ## Admin Probe (dev-only)
 

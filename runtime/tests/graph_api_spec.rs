@@ -300,3 +300,99 @@ async fn given_health_endpoint_when_requested_then_returns_ok() -> Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+#[serial]
+#[ignore] // Requires NATS; run via CI with --ignored
+async fn given_sse_endpoint_when_connected_then_receives_init_and_heartbeats() -> Result<()> {
+    use futures_util::StreamExt;
+
+    // Arrange - create a scope with commits
+    let tenant_id = format!("tenant-sse-{}", uuid::Uuid::new_v4());
+    let scope = GraphScope {
+        tenant_id: tenant_id.clone(),
+        project_id: "proj-1".to_string(),
+        namespace: "ns-1".to_string(),
+        graph_id: "graph-1".to_string(),
+    };
+
+    // Create a commit so we have data to stream
+    let envelope = capsules_graph::create(
+        scope.clone(),
+        vec![capsules_graph::Mutation::AddNode {
+            node_id: "node-1".to_string(),
+            labels: vec!["Test".to_string()],
+            properties: vec![],
+        }],
+    )
+    .await;
+    assert!(envelope.result.is_success());
+
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    // Act - start server and connect to SSE endpoint
+    let server = start_test_server().await?;
+    std::env::set_var("SSE_HEARTBEAT_SECONDS", "1"); // Fast heartbeat for test
+
+    let client = reqwest::Client::new();
+    let base_url = format!("http://{}", server.addr());
+    let url = format!(
+        "{}/api/graph/commits/stream?tenantId={}&projectId={}&namespace={}&graphId={}",
+        base_url, scope.tenant_id, scope.project_id, scope.namespace, scope.graph_id
+    );
+
+    let response = client.get(&url).send().await?;
+
+    // Assert - SSE headers
+    assert_eq!(response.status(), 200);
+    assert_eq!(
+        response.headers().get("content-type").unwrap(),
+        "text/event-stream"
+    );
+    assert_eq!(response.headers().get("cache-control").unwrap(), "no-cache");
+    assert_eq!(response.headers().get("connection").unwrap(), "keep-alive");
+
+    // Read first few events from stream
+    let mut stream = response.bytes_stream();
+    let mut events = Vec::new();
+    let mut event_count = 0;
+
+    while event_count < 3 {
+        tokio::select! {
+            Some(Ok(chunk)) = stream.next() => {
+                let text = String::from_utf8_lossy(&chunk);
+                if text.contains("event:") {
+                    events.push(text.to_string());
+                    event_count += 1;
+                }
+            }
+            _ = tokio::time::sleep(Duration::from_secs(3)) => {
+                break; // Timeout after 3s
+            }
+        }
+    }
+
+    // Assert - should receive init event and at least one heartbeat
+    let all_events = events.join("");
+    assert!(
+        all_events.contains("event: init"),
+        "Should receive init event"
+    );
+    assert!(
+        all_events.contains("event: heartbeat"),
+        "Should receive heartbeat events"
+    );
+
+    // Parse init event and verify structure
+    let init_event = events
+        .iter()
+        .find(|e| e.contains("event: init"))
+        .expect("Should have init event");
+
+    assert!(
+        init_event.contains(&format!("\"tenantId\":\"{}\"", tenant_id)),
+        "Init event should contain tenantId"
+    );
+
+    Ok(())
+}

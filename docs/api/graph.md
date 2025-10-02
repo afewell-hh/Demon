@@ -274,6 +274,109 @@ All error responses follow this envelope structure:
 
 ---
 
+### Stream Commits (SSE)
+
+**GET** `/api/graph/commits/stream`
+
+Server-Sent Events endpoint for real-time streaming of graph commit updates. Provides an initial snapshot of recent commits followed by live updates as new commits are published.
+
+**Query Parameters:**
+- `tenantId` (string, required): Tenant identifier
+- `projectId` (string, required): Project identifier
+- `namespace` (string, required): Namespace identifier
+- `graphId` (string, optional): Graph identifier (currently not used in filtering)
+
+**Response Headers:**
+- `Content-Type: text/event-stream`
+- `Cache-Control: no-cache`
+- `Connection: keep-alive`
+
+**Event Types:**
+
+1. **init** - Connection established with initial snapshot
+```
+event: init
+data: {"type":"init","scope":{"tenantId":"t1","projectId":"p1","namespace":"ns1","graphId":"g1"},"commits":[...],"timestamp":"2025-10-02T12:00:00Z"}
+
+```
+
+2. **commit** - New commit received
+```
+event: commit
+data: {"type":"commit","commit":{"event":"graph.commit.created:v1","commitId":"abc123...","mutations":[...]},"timestamp":"2025-10-02T12:00:01Z"}
+
+```
+
+3. **heartbeat** - Keep-alive signal (every ~25s by default)
+```
+event: heartbeat
+data: {"type":"heartbeat","seq":0,"timestamp":"2025-10-02T12:00:25Z"}
+
+```
+
+4. **warning** - Non-fatal issue (e.g., failed to load snapshot)
+```
+event: warning
+data: {"type":"warning","message":"Failed to load initial snapshot: stream not found"}
+
+```
+
+5. **error** - Fatal error (connection will close)
+```
+event: error
+data: {"type":"error","message":"Failed to connect to NATS: connection refused"}
+
+```
+
+**Configuration:**
+- Heartbeat interval: Set via `SSE_HEARTBEAT_SECONDS` environment variable (default: 25 seconds)
+- Connection timeout: 5 minutes of inactivity
+
+**Client Reconnection Policy:**
+Use exponential backoff with the following strategy:
+- Initial retry: 1 second
+- Exponential backoff: 2s, 4s, 8s, 16s
+- Maximum backoff: 30 seconds
+- Max retries: Continue indefinitely with backoff cap
+
+**Example (JavaScript):**
+```javascript
+const params = new URLSearchParams({
+  tenantId: 't1',
+  projectId: 'p1',
+  namespace: 'ns1',
+  graphId: 'g1'
+});
+
+const eventSource = new EventSource(
+  `http://localhost:8080/api/graph/commits/stream?${params}`
+);
+
+eventSource.addEventListener('init', (event) => {
+  const data = JSON.parse(event.data);
+  console.log('Initial snapshot:', data.commits);
+});
+
+eventSource.addEventListener('commit', (event) => {
+  const data = JSON.parse(event.data);
+  console.log('New commit:', data.commit);
+});
+
+eventSource.addEventListener('heartbeat', (event) => {
+  console.debug('Heartbeat:', event.data);
+});
+
+eventSource.onerror = (error) => {
+  console.error('SSE error:', error);
+  // Implement exponential backoff reconnection
+};
+```
+
+**Example (curl):**
+```bash
+curl -N "http://localhost:8080/api/graph/commits/stream?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1"
+```
+
 ---
 
 ## Graph Query Operations

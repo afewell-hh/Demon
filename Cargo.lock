@@ -2800,6 +2800,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-nats",
+ "async-stream",
  "axum",
  "capsules_echo",
  "capsules_graph",
@@ -2816,6 +2817,7 @@ dependencies = [
  "sha2",
  "tempfile",
  "tokio",
+ "tokio-stream",
  "tower 0.5.2",
  "tower-http 0.5.2",
  "tracing",

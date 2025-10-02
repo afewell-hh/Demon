@@ -191,6 +191,8 @@
 .sse-status.connected { background: #388e3c; color: white; }
 .sse-status.disconnected { background: #d32f2f; color: white; }
 .sse-status.paused { background: #f57c00; color: white; }
+.sse-status.reconnecting { background: #ff9800; color: white; }
+.sse-status.polling { background: #9e9e9e; color: white; }
 </style>
 
 <script>
@@ -523,21 +525,101 @@ function determineTaskType(task) {
 function connectSSE(workflowId) {
     if (sseSource) {
         sseSource.close();
+        sseSource = null;
     }
 
-    // TODO: In production, connect to graph commit SSE stream for workflow state
-    // This would require the runtime API to expose an SSE endpoint for graph commits
-    // For now, we'll use polling as a fallback
+    // Build SSE URL with query params for graph commit stream
+    // Use default scope values - in production these would come from workflow metadata
+    const params = new URLSearchParams({
+        tenantId: 'default',
+        projectId: 'demo',
+        namespace: 'workflows',
+        graphId: workflowId
+    });
 
-    // Example future implementation:
-    // sseSource = new EventSource(`${RUNTIME_API_URL}/api/graph/commits/stream?graphId=${workflowId}`);
-    // sseSource.addEventListener('commit', handleWorkflowCommitEvent);
-    // sseSource.onerror = () => {
-    //     updateSseStatus('disconnected');
-    //     setTimeout(() => connectSSE(workflowId), 5000);
-    // };
+    const sseUrl = `${RUNTIME_API_URL}/api/graph/commits/stream?${params}`;
 
-    updateSseStatus('connected');
+    try {
+        sseSource = new EventSource(sseUrl);
+
+        sseSource.addEventListener('init', (event) => {
+            console.log('SSE init:', event.data);
+            updateSseStatus('connected');
+            const data = JSON.parse(event.data);
+            // Process initial snapshot of commits
+            if (data.commits && Array.isArray(data.commits)) {
+                data.commits.forEach(commit => processWorkflowCommit(commit));
+            }
+        });
+
+        sseSource.addEventListener('commit', (event) => {
+            const data = JSON.parse(event.data);
+            console.log('SSE commit:', data);
+            if (data.commit) {
+                processWorkflowCommit(data.commit);
+            }
+        });
+
+        sseSource.addEventListener('heartbeat', (event) => {
+            const data = JSON.parse(event.data);
+            console.debug('SSE heartbeat:', data.seq);
+            updateSseStatus('connected');
+        });
+
+        sseSource.addEventListener('error', (event) => {
+            console.error('SSE error event:', event);
+            handleSseError();
+        });
+
+        sseSource.addEventListener('warning', (event) => {
+            const data = JSON.parse(event.data);
+            console.warn('SSE warning:', data.message);
+        });
+
+        sseSource.onerror = (error) => {
+            console.error('SSE connection error:', error);
+            handleSseError();
+        };
+    } catch (err) {
+        console.error('Failed to create EventSource:', err);
+        fallbackToPolling(workflowId);
+    }
+}
+
+let sseRetryCount = 0;
+const MAX_SSE_RETRIES = 10;
+
+function handleSseError() {
+    updateSseStatus('disconnected');
+
+    if (sseSource) {
+        sseSource.close();
+        sseSource = null;
+    }
+
+    sseRetryCount++;
+
+    if (sseRetryCount >= MAX_SSE_RETRIES) {
+        console.warn('Max SSE retries reached, falling back to polling');
+        fallbackToPolling(currentWorkflowId);
+        return;
+    }
+
+    // Exponential backoff: 1s, 2s, 4s, 8s, 16s, max 30s
+    const backoffMs = Math.min(1000 * Math.pow(2, sseRetryCount - 1), 30000);
+    console.log(`Reconnecting SSE in ${backoffMs}ms (attempt ${sseRetryCount}/${MAX_SSE_RETRIES})`);
+
+    updateSseStatus('reconnecting');
+    setTimeout(() => {
+        if (!ssePaused && currentWorkflowId) {
+            connectSSE(currentWorkflowId);
+        }
+    }, backoffMs);
+}
+
+function fallbackToPolling(workflowId) {
+    console.log('Using polling fallback for workflow state');
+    updateSseStatus('polling');
 
     // Polling fallback: check for state updates every 5 seconds
     const pollInterval = setInterval(() => {
@@ -545,8 +627,26 @@ function connectSSE(workflowId) {
             clearInterval(pollInterval);
             return;
         }
-        pollWorkflowState(currentWorkflowId);
+        pollWorkflowState(workflowId);
     }, 5000);
+}
+
+function processWorkflowCommit(commit) {
+    // Process graph commit and update workflow state
+    console.log('Processing workflow commit:', commit.commitId);
+
+    // Extract mutations and update task states
+    if (commit.mutations && Array.isArray(commit.mutations)) {
+        commit.mutations.forEach(mutation => {
+            if (mutation.op === 'set-property' && mutation.nodeId && mutation.properties) {
+                // Update task state based on graph mutation
+                if (mutation.properties.state) {
+                    taskStates[mutation.nodeId] = mutation.properties.state;
+                    updateTaskVisual(mutation.nodeId, mutation.properties.state);
+                }
+            }
+        });
+    }
 }
 
 async function pollWorkflowState(workflowId) {
@@ -608,7 +708,8 @@ function updateSseStatus(status = null) {
     }
 
     existingStatus.className = `sse-status ${status}`;
-    existingStatus.textContent = status.toUpperCase();
+    const statusText = status === 'reconnecting' ? 'RECONNECTING...' : status.toUpperCase();
+    existingStatus.textContent = statusText;
 }
 
 function handleWorkflowEvent(event) {
