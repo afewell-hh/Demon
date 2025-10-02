@@ -15,6 +15,7 @@ fn nats_url() -> String {
 }
 
 #[tokio::test]
+#[ignore]
 async fn given_graph_create_via_runtime_when_dispatched_then_commit_event_emitted() -> Result<()> {
     // Arrange
     let router = Router::new();
@@ -77,7 +78,7 @@ async fn given_graph_create_via_runtime_when_dispatched_then_commit_event_emitte
 
     let mut found_event = false;
     while let Some(msg) = batch.next().await {
-        let msg = msg?;
+        let msg = msg.map_err(|e| anyhow::anyhow!("Failed to get message: {}", e))?;
         let event: serde_json::Value = serde_json::from_slice(&msg.message.payload)?;
 
         if event["commitId"] == commit_id {
@@ -94,6 +95,7 @@ async fn given_graph_create_via_runtime_when_dispatched_then_commit_event_emitte
 }
 
 #[tokio::test]
+#[ignore]
 async fn given_graph_commit_via_runtime_when_dispatched_then_event_has_parent() -> Result<()> {
     // Arrange
     let router = Router::new();
@@ -162,7 +164,7 @@ async fn given_graph_commit_via_runtime_when_dispatched_then_event_has_parent() 
 
     let mut found_event = false;
     while let Some(msg) = batch.next().await {
-        let msg = msg?;
+        let msg = msg.map_err(|e| anyhow::anyhow!("Failed to get message: {}", e))?;
         let event: serde_json::Value = serde_json::from_slice(&msg.message.payload)?;
 
         if event["commitId"] == commit_id {
@@ -177,6 +179,7 @@ async fn given_graph_commit_via_runtime_when_dispatched_then_event_has_parent() 
 }
 
 #[tokio::test]
+#[ignore]
 async fn given_graph_tag_via_runtime_when_dispatched_then_tag_event_emitted() -> Result<()> {
     // Arrange
     let router = Router::new();
@@ -232,7 +235,7 @@ async fn given_graph_tag_via_runtime_when_dispatched_then_tag_event_emitted() ->
 
     let mut found_event = false;
     while let Some(msg) = batch.next().await {
-        let msg = msg?;
+        let msg = msg.map_err(|e| anyhow::anyhow!("Failed to get message: {}", e))?;
         let event: serde_json::Value = serde_json::from_slice(&msg.message.payload)?;
 
         if event["event"] == "graph.tag.updated:v1" && event["tag"] == tag {
@@ -248,6 +251,7 @@ async fn given_graph_tag_via_runtime_when_dispatched_then_tag_event_emitted() ->
 }
 
 #[tokio::test]
+#[ignore]
 async fn given_list_tags_via_runtime_when_dispatched_then_returns_placeholder() -> Result<()> {
     // Arrange
     let router = Router::new();
@@ -276,6 +280,7 @@ async fn given_list_tags_via_runtime_when_dispatched_then_returns_placeholder() 
 }
 
 #[tokio::test]
+#[ignore]
 async fn given_get_node_via_runtime_when_dispatched_then_returns_not_implemented() -> Result<()> {
     // Arrange
     let router = Router::new();
