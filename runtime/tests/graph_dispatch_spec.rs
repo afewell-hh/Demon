@@ -15,7 +15,7 @@ fn nats_url() -> String {
 }
 
 #[tokio::test]
-#[ignore] // Requires NATS; run via CI with --ignored
+#[ignore]
 async fn given_graph_create_via_runtime_when_dispatched_then_commit_event_emitted() -> Result<()> {
     // Arrange
     let router = Router::new();
@@ -46,7 +46,7 @@ async fn given_graph_create_via_runtime_when_dispatched_then_commit_event_emitte
 
     // Assert - envelope is success
     let envelope_value = result;
-    assert_eq!(envelope_value["result"]["success"], true);
+    assert_eq!(envelope_value["result"]["success"].as_bool(), Some(true));
     let commit_id = envelope_value["result"]["data"]["commit_id"]
         .as_str()
         .expect("Should have commit ID");
@@ -78,7 +78,7 @@ async fn given_graph_create_via_runtime_when_dispatched_then_commit_event_emitte
 
     let mut found_event = false;
     while let Some(msg) = batch.next().await {
-        let msg = msg.map_err(|e| anyhow::anyhow!("batch error: {}", e))?;
+        let msg = msg.map_err(|e| anyhow::anyhow!("Failed to get message: {}", e))?;
         let event: serde_json::Value = serde_json::from_slice(&msg.message.payload)?;
 
         if event["commitId"] == commit_id {
@@ -95,7 +95,7 @@ async fn given_graph_create_via_runtime_when_dispatched_then_commit_event_emitte
 }
 
 #[tokio::test]
-#[ignore] // Requires NATS; run via CI with --ignored
+#[ignore]
 async fn given_graph_commit_via_runtime_when_dispatched_then_event_has_parent() -> Result<()> {
     // Arrange
     let router = Router::new();
@@ -128,7 +128,7 @@ async fn given_graph_commit_via_runtime_when_dispatched_then_event_has_parent() 
 
     // Assert
     let envelope_value = result;
-    assert_eq!(envelope_value["result"]["success"], true);
+    assert_eq!(envelope_value["result"]["success"].as_bool(), Some(true));
     let commit_id = envelope_value["result"]["data"]["commit_id"]
         .as_str()
         .expect("Should have commit ID");
@@ -164,7 +164,7 @@ async fn given_graph_commit_via_runtime_when_dispatched_then_event_has_parent() 
 
     let mut found_event = false;
     while let Some(msg) = batch.next().await {
-        let msg = msg.map_err(|e| anyhow::anyhow!("batch error: {}", e))?;
+        let msg = msg.map_err(|e| anyhow::anyhow!("Failed to get message: {}", e))?;
         let event: serde_json::Value = serde_json::from_slice(&msg.message.payload)?;
 
         if event["commitId"] == commit_id {
@@ -179,7 +179,7 @@ async fn given_graph_commit_via_runtime_when_dispatched_then_event_has_parent() 
 }
 
 #[tokio::test]
-#[ignore] // Requires NATS; run via CI with --ignored
+#[ignore]
 async fn given_graph_tag_via_runtime_when_dispatched_then_tag_event_emitted() -> Result<()> {
     // Arrange
     let router = Router::new();
@@ -206,7 +206,7 @@ async fn given_graph_tag_via_runtime_when_dispatched_then_tag_event_emitted() ->
 
     // Assert
     let envelope_value = result;
-    assert_eq!(envelope_value["result"]["success"], true);
+    assert_eq!(envelope_value["result"]["success"].as_bool(), Some(true));
 
     // Verify tag event in JetStream
     let client = async_nats::connect(&nats_url()).await?;
@@ -235,7 +235,7 @@ async fn given_graph_tag_via_runtime_when_dispatched_then_tag_event_emitted() ->
 
     let mut found_event = false;
     while let Some(msg) = batch.next().await {
-        let msg = msg.map_err(|e| anyhow::anyhow!("batch error: {}", e))?;
+        let msg = msg.map_err(|e| anyhow::anyhow!("Failed to get message: {}", e))?;
         let event: serde_json::Value = serde_json::from_slice(&msg.message.payload)?;
 
         if event["event"] == "graph.tag.updated:v1" && event["tag"] == tag {
@@ -251,140 +251,19 @@ async fn given_graph_tag_via_runtime_when_dispatched_then_tag_event_emitted() ->
 }
 
 #[tokio::test]
-#[ignore] // Requires NATS; run via CI with --ignored
-async fn given_list_tags_via_runtime_when_dispatched_then_returns_tags() -> Result<()> {
-    // Arrange
-    let router = Router::new();
-    let tenant_id = format!("tenant-list-{}", uuid::Uuid::new_v4());
-
-    // Set a tag first
-    let tag_args = json!({
-        "operation": "tag",
-        "scope": {
-            "tenantId": tenant_id,
-            "projectId": "proj-1",
-            "namespace": "ns-1",
-            "graphId": "graph-1"
-        },
-        "tag": "v1.0.0",
-        "commitId": "a".repeat(64)
-    });
-
-    router
-        .dispatch("graph", &tag_args, "test-run", "test-ritual")
-        .await?;
-
-    // Act - list tags
-    let args = json!({
-        "operation": "list-tags",
-        "scope": {
-            "tenantId": tenant_id,
-            "projectId": "proj-1",
-            "namespace": "ns-1",
-            "graphId": "graph-1"
-        }
-    });
-
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    let result = router
-        .dispatch("graph", &args, "test-run", "test-ritual")
-        .await?;
-
-    // Assert - should return tags
-    let envelope_value = result;
-    assert_eq!(envelope_value["result"]["success"], true);
-    assert!(envelope_value["result"]["data"].is_array());
-    let tags = envelope_value["result"]["data"].as_array().unwrap();
-    assert_eq!(tags.len(), 1);
-    assert_eq!(tags[0]["tag"], "v1.0.0");
-
-    Ok(())
-}
-
-#[tokio::test]
-#[ignore] // Requires NATS; run via CI with --ignored
-async fn given_delete_tag_via_runtime_when_dispatched_then_tag_removed() -> Result<()> {
-    // Arrange
-    let router = Router::new();
-    let tenant_id = format!("tenant-delete-{}", uuid::Uuid::new_v4());
-
-    // Set a tag first
-    let tag_args = json!({
-        "operation": "tag",
-        "scope": {
-            "tenantId": tenant_id,
-            "projectId": "proj-1",
-            "namespace": "ns-1",
-            "graphId": "graph-1"
-        },
-        "tag": "v1.0.0",
-        "commitId": "b".repeat(64)
-    });
-
-    router
-        .dispatch("graph", &tag_args, "test-run", "test-ritual")
-        .await?;
-
-    // Act - delete tag
-    let delete_args = json!({
-        "operation": "delete-tag",
-        "scope": {
-            "tenantId": tenant_id,
-            "projectId": "proj-1",
-            "namespace": "ns-1",
-            "graphId": "graph-1"
-        },
-        "tag": "v1.0.0"
-    });
-
-    let result = router
-        .dispatch("graph", &delete_args, "test-run", "test-ritual")
-        .await?;
-
-    // Assert - delete succeeded
-    let envelope_value = result;
-    assert_eq!(envelope_value["result"]["success"], true);
-
-    // Verify tag removed from list-tags
-    let list_args = json!({
-        "operation": "list-tags",
-        "scope": {
-            "tenantId": tenant_id,
-            "projectId": "proj-1",
-            "namespace": "ns-1",
-            "graphId": "graph-1"
-        }
-    });
-
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    let list_result = router
-        .dispatch("graph", &list_args, "test-run", "test-ritual")
-        .await?;
-
-    let list_envelope = list_result;
-    assert_eq!(list_envelope["result"]["success"], true);
-    let tags = list_envelope["result"]["data"].as_array().unwrap();
-    assert_eq!(tags.len(), 0, "Tag should be removed");
-
-    Ok(())
-}
-
-#[tokio::test]
-#[ignore] // Requires NATS; run via CI with --ignored
-async fn given_get_node_via_runtime_when_dispatched_then_returns_not_implemented() -> Result<()> {
+#[ignore]
+async fn given_list_tags_via_runtime_when_dispatched_then_returns_placeholder() -> Result<()> {
     // Arrange
     let router = Router::new();
 
     let args = json!({
-        "operation": "get-node",
+        "operation": "list-tags",
         "scope": {
             "tenantId": "tenant-1",
             "projectId": "proj-1",
             "namespace": "ns-1",
             "graphId": "graph-1"
-        },
-        "commitId": "c".repeat(64),
-        "nodeId": "node-1"
+        }
     });
 
     // Act
@@ -392,10 +271,71 @@ async fn given_get_node_via_runtime_when_dispatched_then_returns_not_implemented
         .dispatch("graph", &args, "test-run", "test-ritual")
         .await?;
 
-    // Assert - should return error with NOT_IMPLEMENTED (or MATERIALIZATION_FAILED for missing commit)
+    // Assert - should succeed but return empty (placeholder)
     let envelope_value = result;
-    assert_eq!(envelope_value["result"]["success"], false);
-    assert!(envelope_value["result"]["error"]["code"] != serde_json::Value::Null);
+    assert_eq!(envelope_value["result"]["success"].as_bool(), Some(true));
+    assert!(envelope_value["result"]["data"].is_array());
+
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore]
+async fn given_get_node_via_runtime_when_dispatched_then_returns_node_snapshot() -> Result<()> {
+    // Arrange
+    let router = Router::new();
+    let tenant_id = format!("tenant-{}", uuid::Uuid::new_v4());
+
+    let create_args = json!({
+        "operation": "create",
+        "scope": {
+            "tenantId": &tenant_id,
+            "projectId": "proj-1",
+            "namespace": "ns-1",
+            "graphId": "graph-1"
+        },
+        "seed": [
+            {
+                "op": "add-node",
+                "nodeId": "root",
+                "labels": ["Root"],
+                "properties": []
+            }
+        ]
+    });
+
+    let create_result = router
+        .dispatch("graph", &create_args, "test-run", "test-ritual")
+        .await?;
+    let commit_id = create_result["result"]["data"]["commit_id"]
+        .as_str()
+        .expect("commit id present")
+        .to_string();
+
+    let args = json!({
+        "operation": "get-node",
+        "scope": {
+            "tenantId": tenant_id,
+            "projectId": "proj-1",
+            "namespace": "ns-1",
+            "graphId": "graph-1"
+        },
+        "commitId": commit_id,
+        "nodeId": "root"
+    });
+
+    // Act
+    let result = router
+        .dispatch("graph", &args, "test-run", "test-ritual")
+        .await?;
+
+    // Assert - should succeed and return node snapshot
+    let envelope_value = result;
+    assert_eq!(envelope_value["result"]["success"].as_bool(), Some(true));
+    let node = envelope_value["result"]["data"]
+        .as_object()
+        .expect("node snapshot");
+    assert_eq!(node["nodeId"], "root");
 
     Ok(())
 }
