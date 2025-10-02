@@ -359,11 +359,19 @@ async fn given_sse_endpoint_when_connected_then_receives_init_and_heartbeats() -
 
     while event_count < 3 {
         tokio::select! {
-            Some(Ok(chunk)) = stream.next() => {
-                let text = String::from_utf8_lossy(&chunk);
-                if text.contains("event:") {
-                    events.push(text.to_string());
-                    event_count += 1;
+            Some(result) = stream.next() => {
+                match result {
+                    Ok(chunk) => {
+                        let text = String::from_utf8_lossy(&chunk);
+                        if text.contains("event:") {
+                            events.push(text.to_string());
+                            event_count += 1;
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Stream error: {}", e);
+                        break;
+                    }
                 }
             }
             _ = tokio::time::sleep(Duration::from_secs(3)) => {
