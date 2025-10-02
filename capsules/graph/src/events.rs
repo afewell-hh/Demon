@@ -116,9 +116,15 @@ pub async fn emit_tag_updated(
     );
 
     let mut headers = async_nats::HeaderMap::new();
+    // Include commit_id and timestamp in message ID to allow tag moves within duplicate window
     let msg_id = format!(
-        "{}:{}:{}:tag:{}",
-        scope.tenant_id, scope.project_id, scope.namespace, tag
+        "{}:{}:{}:tag:{}:{}:{}",
+        scope.tenant_id,
+        scope.project_id,
+        scope.namespace,
+        tag,
+        commit_id.unwrap_or("delete"),
+        timestamp.timestamp_millis()
     );
     headers.insert("Nats-Msg-Id", msg_id.as_str());
 
@@ -207,10 +213,13 @@ fn serialize_mutations(mutations: &[Mutation]) -> Vec<serde_json::Value> {
         .collect()
 }
 
-/// Ensure GRAPH_COMMITS stream exists
+/// Ensure GRAPH_COMMITS stream exists with reconciliation for config drift.
+/// When the stream already exists, any drift in critical configuration is reconciled via
+/// `update_stream` so operators do not have to delete/recreate resources manually.
 async fn ensure_graph_stream(js: &jetstream::Context) -> Result<()> {
+    let stream_name = "GRAPH_COMMITS";
     let stream_config = jetstream::stream::Config {
-        name: "GRAPH_COMMITS".to_string(),
+        name: stream_name.to_string(),
         subjects: vec!["demon.graph.v1.*.*.*.commit".to_string()],
         retention: jetstream::stream::RetentionPolicy::Limits,
         storage: jetstream::stream::StorageType::File,
@@ -220,9 +229,34 @@ async fn ensure_graph_stream(js: &jetstream::Context) -> Result<()> {
         ..Default::default()
     };
 
-    js.get_or_create_stream(stream_config)
-        .await
-        .context("Failed to ensure GRAPH_COMMITS stream")?;
+    match js.get_stream(stream_name).await {
+        Ok(mut stream) => {
+            let info = stream.info().await?;
+            if stream_config_differs(&info.config, &stream_config) {
+                js.update_stream(stream_config.clone())
+                    .await
+                    .context("Failed to update GRAPH_COMMITS stream")?;
+            }
+        }
+        Err(_) => {
+            js.create_stream(stream_config.clone())
+                .await
+                .context("Failed to create GRAPH_COMMITS stream")?;
+        }
+    }
 
     Ok(())
+}
+
+/// Check if stream config differs on fields we care about for reconciliation
+fn stream_config_differs(
+    existing: &jetstream::stream::Config,
+    desired: &jetstream::stream::Config,
+) -> bool {
+    existing.subjects != desired.subjects
+        || existing.retention != desired.retention
+        || existing.storage != desired.storage
+        || existing.max_messages_per_subject != desired.max_messages_per_subject
+        || existing.discard != desired.discard
+        || existing.duplicate_window != desired.duplicate_window
 }
