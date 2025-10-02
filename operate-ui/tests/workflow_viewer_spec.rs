@@ -126,3 +126,45 @@ async fn test_workflow_metadata_path_traversal_protection() {
     // Should either fail or sanitize the path
     assert!(response.status_code() == 404 || response.status_code() == 400);
 }
+
+#[tokio::test]
+async fn test_list_workflows_api() {
+    let state = AppState::new().await;
+    let app = create_app(state);
+    let server = TestServer::new(app).unwrap();
+
+    let response = server.get("/api/workflows").await;
+
+    assert_eq!(response.status_code(), 200);
+
+    let body: serde_json::Value = response.json();
+    assert!(body.is_array(), "Response should be an array of workflows");
+
+    let workflows = body.as_array().unwrap();
+    // Should have at least echo.yaml and timer.yaml
+    assert!(workflows.len() >= 2, "Should have at least 2 workflows");
+
+    // Verify structure of first workflow
+    if let Some(first) = workflows.first() {
+        assert!(first.get("name").is_some(), "Workflow should have name");
+        assert!(first.get("path").is_some(), "Workflow should have path");
+        // workflowId and description are optional
+    }
+}
+
+#[tokio::test]
+async fn test_workflow_viewer_with_browse_button() {
+    let state = AppState::new().await;
+    let app = create_app(state);
+    let server = TestServer::new(app).unwrap();
+
+    let response = server.get("/ui/workflow").await;
+
+    assert_eq!(response.status_code(), 200);
+    let html = response.text();
+
+    // Verify new UI elements are present
+    assert!(html.contains("Browse Workflows"));
+    assert!(html.contains("workflowListView"));
+    assert!(html.contains("workflowSearchInput"));
+}

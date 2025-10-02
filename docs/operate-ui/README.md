@@ -105,6 +105,77 @@ The UI now supports real-time event streaming via Server-Sent Events (SSE):
    - Presenter Script (60‑sec): `docs/preview/alpha/presenter_script.md`
   - Dry‑Run Checklist: `docs/preview/alpha/dry_run_checklist.md`
 
+## Workflow Viewer
+
+The Operate UI includes an enhanced workflow viewer for visualizing and managing Serverless Workflow 1.0 definitions:
+
+### Features
+- **Workflow Discovery**: Browse all available workflows from the `examples/rituals/` directory
+- **Search & Filter**: Real-time search by workflow name or description
+- **Manual Load**: Load workflows by local path or remote URL
+- **Visual Rendering**: Display workflow tasks/states with current execution status
+- **State Updates**: Polling-based state updates (5-second intervals) for active workflows
+- **YAML Inspection**: View raw workflow YAML/JSON definitions
+
+### Endpoints
+- `/ui/workflow` — Workflow viewer UI page
+- `/api/workflows` — List available local workflows (JSON array)
+- `/api/workflow/metadata?workflowPath=<path>` — Get workflow metadata by local path
+- `/api/workflow/metadata?workflowUrl=<url>` — Get workflow metadata by remote URL
+- `/api/workflow/state?workflowId=<id>` — Get current workflow execution state (placeholder)
+
+### Usage
+
+#### Browse Workflows
+1. Navigate to `/ui/workflow`
+2. Click "Browse Workflows" button
+3. Use the search box to filter workflows by name or description
+4. Click "View" on any workflow to load and visualize it
+
+#### Manual Load
+1. Navigate to `/ui/workflow`
+2. Enter a local path (relative to `examples/rituals/`) or remote URL
+3. Click "Load Workflow" to fetch and display the workflow
+
+### Example Workflows
+- `echo.yaml` — Simple echo ritual demonstrating basic task execution
+- `timer.yaml` — Timer-based workflow example
+
+### Live Updates via SSE
+
+The workflow viewer now supports real-time state updates via Server-Sent Events (SSE):
+
+#### Features
+- **Real-time commit streaming**: Connects to runtime's graph commit SSE endpoint
+- **Automatic reconnection**: Exponential backoff (1s → 30s max) with 10 retry limit
+- **Polling fallback**: Falls back to 5-second polling after max retries
+- **Connection status**: Visual indicator showing Connected/Reconnecting/Polling/Paused states
+- **Stream control**: Pause/Resume button to control SSE connection
+
+#### Configuration
+- Runtime SSE endpoint: `${RUNTIME_API_URL}/api/graph/commits/stream`
+- Heartbeat interval: Configurable via `SSE_HEARTBEAT_SECONDS` (default: 25s in runtime)
+- Reconnection policy:
+  - Max retries: 10 attempts
+  - Backoff: 1s, 2s, 4s, 8s, 16s (capped at 30s)
+  - After max retries: switches to 5s polling
+
+#### Event Handling
+- `init`: Receives initial snapshot of recent commits
+- `commit`: Processes new graph commits and updates task states based on mutations
+- `heartbeat`: Maintains connection liveness
+- `warning`: Logs non-fatal issues (e.g., snapshot load failure)
+- `error`: Triggers reconnection logic
+
+#### Implementation
+Connection established via `EventSource` API when workflow is loaded. Graph commit mutations are processed to extract workflow state changes (e.g., task state transitions). Task visuals update in real-time as mutations arrive.
+
+### Future Enhancements
+- **Approval Gates**: Display and interact with workflow approval gates
+- **Policy Decisions**: Show policy evaluation results alongside task states
+- **Runtime Integration**: Deep integration with runtime API for execution control
+- **Multi-graph filtering**: Filter SSE stream by specific graphId
+
 ## Admin Probe (dev-only)
 
 - Endpoint: `/admin/templates/report` returns JSON `{ template_ready, has_filter_tojson, templates }` used by the bootstrapper verify phase.

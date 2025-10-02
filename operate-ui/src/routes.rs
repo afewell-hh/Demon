@@ -2768,3 +2768,121 @@ async fn fetch_remote_workflow(url: &str) -> anyhow::Result<serde_json::Value> {
 
     Ok(workflow)
 }
+
+#[derive(Serialize, Debug)]
+pub struct WorkflowListItem {
+    pub name: String,
+    #[serde(rename = "workflowId")]
+    pub workflow_id: Option<String>,
+    pub description: Option<String>,
+    pub path: String,
+}
+
+/// List available workflows from local examples directory
+#[axum::debug_handler]
+pub async fn list_workflows_api(State(_state): State<AppState>) -> Response {
+    debug!("Handling workflow list API");
+
+    let rituals_dir = format!("{}/../examples/rituals", env!("CARGO_MANIFEST_DIR"));
+
+    match list_local_workflows(&rituals_dir) {
+        Ok(workflows) => {
+            info!("Successfully listed {} workflows", workflows.len());
+            Json(workflows).into_response()
+        }
+        Err(e) => {
+            error!("Failed to list workflows: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": format!("Failed to list workflows: {}", e)
+                })),
+            )
+                .into_response()
+        }
+    }
+}
+
+fn list_local_workflows(dir_path: &str) -> anyhow::Result<Vec<WorkflowListItem>> {
+    use anyhow::Context;
+    use std::path::Path;
+
+    let dir = Path::new(dir_path);
+    if !dir.exists() || !dir.is_dir() {
+        anyhow::bail!("Rituals directory not found: {}", dir_path);
+    }
+
+    let mut workflows = Vec::new();
+
+    for entry in std::fs::read_dir(dir).context("Failed to read rituals directory")? {
+        let entry = entry?;
+        let path = entry.path();
+
+        // Only process YAML files
+        if !path.is_file() {
+            continue;
+        }
+
+        let ext = path.extension().and_then(|s| s.to_str());
+        if ext != Some("yaml") && ext != Some("yml") {
+            continue;
+        }
+
+        let file_name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("unknown")
+            .to_string();
+
+        // Try to read and parse to extract metadata
+        match std::fs::read_to_string(&path) {
+            Ok(content) => {
+                if content.len() > 1_000_000 {
+                    warn!("Skipping large workflow file: {}", file_name);
+                    continue;
+                }
+
+                match serde_yaml::from_str::<serde_json::Value>(&content) {
+                    Ok(workflow) => {
+                        let workflow_id = workflow
+                            .get("id")
+                            .or_else(|| workflow.get("name"))
+                            .or_else(|| workflow.get("document").and_then(|d| d.get("name")))
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+
+                        let description = workflow
+                            .get("description")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+
+                        workflows.push(WorkflowListItem {
+                            name: file_name.clone(),
+                            workflow_id,
+                            description,
+                            path: file_name,
+                        });
+                    }
+                    Err(e) => {
+                        warn!("Failed to parse workflow {}: {}", file_name, e);
+                        // Still include the file even if parsing fails
+                        workflows.push(WorkflowListItem {
+                            name: file_name.clone(),
+                            workflow_id: None,
+                            description: None,
+                            path: file_name,
+                        });
+                    }
+                }
+            }
+            Err(e) => {
+                warn!("Failed to read workflow file {}: {}", file_name, e);
+            }
+        }
+    }
+
+    // Sort by name
+    workflows.sort_by(|a, b| a.name.cmp(&b.name));
+
+    Ok(workflows)
+}
