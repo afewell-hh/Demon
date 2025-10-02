@@ -47,7 +47,7 @@ async fn given_graph_create_via_runtime_when_dispatched_then_commit_event_emitte
     // Assert - envelope is success
     let envelope_value = result;
     assert_eq!(envelope_value["result"]["success"].as_bool(), Some(true));
-    let commit_id = envelope_value["result"]["data"]["commitId"]
+    let commit_id = envelope_value["result"]["data"]["commit_id"]
         .as_str()
         .expect("Should have commit ID");
 
@@ -129,10 +129,10 @@ async fn given_graph_commit_via_runtime_when_dispatched_then_event_has_parent() 
     // Assert
     let envelope_value = result;
     assert_eq!(envelope_value["result"]["success"].as_bool(), Some(true));
-    let commit_id = envelope_value["result"]["data"]["commitId"]
+    let commit_id = envelope_value["result"]["data"]["commit_id"]
         .as_str()
         .expect("Should have commit ID");
-    let returned_parent = envelope_value["result"]["data"]["parentCommitId"]
+    let returned_parent = envelope_value["result"]["data"]["parent_commit_id"]
         .as_str()
         .expect("Should have parent commit ID");
     assert_eq!(returned_parent, parent_commit_id);
@@ -307,7 +307,7 @@ async fn given_get_node_via_runtime_when_dispatched_then_returns_node_snapshot()
     let create_result = router
         .dispatch("graph", &create_args, "test-run", "test-ritual")
         .await?;
-    let commit_id = create_result["result"]["data"]["commitId"]
+    let commit_id = create_result["result"]["data"]["commit_id"]
         .as_str()
         .expect("commit id present")
         .to_string();
