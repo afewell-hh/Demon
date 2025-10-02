@@ -356,6 +356,7 @@ async fn given_sse_endpoint_when_connected_then_receives_init_and_heartbeats() -
     let mut stream = response.bytes_stream();
     let mut events = Vec::new();
     let mut event_count = 0;
+    let mut buffer = String::new();
 
     while event_count < 3 {
         tokio::select! {
@@ -363,9 +364,17 @@ async fn given_sse_endpoint_when_connected_then_receives_init_and_heartbeats() -
                 match result {
                     Ok(chunk) => {
                         let text = String::from_utf8_lossy(&chunk);
-                        if text.contains("event:") {
-                            events.push(text.to_string());
-                            event_count += 1;
+                        buffer.push_str(&text);
+
+                        // SSE events are delimited by \n\n
+                        while let Some(end_pos) = buffer.find("\n\n") {
+                            let event = buffer[..end_pos + 2].to_string();
+                            buffer = buffer[end_pos + 2..].to_string();
+
+                            if event.contains("event:") {
+                                events.push(event);
+                                event_count += 1;
+                            }
                         }
                     }
                     Err(e) => {

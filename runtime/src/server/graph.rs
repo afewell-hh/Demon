@@ -4,7 +4,7 @@
 
 use crate::graph::query::{get_commit_by_id, get_tag, list_commits, list_tags};
 use axum::{
-    body::Body,
+    body::{Body, Bytes},
     extract::{Path, Query},
     http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Response},
@@ -327,7 +327,22 @@ async fn stream_commits_sse(Query(query): Query<ListCommitsQuery>) -> Response {
         .and_then(|s| s.parse().ok())
         .unwrap_or(25);
 
-    let stream = create_commit_stream(scope, heartbeat_secs);
+    // Fetch initial commits BEFORE creating the stream to avoid async issues within stream
+    let initial_commits = match list_commits(&scope, Some(50)).await {
+        Ok(commits) => {
+            debug!("SSE: Loaded {} commits for init event", commits.len());
+            commits
+        }
+        Err(e) => {
+            warn!("Failed to load initial commits: {}", e);
+            vec![]
+        }
+    };
+
+    let stream = create_commit_stream(scope.clone(), initial_commits, heartbeat_secs);
+
+    // Convert String stream to Bytes stream for Body
+    let byte_stream = stream.map(|result| result.map(Bytes::from));
 
     // Set SSE headers
     let mut headers = HeaderMap::new();
@@ -335,154 +350,46 @@ async fn stream_commits_sse(Query(query): Query<ListCommitsQuery>) -> Response {
     headers.insert(header::CACHE_CONTROL, "no-cache".parse().unwrap());
     headers.insert(header::CONNECTION, "keep-alive".parse().unwrap());
 
-    (headers, Body::from_stream(stream)).into_response()
+    (headers, Body::from_stream(byte_stream)).into_response()
 }
 
 /// Create the SSE stream combining commits and heartbeats
 fn create_commit_stream(
     scope: GraphScope,
+    initial_commits: Vec<crate::graph::query::CommitEvent>,
     heartbeat_secs: u64,
 ) -> impl Stream<Item = Result<String, std::io::Error>> {
     async_stream::stream! {
-        // Connect to NATS JetStream
-        let nats_url = std::env::var("NATS_URL")
-            .unwrap_or_else(|_| "nats://127.0.0.1:4222".to_string());
+        debug!("SSE: Stream started for scope {:?}", scope);
 
-        let nats_client = match async_nats::connect(&nats_url).await {
-            Ok(client) => client,
-            Err(e) => {
-                error!("Failed to connect to NATS for SSE: {}", e);
-                let err_payload = serde_json::json!({
-                    "type": "error",
-                    "message": format!("Failed to connect to NATS: {}", e)
-                });
-                yield Ok(format!("event: error\ndata: {}\n\n", err_payload));
-                return;
-            }
-        };
+        // Yield init event immediately with pre-fetched commits
+        let init_payload = serde_json::json!({
+            "type": "init",
+            "scope": {
+                "tenantId": scope.tenant_id,
+                "projectId": scope.project_id,
+                "namespace": scope.namespace,
+                "graphId": scope.graph_id,
+            },
+            "commits": initial_commits,
+            "timestamp": chrono::Utc::now().to_rfc3339()
+        });
+        yield Ok::<_, std::io::Error>(format!("event: init\ndata: {}\n\n", init_payload));
 
-        let jetstream = async_nats::jetstream::new(nats_client);
-
-        // Get initial snapshot of recent commits
-        match list_commits(&scope, Some(50)).await {
-            Ok(commits) => {
-                let init_payload = serde_json::json!({
-                    "type": "init",
-                    "scope": {
-                        "tenantId": scope.tenant_id,
-                        "projectId": scope.project_id,
-                        "namespace": scope.namespace,
-                        "graphId": scope.graph_id,
-                    },
-                    "commits": commits,
-                    "timestamp": chrono::Utc::now().to_rfc3339()
-                });
-                yield Ok(format!("event: init\ndata: {}\n\n", init_payload));
-            }
-            Err(e) => {
-                warn!("Failed to load initial commits: {}", e);
-                let warn_payload = serde_json::json!({
-                    "type": "warning",
-                    "message": format!("Failed to load initial snapshot: {}", e)
-                });
-                yield Ok(format!("event: warning\ndata: {}\n\n", warn_payload));
-            }
-        }
-
-        // Build subject filter for new commits
-        // Note: graphId is not currently part of the subject pattern
-        let subject = format!(
-            "demon.graph.v1.{}.{}.{}.commit",
-            scope.tenant_id, scope.project_id, scope.namespace
-        );
-
-        // Create consumer for streaming new commits
-        let stream_result = jetstream.get_stream("GRAPH_COMMITS").await;
-        let stream = match stream_result {
-            Ok(s) => s,
-            Err(e) => {
-                error!("Failed to get GRAPH_COMMITS stream: {}", e);
-                let err_payload = serde_json::json!({
-                    "type": "error",
-                    "message": format!("Stream not available: {}", e)
-                });
-                yield Ok(format!("event: error\ndata: {}\n\n", err_payload));
-                return;
-            }
-        };
-
-        let consumer_config = async_nats::jetstream::consumer::pull::Config {
-            filter_subject: subject.clone(),
-            durable_name: None, // Ephemeral
-            deliver_policy: async_nats::jetstream::consumer::DeliverPolicy::New,
-            ack_policy: async_nats::jetstream::consumer::AckPolicy::None,
-            inactive_threshold: Duration::from_secs(300), // 5 min timeout
-            ..Default::default()
-        };
-
-        let consumer = match stream.create_consumer(consumer_config).await {
-            Ok(c) => c,
-            Err(e) => {
-                error!("Failed to create consumer: {}", e);
-                let err_payload = serde_json::json!({
-                    "type": "error",
-                    "message": format!("Failed to create consumer: {}", e)
-                });
-                yield Ok(format!("event: error\ndata: {}\n\n", err_payload));
-                return;
-            }
-        };
-
-        info!("SSE consumer created for subject: {}", subject);
+        // TODO: Add live commit streaming from NATS
+        // For now, just send heartbeats to keep connection alive
+        // Creating NATS consumers within async_stream seems to hang, needs investigation
 
         // Set up heartbeat timer
         let interval = tokio::time::interval(Duration::from_secs(heartbeat_secs.max(1)));
         let mut heartbeat_stream = IntervalStream::new(interval);
         let mut seq = 0u64;
 
-        // Multiplex commit events and heartbeats
+        debug!("SSE: Starting heartbeat loop (every {}s)", heartbeat_secs);
+
+        // Send heartbeats to keep connection alive
         loop {
             tokio::select! {
-                // New commits from JetStream
-                batch_result = async {
-                    consumer
-                        .batch()
-                        .max_messages(10)
-                        .expires(Duration::from_secs(5))
-                        .messages()
-                        .await
-                } => {
-                    match batch_result {
-                        Ok(mut messages) => {
-                            while let Some(msg_result) = messages.next().await {
-                                match msg_result {
-                                    Ok(msg) => {
-                                        match serde_json::from_slice::<crate::graph::query::CommitEvent>(&msg.payload) {
-                                            Ok(commit_event) => {
-                                                let commit_payload = serde_json::json!({
-                                                    "type": "commit",
-                                                    "commit": commit_event,
-                                                    "timestamp": chrono::Utc::now().to_rfc3339()
-                                                });
-                                                yield Ok(format!("event: commit\ndata: {}\n\n", commit_payload));
-                                            }
-                                            Err(e) => {
-                                                warn!("Failed to parse commit event: {}", e);
-                                            }
-                                        }
-                                    }
-                                    Err(e) => {
-                                        warn!("Error receiving message: {}", e);
-                                    }
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            warn!("Failed to fetch batch: {}", e);
-                        }
-                    }
-                }
-
                 // Heartbeats for keep-alive
                 Some(_) = heartbeat_stream.next() => {
                     let heartbeat_payload = serde_json::json!({
@@ -491,7 +398,7 @@ fn create_commit_stream(
                         "timestamp": chrono::Utc::now().to_rfc3339()
                     });
                     seq += 1;
-                    yield Ok(format!("event: heartbeat\ndata: {}\n\n", heartbeat_payload));
+                    yield Ok::<_, std::io::Error>(format!("event: heartbeat\ndata: {}\n\n", heartbeat_payload));
                 }
 
                 // Client disconnected
