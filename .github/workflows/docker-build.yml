@@ -66,6 +66,8 @@ jobs:
             type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
 
+      # Buildx cache uploads can fail due to Azure storage contention on PRs;
+      # ignore-error=true ensures builds succeed even when cache service is unavailable
       - name: Build and push Docker image
         id: build
         uses: docker/build-push-action@v5
@@ -76,8 +78,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.component }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
-          platforms: linux/amd64
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }},ignore-error=true
+          platforms: linux/amd64,linux/arm64
 
       - name: Output image metadata
         if: always()
