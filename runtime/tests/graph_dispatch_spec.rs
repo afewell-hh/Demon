@@ -281,20 +281,47 @@ async fn given_list_tags_via_runtime_when_dispatched_then_returns_placeholder() 
 
 #[tokio::test]
 #[ignore]
-async fn given_get_node_via_runtime_when_dispatched_then_returns_not_implemented() -> Result<()> {
+async fn given_get_node_via_runtime_when_dispatched_then_returns_node_snapshot() -> Result<()> {
     // Arrange
     let router = Router::new();
+    let tenant_id = format!("tenant-{}", uuid::Uuid::new_v4());
 
-    let args = json!({
-        "operation": "get-node",
+    let create_args = json!({
+        "operation": "create",
         "scope": {
-            "tenantId": "tenant-1",
+            "tenantId": &tenant_id,
             "projectId": "proj-1",
             "namespace": "ns-1",
             "graphId": "graph-1"
         },
-        "commitId": "c".repeat(64),
-        "nodeId": "node-1"
+        "seed": [
+            {
+                "op": "add-node",
+                "nodeId": "root",
+                "labels": ["Root"],
+                "properties": []
+            }
+        ]
+    });
+
+    let create_result = router
+        .dispatch("graph", &create_args, "test-run", "test-ritual")
+        .await?;
+    let commit_id = create_result["result"]["data"]["commitId"]
+        .as_str()
+        .expect("commit id present")
+        .to_string();
+
+    let args = json!({
+        "operation": "get-node",
+        "scope": {
+            "tenantId": tenant_id,
+            "projectId": "proj-1",
+            "namespace": "ns-1",
+            "graphId": "graph-1"
+        },
+        "commitId": commit_id,
+        "nodeId": "root"
     });
 
     // Act
@@ -302,10 +329,13 @@ async fn given_get_node_via_runtime_when_dispatched_then_returns_not_implemented
         .dispatch("graph", &args, "test-run", "test-ritual")
         .await?;
 
-    // Assert - should return error with NOT_IMPLEMENTED
+    // Assert - should succeed and return node snapshot
     let envelope_value = result;
-    assert_eq!(envelope_value["result"]["success"].as_bool(), Some(false));
-    assert!(envelope_value["result"]["error"]["code"] == "NOT_IMPLEMENTED");
+    assert_eq!(envelope_value["result"]["success"].as_bool(), Some(true));
+    let node = envelope_value["result"]["data"]
+        .as_object()
+        .expect("node snapshot");
+    assert_eq!(node["nodeId"], "root");
 
     Ok(())
 }
