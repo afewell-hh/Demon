@@ -46,7 +46,7 @@ async fn given_graph_create_via_runtime_when_dispatched_then_commit_event_emitte
 
     // Assert - envelope is success
     let envelope_value = result;
-    assert!(envelope_value["result"]["status"].as_str() == Some("success"));
+    assert_eq!(envelope_value["result"]["success"].as_bool(), Some(true));
     let commit_id = envelope_value["result"]["data"]["commitId"]
         .as_str()
         .expect("Should have commit ID");
@@ -128,7 +128,7 @@ async fn given_graph_commit_via_runtime_when_dispatched_then_event_has_parent() 
 
     // Assert
     let envelope_value = result;
-    assert!(envelope_value["result"]["status"].as_str() == Some("success"));
+    assert_eq!(envelope_value["result"]["success"].as_bool(), Some(true));
     let commit_id = envelope_value["result"]["data"]["commitId"]
         .as_str()
         .expect("Should have commit ID");
@@ -206,7 +206,7 @@ async fn given_graph_tag_via_runtime_when_dispatched_then_tag_event_emitted() ->
 
     // Assert
     let envelope_value = result;
-    assert!(envelope_value["result"]["status"].as_str() == Some("success"));
+    assert_eq!(envelope_value["result"]["success"].as_bool(), Some(true));
 
     // Verify tag event in JetStream
     let client = async_nats::connect(&nats_url()).await?;
@@ -273,7 +273,7 @@ async fn given_list_tags_via_runtime_when_dispatched_then_returns_placeholder() 
 
     // Assert - should succeed but return empty (placeholder)
     let envelope_value = result;
-    assert!(envelope_value["result"]["status"].as_str() == Some("success"));
+    assert_eq!(envelope_value["result"]["success"].as_bool(), Some(true));
     assert!(envelope_value["result"]["data"].is_array());
 
     Ok(())
@@ -304,7 +304,7 @@ async fn given_get_node_via_runtime_when_dispatched_then_returns_not_implemented
 
     // Assert - should return error with NOT_IMPLEMENTED
     let envelope_value = result;
-    assert!(envelope_value["result"]["status"].as_str() == Some("error"));
+    assert_eq!(envelope_value["result"]["success"].as_bool(), Some(false));
     assert!(envelope_value["result"]["error"]["code"] == "NOT_IMPLEMENTED");
 
     Ok(())
