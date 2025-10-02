@@ -52,16 +52,30 @@
 - Workaround: Run with `--test-threads=1` for CI or development
 - Root cause: Global environment variable manipulation in concurrent tests
 
-### Docker Infrastructure TODO
+### Docker Infrastructure Status
 
-From `DOCKER_PIPELINE_PLAN.md`, the next major milestone requires:
+From `DOCKER_PIPELINE_PLAN.md`, phases:
 
-1. **Create Dockerfiles** for operate-ui, runtime, and engine components
-2. **Implement CI workflow** to build and push images to GHCR
-3. **Update K8s manifests** to reference real images instead of placeholders
-4. **Restore HTTP health checks** once real services are available
+#### Phase 1: Dockerfiles ✅ COMPLETE (2025-10-02)
+- ✅ **Created multi-stage Dockerfiles** for operate-ui, runtime, and engine
+  - Uses cargo-chef for efficient dependency caching
+  - Alpine-based builder, distroless runtime (secure & minimal)
+  - Image sizes: operate-ui (~34MB), runtime (~13MB), engine (~5MB)
+- ✅ **Validated local builds** for all three components
+- ✅ **Documentation updated** in component READMEs with build/run instructions
+- See commit: PR TBD
 
-**Timeline Estimate**: 2-3 weeks per the detailed plan
+#### Phase 2: CI/CD Workflow (NEXT)
+- [ ] Implement GitHub Actions workflow to build and push images to GHCR
+- [ ] Tag strategy and versioning
+- [ ] Multi-arch builds (amd64/arm64)
+
+#### Phase 3: K8s Integration
+- [ ] Update K8s manifests to reference GHCR images
+- [ ] Remove placeholder nginx images
+- [ ] Restore HTTP health checks for real services
+
+**Timeline Estimate**: Phase 2-3 implementation ~1-2 weeks
 
 ### File Changes Made
 

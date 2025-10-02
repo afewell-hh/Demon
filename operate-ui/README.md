@@ -194,17 +194,27 @@ open tarpaulin-report.html
 
 ## Deployment
 
-### Docker (Future)
-```dockerfile
-FROM rust:1.82 as builder
-COPY . .
-RUN cargo build --release --bin operate-ui
+### Docker Build
 
-FROM debian:bookworm-slim
-COPY --from=builder /target/release/operate-ui /usr/local/bin/
-EXPOSE 3000
-CMD ["operate-ui"]
+Build the Docker image from the repository root:
+
+```bash
+# Build from the root directory (includes workspace dependencies)
+docker build -f operate-ui/Dockerfile -t demon-operate-ui:latest .
+
+# Run the container
+docker run -p 3000:3000 \
+  -e NATS_URL=nats://host.docker.internal:4222 \
+  demon-operate-ui:latest
+
+# Test the container
+docker run --rm demon-operate-ui:latest /usr/local/bin/operate-ui
 ```
+
+The Dockerfile uses a multi-stage build with:
+- **Builder stage**: cargo-chef for dependency caching, Alpine-based Rust toolchain
+- **Runtime stage**: Distroless static image (~33MB) with templates bundled
+- **Security**: Runs as non-root user, static musl linking
 
 ### Configuration for Production
 
