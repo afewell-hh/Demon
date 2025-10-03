@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -7,6 +7,8 @@ use std::time::Duration;
 use tracing::{info, Level};
 use tracing_subscriber::{fmt, EnvFilter};
 
+mod docker;
+mod github;
 mod k8s_bootstrap;
 
 const MANIFEST_FILES: [&str; 5] = [
@@ -16,6 +18,8 @@ const MANIFEST_FILES: [&str; 5] = [
     "engine.yaml",
     "operate-ui.yaml",
 ];
+const DEFAULT_DOCKER_WORKFLOW: &str = "docker-build.yml";
+const DEFAULT_DOCKER_BRANCH: &str = "main";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum BootstrapExecutionMode {
@@ -143,6 +147,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: K8sBootstrapCommands,
     },
+    /// Docker utility commands
+    Docker {
+        #[command(subcommand)]
+        cmd: DockerCommands,
+    },
     /// Print version and exit
     Version,
 }
@@ -160,7 +169,58 @@ enum K8sBootstrapCommands {
         /// Enable verbose output
         #[arg(long, short)]
         verbose: bool,
+        /// Resolve GHCR digests before rendering manifests
+        #[arg(long, action = ArgAction::SetTrue)]
+        use_latest_digests: bool,
+        /// GitHub Actions workflow file name or ID
+        #[arg(long, value_name = "WORKFLOW")]
+        workflow: Option<String>,
+        /// Repository in <owner>/<repo> format
+        #[arg(long, value_name = "OWNER/REPO")]
+        repo: Option<String>,
+        /// GitHub API base URL (for GitHub Enterprise)
+        #[arg(long, value_name = "URL")]
+        api_url: Option<String>,
+        /// Branch to inspect for docker build digests (default: main)
+        #[arg(long, value_name = "BRANCH", default_value = DEFAULT_DOCKER_BRANCH)]
+        branch: String,
     },
+}
+
+#[derive(Subcommand)]
+enum DockerCommands {
+    /// Fetch docker image digest artifacts
+    Digests {
+        #[command(subcommand)]
+        cmd: DockerDigestsCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum DockerDigestsCommands {
+    /// Download the docker-image-digests manifest from GitHub Actions
+    Fetch {
+        /// Workflow file name or ID (default: docker-build.yml)
+        #[arg(long, value_name = "WORKFLOW", default_value = DEFAULT_DOCKER_WORKFLOW)]
+        workflow: String,
+        /// Branch to inspect for successful runs (default: main)
+        #[arg(long, value_name = "BRANCH", default_value = DEFAULT_DOCKER_BRANCH)]
+        branch: String,
+        /// Output file for the digest manifest JSON
+        #[arg(long, value_name = "FILE", default_value = "docker-image-digests.json")]
+        output: PathBuf,
+        /// Output mode: raw JSON or shell exports
+        #[arg(long, value_enum, default_value_t = DockerOutputFormat::Json)]
+        format: DockerOutputFormat,
+    },
+}
+
+#[derive(Copy, Clone, Debug, ValueEnum)]
+enum DockerOutputFormat {
+    /// Emit the raw JSON manifest
+    Json,
+    /// Emit export lines for shell consumption
+    Env,
 }
 
 #[derive(Subcommand)]
@@ -503,6 +563,9 @@ async fn main() -> Result<()> {
         }
         Commands::Graph { cmd } => {
             handle_graph_command(cmd).await?;
+        }
+        Commands::Docker { cmd } => {
+            handle_docker_command(cmd).await?;
         }
         Commands::Version => {
             println!("{}", env!("CARGO_PKG_VERSION"));
@@ -1482,12 +1545,17 @@ async fn handle_k8s_bootstrap_command(cmd: K8sBootstrapCommands) -> Result<()> {
             config,
             dry_run,
             verbose,
+            use_latest_digests,
+            workflow,
+            repo,
+            api_url,
+            branch,
         } => {
             if verbose {
                 println!("Loading K8s bootstrap configuration from: {}", config);
             }
 
-            let bootstrap_config = k8s_bootstrap::load_config(&config)?;
+            let mut bootstrap_config = k8s_bootstrap::load_config(&config)?;
 
             if verbose {
                 println!("Configuration loaded successfully");
@@ -1499,6 +1567,43 @@ async fn handle_k8s_bootstrap_command(cmd: K8sBootstrapCommands) -> Result<()> {
 
             if verbose {
                 println!("Configuration validation passed");
+            }
+
+            if use_latest_digests {
+                let token = std::env::var("GH_TOKEN").context(
+                    "GH_TOKEN environment variable must be set when using --use-latest-digests",
+                )?;
+
+                let workflow_name = workflow.unwrap_or_else(|| DEFAULT_DOCKER_WORKFLOW.to_string());
+
+                let client = docker::DockerDigestClient::new_with_overrides(
+                    token,
+                    repo.as_deref(),
+                    api_url.as_deref(),
+                )?;
+
+                let docker::FetchManifestResult {
+                    manifest,
+                    workflow_run,
+                } = client.fetch_manifest(&workflow_name, &branch).await?;
+
+                k8s_bootstrap::merge_digests_into_config(&mut bootstrap_config, &manifest)?;
+
+                if let Some(number) = workflow_run.run_number {
+                    eprintln!(
+                        "Resolved docker-image-digests from workflow run #{number} (id {}).",
+                        workflow_run.id
+                    );
+                } else {
+                    eprintln!(
+                        "Resolved docker-image-digests from workflow run id {}.",
+                        workflow_run.id
+                    );
+                }
+
+                if let Some(url) = &workflow_run.html_url {
+                    eprintln!("Run URL: {}", url);
+                }
             }
 
             // Collect secrets
@@ -2230,6 +2335,76 @@ fn port_forward_and_check(
         }
         Err(e) => anyhow::bail!("Failed to execute curl for health check: {}", e),
     }
+}
+
+async fn handle_docker_command(cmd: DockerCommands) -> Result<()> {
+    match cmd {
+        DockerCommands::Digests { cmd } => handle_docker_digests_command(cmd).await?,
+    }
+
+    Ok(())
+}
+
+async fn handle_docker_digests_command(cmd: DockerDigestsCommands) -> Result<()> {
+    match cmd {
+        DockerDigestsCommands::Fetch {
+            workflow,
+            branch,
+            output,
+            format,
+        } => {
+            let token = std::env::var("GH_TOKEN").context(
+                "GH_TOKEN environment variable must be set to fetch docker digests from GitHub",
+            )?;
+
+            let client = docker::DockerDigestClient::new(token)?;
+            let docker::FetchManifestResult {
+                manifest,
+                workflow_run,
+            } = client.fetch_manifest(&workflow, &branch).await?;
+
+            let manifest_json = serde_json::to_string_pretty(&manifest)
+                .context("Failed to serialize digest manifest to JSON")?;
+
+            std::fs::write(&output, manifest_json.as_bytes()).with_context(|| {
+                format!("Failed to write digest manifest to {}", output.display())
+            })?;
+
+            match format {
+                DockerOutputFormat::Json => {
+                    println!("{}", manifest_json);
+                }
+                DockerOutputFormat::Env => {
+                    for (component, env_var) in docker::REQUIRED_COMPONENTS {
+                        let entry = manifest.get(component).with_context(|| {
+                            format!("Manifest is missing required component '{}'", component)
+                        })?;
+                        println!("export {}={}", env_var, entry.image);
+                    }
+                }
+            }
+
+            if let Some(number) = workflow_run.run_number {
+                eprintln!(
+                    "Fetched docker-image-digests from workflow run #{number} (id {}).",
+                    workflow_run.id
+                );
+            } else {
+                eprintln!(
+                    "Fetched docker-image-digests from workflow run id {}.",
+                    workflow_run.id
+                );
+            }
+
+            if let Some(url) = &workflow_run.html_url {
+                eprintln!("Run URL: {}", url);
+            }
+
+            eprintln!("Manifest written to {}", output.display());
+        }
+    }
+
+    Ok(())
 }
 
 async fn handle_graph_command(cmd: GraphCommands) -> Result<()> {

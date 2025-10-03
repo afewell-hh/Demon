@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::process::Command;
 
+use crate::docker;
+
 pub mod addons;
 pub mod k3s;
 pub mod secrets;
@@ -337,4 +339,246 @@ pub fn validate_networking_config(networking: &NetworkingConfig) -> Result<()> {
     }
 
     Ok(())
+}
+
+pub fn merge_digests_into_config(
+    config: &mut K8sBootstrapConfig,
+    manifest: &docker::Manifest,
+) -> Result<()> {
+    for (component, env_var) in docker::REQUIRED_COMPONENTS {
+        let entry = manifest
+            .get(component)
+            .with_context(|| format!("Manifest is missing required component '{}'.", component))?;
+
+        let image_reference = entry.image.clone();
+
+        match component {
+            "operate-ui" => config.demon.images.operate_ui = image_reference.clone(),
+            "runtime" => config.demon.images.runtime = image_reference.clone(),
+            "engine" => config.demon.images.engine = image_reference.clone(),
+            other => anyhow::bail!("Unsupported component '{}' in manifest", other),
+        }
+
+        std::env::set_var(env_var, &image_reference);
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn merge_digests_into_config_overrides_images_and_env() {
+        let mut config = K8sBootstrapConfig {
+            api_version: "v1".to_string(),
+            kind: "BootstrapConfig".to_string(),
+            metadata: ConfigMetadata {
+                name: "test".to_string(),
+            },
+            cluster: ClusterConfig {
+                name: "test".to_string(),
+                runtime: "k3s".to_string(),
+                k3s: K3sConfig {
+                    version: "v1".to_string(),
+                    install: K3sInstallConfig {
+                        channel: "stable".to_string(),
+                        disable: vec![],
+                    },
+                    data_dir: "/var/lib/rancher/k3s".to_string(),
+                    node_name: "node".to_string(),
+                    extra_args: vec![],
+                },
+            },
+            demon: DemonConfig {
+                nats_url: "nats://localhost:4222".to_string(),
+                namespace: "test-system".to_string(),
+                stream_name: "events".to_string(),
+                subjects: vec!["test.>".to_string()],
+                dedupe_window_secs: 30,
+                ui_url: "http://localhost:3000".to_string(),
+                persistence: PersistenceConfig {
+                    enabled: true,
+                    storage_class: "standard".to_string(),
+                    size: "10Gi".to_string(),
+                },
+                bundle: None,
+                images: ImageConfig {
+                    operate_ui: "main".to_string(),
+                    runtime: "main".to_string(),
+                    engine: "main".to_string(),
+                },
+            },
+            secrets: SecretsConfig {
+                provider: "env".to_string(),
+                vault: None,
+                env: None,
+            },
+            addons: vec![],
+            networking: NetworkingConfig {
+                ingress: IngressConfig {
+                    enabled: false,
+                    hostname: None,
+                    ingress_class: None,
+                    annotations: None,
+                    tls: TlsConfig::default(),
+                },
+                service_mesh: ServiceMeshConfig {
+                    enabled: false,
+                    annotations: default_mesh_annotations(),
+                },
+            },
+            registries: None,
+        };
+
+        std::env::remove_var("OPERATE_UI_IMAGE_TAG");
+        std::env::remove_var("RUNTIME_IMAGE_TAG");
+        std::env::remove_var("ENGINE_IMAGE_TAG");
+
+        let manifest = [
+            (
+                "operate-ui".to_string(),
+                docker::ManifestEntry {
+                    repository: "ghcr.io/acme/demon-operate-ui".to_string(),
+                    digest: "sha256:aaa".to_string(),
+                    image: "ghcr.io/acme/demon-operate-ui@sha256:aaa".to_string(),
+                    git_sha_tag: Some("ghcr.io/acme/demon-operate-ui:sha-deadbeef".to_string()),
+                },
+            ),
+            (
+                "runtime".to_string(),
+                docker::ManifestEntry {
+                    repository: "ghcr.io/acme/demon-runtime".to_string(),
+                    digest: "sha256:bbb".to_string(),
+                    image: "ghcr.io/acme/demon-runtime@sha256:bbb".to_string(),
+                    git_sha_tag: Some("ghcr.io/acme/demon-runtime:sha-deadbeef".to_string()),
+                },
+            ),
+            (
+                "engine".to_string(),
+                docker::ManifestEntry {
+                    repository: "ghcr.io/acme/demon-engine".to_string(),
+                    digest: "sha256:ccc".to_string(),
+                    image: "ghcr.io/acme/demon-engine@sha256:ccc".to_string(),
+                    git_sha_tag: Some("ghcr.io/acme/demon-engine:sha-deadbeef".to_string()),
+                },
+            ),
+        ]
+        .into_iter()
+        .collect();
+
+        merge_digests_into_config(&mut config, &manifest).unwrap();
+
+        assert_eq!(
+            config.demon.images.operate_ui,
+            "ghcr.io/acme/demon-operate-ui@sha256:aaa"
+        );
+        assert_eq!(
+            config.demon.images.runtime,
+            "ghcr.io/acme/demon-runtime@sha256:bbb"
+        );
+        assert_eq!(
+            config.demon.images.engine,
+            "ghcr.io/acme/demon-engine@sha256:ccc"
+        );
+
+        assert_eq!(
+            std::env::var("OPERATE_UI_IMAGE_TAG").unwrap(),
+            "ghcr.io/acme/demon-operate-ui@sha256:aaa"
+        );
+        assert_eq!(
+            std::env::var("RUNTIME_IMAGE_TAG").unwrap(),
+            "ghcr.io/acme/demon-runtime@sha256:bbb"
+        );
+        assert_eq!(
+            std::env::var("ENGINE_IMAGE_TAG").unwrap(),
+            "ghcr.io/acme/demon-engine@sha256:ccc"
+        );
+
+        std::env::remove_var("OPERATE_UI_IMAGE_TAG");
+        std::env::remove_var("RUNTIME_IMAGE_TAG");
+        std::env::remove_var("ENGINE_IMAGE_TAG");
+    }
+
+    #[test]
+    fn merge_digests_into_config_errors_when_component_missing() {
+        let mut config = K8sBootstrapConfig {
+            api_version: "v1".to_string(),
+            kind: "BootstrapConfig".to_string(),
+            metadata: ConfigMetadata {
+                name: "test".to_string(),
+            },
+            cluster: ClusterConfig {
+                name: "test".to_string(),
+                runtime: "k3s".to_string(),
+                k3s: K3sConfig {
+                    version: "v1".to_string(),
+                    install: K3sInstallConfig {
+                        channel: "stable".to_string(),
+                        disable: vec![],
+                    },
+                    data_dir: "/var/lib/rancher/k3s".to_string(),
+                    node_name: "node".to_string(),
+                    extra_args: vec![],
+                },
+            },
+            demon: DemonConfig {
+                nats_url: "nats://localhost:4222".to_string(),
+                namespace: "test-system".to_string(),
+                stream_name: "events".to_string(),
+                subjects: vec!["test.>".to_string()],
+                dedupe_window_secs: 30,
+                ui_url: "http://localhost:3000".to_string(),
+                persistence: PersistenceConfig {
+                    enabled: true,
+                    storage_class: "standard".to_string(),
+                    size: "10Gi".to_string(),
+                },
+                bundle: None,
+                images: ImageConfig {
+                    operate_ui: "main".to_string(),
+                    runtime: "main".to_string(),
+                    engine: "main".to_string(),
+                },
+            },
+            secrets: SecretsConfig {
+                provider: "env".to_string(),
+                vault: None,
+                env: None,
+            },
+            addons: vec![],
+            networking: NetworkingConfig {
+                ingress: IngressConfig {
+                    enabled: false,
+                    hostname: None,
+                    ingress_class: None,
+                    annotations: None,
+                    tls: TlsConfig::default(),
+                },
+                service_mesh: ServiceMeshConfig {
+                    enabled: false,
+                    annotations: default_mesh_annotations(),
+                },
+            },
+            registries: None,
+        };
+
+        let manifest: docker::Manifest = [(
+            "operate-ui".to_string(),
+            docker::ManifestEntry {
+                repository: "ghcr.io/acme/demon-operate-ui".to_string(),
+                digest: "sha256:aaa".to_string(),
+                image: "ghcr.io/acme/demon-operate-ui@sha256:aaa".to_string(),
+                git_sha_tag: None,
+            },
+        )]
+        .into_iter()
+        .collect();
+
+        let err = merge_digests_into_config(&mut config, &manifest).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("Manifest is missing required component"));
+    }
 }

@@ -24,6 +24,8 @@ DRY_RUN=${DRY_RUN:-false}
 CLEANUP=${CLEANUP:-false}
 VERBOSE=${VERBOSE:-false}
 
+DEMONCTL_BIN="${DEMONCTL_BIN:-}"
+
 # Tools configuration - k3d preferred, kind as fallback
 CONTAINER_TOOL=""
 KUBECTL_CMD=""
@@ -91,11 +93,19 @@ check_dependencies() {
     log "Checking dependencies..."
 
     # Check for demonctl
-    if ! command -v "${PROJECT_ROOT}/target/debug/demonctl" >/dev/null 2>&1; then
-        if ! cargo build -p demonctl >/dev/null 2>&1; then
+    if command -v demonctl >/dev/null 2>&1; then
+        DEMONCTL_BIN="$(command -v demonctl)"
+        log "Found demonctl in PATH: ${DEMONCTL_BIN}"
+    elif [ -x "${PROJECT_ROOT}/target/debug/demonctl" ]; then
+        DEMONCTL_BIN="${PROJECT_ROOT}/target/debug/demonctl"
+        log "Using demonctl from target/debug"
+    else
+        log "demonctl binary not found; building via cargo"
+        if ! (cd "${PROJECT_ROOT}" && cargo build -p demonctl >/dev/null 2>&1); then
             error "Failed to build demonctl. Run 'cargo build -p demonctl' first."
             exit 1
         fi
+        DEMONCTL_BIN="${PROJECT_ROOT}/target/debug/demonctl"
     fi
 
     # Check for container runtime tools
@@ -211,12 +221,12 @@ run_dry_run_bootstrap() {
 
     # Capture dry-run output
     if [[ "${VERBOSE}" == "true" ]]; then
-        "${PROJECT_ROOT}/target/debug/demonctl" k8s-bootstrap bootstrap \
+        "${DEMONCTL_BIN}" k8s-bootstrap bootstrap \
             --config "${CONFIG_FILE}" \
             --dry-run \
             --verbose > "${output_file}" 2>&1
     else
-        "${PROJECT_ROOT}/target/debug/demonctl" k8s-bootstrap bootstrap \
+        "${DEMONCTL_BIN}" k8s-bootstrap bootstrap \
             --config "${CONFIG_FILE}" \
             --dry-run > "${output_file}" 2>&1
     fi
@@ -258,11 +268,11 @@ run_live_bootstrap() {
 
     # Run bootstrap with verbose output
     if [[ "${VERBOSE}" == "true" ]]; then
-        "${PROJECT_ROOT}/target/debug/demonctl" k8s-bootstrap bootstrap \
+        "${DEMONCTL_BIN}" k8s-bootstrap bootstrap \
             --config "${CONFIG_FILE}" \
             --verbose > "${output_file}" 2>&1
     else
-        "${PROJECT_ROOT}/target/debug/demonctl" k8s-bootstrap bootstrap \
+        "${DEMONCTL_BIN}" k8s-bootstrap bootstrap \
             --config "${CONFIG_FILE}" > "${output_file}" 2>&1
     fi
 

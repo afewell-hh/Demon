@@ -92,3 +92,77 @@ jobs:
           if [ "${{ steps.build.outcome }}" = "failure" ]; then
             echo "::error title=Docker Build Failed::Failed to build ${{ matrix.component }} image"
           fi
+
+      - name: Write image digest artifact
+        id: write-digest
+        if: ${{ steps.build.outputs.digest != '' }}
+        run: |
+          set -euo pipefail
+          mkdir -p image-digests
+          digest="${{ steps.build.outputs.digest }}"
+          digest="${digest#sha256:}"
+          if [ -z "$digest" ]; then
+            echo "Digest missing for ${{ matrix.component }}" >&2
+            exit 1
+          fi
+
+          repository="${{ env.IMAGE_PREFIX }}-${{ matrix.component }}"
+          cat <<'JSON' > image-digests/${{ matrix.component }}.json
+          {
+            "component": "${{ matrix.component }}",
+            "repository": "${repository}",
+            "digest": "sha256:${digest}",
+            "image": "${repository}@sha256:${digest}",
+            "gitShaTag": "${repository}:sha-${{ github.sha }}"
+          }
+          JSON
+          cat image-digests/${{ matrix.component }}.json
+
+      - name: Upload image digest artifact
+        if: steps.write-digest.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image-metadata-${{ matrix.component }}
+          path: image-digests/${{ matrix.component }}.json
+          retention-days: 30
+
+  publish_digests:
+    name: Publish image digest manifest
+    runs-on: ubuntu-latest
+    needs: build
+    outputs:
+      digest-json: ${{ steps.collect.outputs.digest-json }}
+    steps:
+      - name: Download component digests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: docker-image-metadata-*
+          path: image-digests
+          merge-multiple: true
+
+      - name: Merge digest manifest
+        id: collect
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(image-digests/*.json)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No image digest artifacts available; writing empty manifest" >&2
+            printf '{}\n' > docker-image-digests.json
+          else
+            jq -s 'map({ (.component): {repository: .repository, digest: .digest, image: .image, gitShaTag: .gitShaTag}}) | add' "${files[@]}" > docker-image-digests.json
+          fi
+          cat docker-image-digests.json
+          echo "digest-json=$(jq -c . docker-image-digests.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload digest manifest artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image-digests
+          path: docker-image-digests.json
+          retention-days: 30
+
+      - name: Summarize digest manifest
+        run: |
+          echo "### Docker image digests" >> "$GITHUB_STEP_SUMMARY"
+          jq -r 'to_entries | ("| Component | Digest | Image |"), ("| --- | --- | --- |"), (.[] | "| " + .key + " | `" + .value.digest + "` | `" + .value.image + "` |")' docker-image-digests.json >> "$GITHUB_STEP_SUMMARY"

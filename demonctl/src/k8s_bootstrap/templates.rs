@@ -107,15 +107,26 @@ impl TemplateRenderer {
         let registry_context = self.build_registry_context(&config.registries)?;
         context.insert("registries".to_string(), Value::Object(registry_context));
 
-        let operate_ui_tag =
-            resolve_image_tag("OPERATE_UI_IMAGE_TAG", &demon_config.images.operate_ui);
-        let runtime_tag = resolve_image_tag("RUNTIME_IMAGE_TAG", &demon_config.images.runtime);
-        let engine_tag = resolve_image_tag("ENGINE_IMAGE_TAG", &demon_config.images.engine);
+        let operate_ui_image = build_image_reference(
+            "OPERATE_UI_IMAGE_TAG",
+            &demon_config.images.operate_ui,
+            "ghcr.io/afewell-hh/demon-operate-ui",
+        );
+        let runtime_image = build_image_reference(
+            "RUNTIME_IMAGE_TAG",
+            &demon_config.images.runtime,
+            "ghcr.io/afewell-hh/demon-runtime",
+        );
+        let engine_image = build_image_reference(
+            "ENGINE_IMAGE_TAG",
+            &demon_config.images.engine,
+            "ghcr.io/afewell-hh/demon-engine",
+        );
 
         let mut image_tags_obj = serde_json::Map::new();
-        image_tags_obj.insert("operateUi".to_string(), Value::String(operate_ui_tag));
-        image_tags_obj.insert("runtime".to_string(), Value::String(runtime_tag));
-        image_tags_obj.insert("engine".to_string(), Value::String(engine_tag));
+        image_tags_obj.insert("operateUi".to_string(), Value::String(operate_ui_image));
+        image_tags_obj.insert("runtime".to_string(), Value::String(runtime_image));
+        image_tags_obj.insert("engine".to_string(), Value::String(engine_image));
         context.insert("imageTags".to_string(), Value::Object(image_tags_obj));
 
         Ok(context)
@@ -586,6 +597,18 @@ fn resolve_image_tag(env_var: &str, fallback: &str) -> String {
         .unwrap_or_else(|| fallback.to_string())
 }
 
+fn build_image_reference(env_var: &str, fallback: &str, repository: &str) -> String {
+    let raw = resolve_image_tag(env_var, fallback);
+
+    if raw.contains('/') || raw.contains('@') {
+        raw
+    } else if raw.starts_with("sha256:") {
+        format!("{}@{}", repository, raw)
+    } else {
+        format!("{}:{}", repository, raw)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -672,6 +695,29 @@ mod tests {
             context.get("natsUrl").unwrap(),
             &Value::String("nats://nats.test-ns.svc.cluster.local:4222".to_string())
         );
+
+        if let Some(Value::Object(image_tags)) = context.get("imageTags") {
+            assert_eq!(
+                image_tags.get("operateUi"),
+                Some(&Value::String(
+                    "ghcr.io/afewell-hh/demon-operate-ui:main".to_string()
+                ))
+            );
+            assert_eq!(
+                image_tags.get("runtime"),
+                Some(&Value::String(
+                    "ghcr.io/afewell-hh/demon-runtime:main".to_string()
+                ))
+            );
+            assert_eq!(
+                image_tags.get("engine"),
+                Some(&Value::String(
+                    "ghcr.io/afewell-hh/demon-engine:main".to_string()
+                ))
+            );
+        } else {
+            panic!("imageTags context missing");
+        }
     }
 
     #[test]
@@ -750,15 +796,21 @@ mod tests {
         if let Some(Value::Object(image_tags)) = context.get("imageTags") {
             assert_eq!(
                 image_tags.get("operateUi"),
-                Some(&Value::String("sha-operate".to_string()))
+                Some(&Value::String(
+                    "ghcr.io/afewell-hh/demon-operate-ui:sha-operate".to_string()
+                ))
             );
             assert_eq!(
                 image_tags.get("runtime"),
-                Some(&Value::String("sha-runtime".to_string()))
+                Some(&Value::String(
+                    "ghcr.io/afewell-hh/demon-runtime:sha-runtime".to_string()
+                ))
             );
             assert_eq!(
                 image_tags.get("engine"),
-                Some(&Value::String("sha-engine".to_string()))
+                Some(&Value::String(
+                    "ghcr.io/afewell-hh/demon-engine:sha-engine".to_string()
+                ))
             );
         } else {
             panic!("imageTags context missing");
@@ -767,6 +819,35 @@ mod tests {
         std::env::remove_var("OPERATE_UI_IMAGE_TAG");
         std::env::remove_var("RUNTIME_IMAGE_TAG");
         std::env::remove_var("ENGINE_IMAGE_TAG");
+    }
+
+    #[test]
+    fn test_build_image_reference_with_digest() {
+        let reference = build_image_reference(
+            "OPERATE_UI_IMAGE_TAG",
+            "sha256:abc",
+            "ghcr.io/afewell-hh/demon-operate-ui",
+        );
+
+        assert_eq!(reference, "ghcr.io/afewell-hh/demon-operate-ui@sha256:abc");
+    }
+
+    #[test]
+    fn test_build_image_reference_preserves_full_reference() {
+        std::env::set_var(
+            "OPERATE_UI_IMAGE_TAG",
+            "ghcr.io/custom/operate-ui@sha256:def",
+        );
+
+        let reference = build_image_reference(
+            "OPERATE_UI_IMAGE_TAG",
+            "main",
+            "ghcr.io/afewell-hh/demon-operate-ui",
+        );
+
+        assert_eq!(reference, "ghcr.io/custom/operate-ui@sha256:def");
+
+        std::env::remove_var("OPERATE_UI_IMAGE_TAG");
     }
 
     #[test]

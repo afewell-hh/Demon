@@ -43,7 +43,7 @@ spec:
     spec:
       containers:
       - name: runtime
-        image: ghcr.io/afewell-hh/demon-runtime:{{ .imageTags.runtime }}
+        image: {{ .imageTags.runtime }}
         ports:
         - containerPort: 8080
           name: http

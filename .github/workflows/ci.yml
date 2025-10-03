@@ -58,8 +58,11 @@ jobs:
               return;
             }
             if (lock.toLowerCase() !== headSha.toLowerCase()) {
-              core.setFailed(`Review-lock mismatch after retries: lock=${lock.slice(0,12)} headSha=${headSha.slice(0,12)}`);
-            }
+            core.setFailed(`Review-lock mismatch after retries: lock=${lock.slice(0,12)} headSha=${headSha.slice(0,12)}`);
+          }
+  docker-build:
+    uses: ./.github/workflows/docker-build.yml
+    secrets: inherit
   build-test:
     runs-on: ubuntu-latest
 
@@ -799,7 +802,9 @@ jobs:
 
   k8s-bootstrapper-smoke-dryrun:
     runs-on: ubuntu-latest
-    needs: build-test
+    needs:
+      - build-test
+      - docker-build
     # Only run on PRs/pushes that affect k8s-bootstrap related code
     if: |
       github.event_name == 'workflow_dispatch' ||
@@ -829,8 +834,30 @@ jobs:
             .
           cache-on-failure: true
 
-      - name: Build demonctl
-        run: cargo build -p demonctl
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Install demonctl CLI
+        run: cargo install --path demonctl --locked --force
+
+      - name: Fetch GHCR image tags with demonctl
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEMONCTL_GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          BIN="$HOME/.cargo/bin/demonctl"
+          MANIFEST_PATH="$RUNNER_TEMP/docker-image-digests.json"
+          ENV_EXPORTS="$($BIN docker digests fetch --format env --output "$MANIFEST_PATH")"
+
+          eval "$ENV_EXPORTS"
+          printf '%s\n' "$ENV_EXPORTS" | sed 's/^export //' >> "$GITHUB_ENV"
+
+          {
+            echo "### K8s smoke image digests"
+            echo ""
+            jq -r 'to_entries | ("| Component | Image |"), ("| --- | --- |"), (.[] | "| " + .key + " | `" + .value.image + "` |")' "$MANIFEST_PATH"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Run bootstrapper smoke test (dry-run only)
         run: |

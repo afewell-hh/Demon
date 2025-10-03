@@ -120,6 +120,12 @@ Update `scripts/tests/smoke-k8s-bootstrap.sh`:
 - Docker build must complete before smoke tests
 - Image availability validation before K8s deployment
 
+**Progress:**
+- ✅ Docker build workflow now produces a reusable `docker-image-digests.json` artifact with component → digest mappings (exposed via workflow outputs).
+- ✅ `ci.yml` invokes the docker-build workflow via `needs` and exports immutable GHCR digests to the dry-run smoke job.
+- ✅ Nightly smoke workflow resolves the latest successful docker-build run on `main`, downloads the digest artifact with `gh` API access, and fails fast when artifacts expire (documented fallback to `:main`).
+- 🔄 Follow-up: monitor nightly run after the first scheduled execution to ensure clusters pull digests without relying on local image import.
+
 #### 4.2 Rollback Strategy
 **Immediate rollback capability:**
 - Keep placeholder manifests in a separate branch

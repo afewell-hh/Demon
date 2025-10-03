@@ -80,6 +80,13 @@ From `DOCKER_PIPELINE_PLAN.md`, tracking the multi-phase implementation:
 - ✅ Added `demon.imageTags` to bootstrap config + schema with defaults (`main`) and env overrides (`OPERATE_UI_IMAGE_TAG`, `RUNTIME_IMAGE_TAG`, `ENGINE_IMAGE_TAG`)
 - ✅ Smoke workflow continues to run real HTTP health checks against runtime/engine/operate-ui using GHCR builds
 
+#### Phase 4: CI Integration 🚧 **IN PROGRESS** (2025-10-03)
+- ✅ `.github/workflows/docker-build.yml` now emits a `docker-image-digests` artifact and exposes a JSON output for downstream jobs (component → `repository`, `digest`, `image`, `gitShaTag`).
+- ✅ `ci.yml` now installs `demonctl` and calls `demonctl docker digests fetch --format env` to hydrate `OPERATE_UI_IMAGE_TAG`, `RUNTIME_IMAGE_TAG`, and `ENGINE_IMAGE_TAG`, eliminating the bespoke `jq` parsing of reusable workflow outputs.
+- ✅ Scheduled smoke workflow (`bootstrapper-smoke.yml`) reuses the same command to download/validate digests, publishes tags as job outputs, and shares them with the cluster run—no more GitHub Script + artifact plumbing.
+- ✅ New `demonctl docker digests fetch` command mirrors the CI flow so operators can fetch the latest GHCR digests locally (supports `--format env|json`, optional `--workflow`/`--branch`, and writes `docker-image-digests.json`).
+- 🔄 Validation: nightly run pending to confirm k3d pulls GHCR digests without local image import. Capture run ID + summary once the first scheduled execution completes on the new plumbing.
+
 ### File Changes Made
 
 #### Core Health Check Fix
@@ -104,8 +111,21 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace --all-features -- --test-threads=1
 
 # Validate bootstrap against GHCR builds (requires k3d/kind)
-OPERATE_UI_IMAGE_TAG=sha-<commit> RUNTIME_IMAGE_TAG=sha-<commit> ENGINE_IMAGE_TAG=sha-<commit> make bootstrap-smoke ARGS="--dry-run-only --verbose"
-OPERATE_UI_IMAGE_TAG=sha-<commit> RUNTIME_IMAGE_TAG=sha-<commit> ENGINE_IMAGE_TAG=sha-<commit> make bootstrap-smoke ARGS="--verbose --cleanup"
+# Preferred: fetch digests via demonctl and export for the session
+export GH_TOKEN=$(gh auth token)
+demonctl docker digests fetch --workflow docker-build.yml --branch main --format env --output /tmp/docker-image-digests.json \
+  | tee /tmp/demon-ghcr.env
+source /tmp/demon-ghcr.env
+make bootstrap-smoke ARGS="--dry-run-only --verbose"
+
+OPERATE_UI_IMAGE_TAG=${OPERATE_UI_IMAGE_TAG:-ghcr.io/afewell-hh/demon-operate-ui:main} \
+RUNTIME_IMAGE_TAG=${RUNTIME_IMAGE_TAG:-ghcr.io/afewell-hh/demon-runtime:main} \
+ENGINE_IMAGE_TAG=${ENGINE_IMAGE_TAG:-ghcr.io/afewell-hh/demon-engine:main} \
+  make bootstrap-smoke ARGS="--verbose --cleanup"
+
+# Fallback: manually download the artifact if retention expired
+# RUN_ID=$(gh run list --repo afewell-hh/demon --workflow docker-build.yml --branch main --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+# gh run download $RUN_ID --repo afewell-hh/demon --name docker-image-digests --dir /tmp/docker-digests
 ```
 
 ### Next Deployment Test
