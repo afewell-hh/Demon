@@ -69,7 +69,7 @@ From `DOCKER_PIPELINE_PLAN.md`, tracking the multi-phase implementation:
 - ✅ **Implemented CI workflow** to build and push images to GHCR
   - PR #226: Merged Docker build workflow
   - Workflow: `.github/workflows/docker-build.yml`
-  - Multi-arch support: linux/amd64, linux/arm64
+  - Multi-arch support (main pushes): linux/amd64, linux/arm64; PR builds stay on linux/amd64 for dry-run safety
   - Auto-triggers on push to main, PR changes, and manual dispatch
   - Images: ghcr.io/afewell-hh/demon-{operate-ui,runtime,engine}:{latest,sha-*}
   - **Cache resilience**: Added `ignore-error=true` to tolerate Azure storage contention
@@ -189,4 +189,3 @@ The handoff is designed to be seamless with no immediate action required beyond 
 - GHCR images operational with correct endpoints
 - CI/CD pipeline functioning correctly
 - Ready for handoff
-
