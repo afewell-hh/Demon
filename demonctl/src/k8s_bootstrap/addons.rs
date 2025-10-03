@@ -527,6 +527,11 @@ mod tests {
                     size: "1Gi".to_string(),
                 },
                 bundle: None,
+                images: crate::k8s_bootstrap::ImageConfig {
+                    operate_ui: "main".to_string(),
+                    runtime: "main".to_string(),
+                    engine: "main".to_string(),
+                },
             },
             secrets: SecretsConfig {
                 provider: "env".to_string(),

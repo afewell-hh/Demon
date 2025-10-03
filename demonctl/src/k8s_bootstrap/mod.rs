@@ -155,6 +155,8 @@ pub struct DemonConfig {
     pub ui_url: String,
     pub persistence: PersistenceConfig,
     pub bundle: Option<BundleConfig>,
+    #[serde(default = "default_image_config")]
+    pub images: ImageConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -190,6 +192,28 @@ pub struct VaultConfig {
 
 fn default_auth_method() -> String {
     "token".to_string()
+}
+
+fn default_image_tag() -> String {
+    "main".to_string()
+}
+
+fn default_image_config() -> ImageConfig {
+    ImageConfig {
+        operate_ui: default_image_tag(),
+        runtime: default_image_tag(),
+        engine: default_image_tag(),
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageConfig {
+    #[serde(rename = "operateUi", default = "default_image_tag")]
+    pub operate_ui: String,
+    #[serde(default = "default_image_tag")]
+    pub runtime: String,
+    #[serde(default = "default_image_tag")]
+    pub engine: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

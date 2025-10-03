@@ -72,6 +72,21 @@ demonctl k8s-bootstrap bootstrap --config config.yaml
 - `demon.persistence.storageClass`: Storage class (default: `local-path`)
 - `demon.persistence.size`: Storage size (default: `10Gi`)
 
+#### Image Tags
+- `demon.imageTags.operateUi`: Tag for `ghcr.io/afewell-hh/demon-operate-ui` (default: `main`)
+- `demon.imageTags.runtime`: Tag for `ghcr.io/afewell-hh/demon-runtime` (default: `main`)
+- `demon.imageTags.engine`: Tag for `ghcr.io/afewell-hh/demon-engine` (default: `main`)
+
+**Runtime overrides:** set the following environment variables before running `demonctl k8s-bootstrap bootstrap` to override tags without editing the config file:
+
+```bash
+export OPERATE_UI_IMAGE_TAG=sha-abcdef1234567890
+export RUNTIME_IMAGE_TAG=sha-fedcba0987654321
+export ENGINE_IMAGE_TAG=sha-1122334455667788
+```
+
+Environment variables take precedence over configuration values, enabling CI/CD pipelines to inject the current image digest.
+
 #### Secret Management
 The bootstrapper generates a Kubernetes Secret manifest with your configured secrets, which is applied before other Demon components. The secret is named `demon-secrets` by default.
 

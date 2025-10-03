@@ -75,9 +75,10 @@ From `DOCKER_PIPELINE_PLAN.md`, tracking the multi-phase implementation:
   - **Cache resilience**: Added `ignore-error=true` to tolerate Azure storage contention
   - GitHub Actions cache optimization for faster rebuilds
 
-#### Phase 3: K8s Manifests 📋 **PLANNED**
-- **Update K8s manifests** to reference real images instead of placeholders
-- **Restore HTTP health checks** once real services are available
+#### Phase 3: K8s Manifests ✅ **COMPLETED** (2025-10-03)
+- ✅ `demonctl` manifests now render GHCR image tags from config/env overrides (`demonctl/resources/k8s/*.yaml`)
+- ✅ Added `demon.imageTags` to bootstrap config + schema with defaults (`main`) and env overrides (`OPERATE_UI_IMAGE_TAG`, `RUNTIME_IMAGE_TAG`, `ENGINE_IMAGE_TAG`)
+- ✅ Smoke workflow continues to run real HTTP health checks against runtime/engine/operate-ui using GHCR builds
 
 ### File Changes Made
 
@@ -88,8 +89,9 @@ From `DOCKER_PIPELINE_PLAN.md`, tracking the multi-phase implementation:
   - Lines 397-474: Applied to all three components (runtime, UI, engine)
 
 #### Documentation Updates
-- `scripts/tests/smoke-k8s-bootstrap.sh`: Updated header comments to reflect new capability
+- `scripts/tests/smoke-k8s-bootstrap.sh`: Updated header comments to reflect new capability (GHCR image tags via env)
 - `docs/releases/README-HANDOFF.md`: This handoff document
+- `docs/examples/k8s-bootstrap/README.md`: Documented `demon.imageTags` and env override flow
 
 ### Validation Commands
 
@@ -101,10 +103,9 @@ cargo fmt
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace --all-features -- --test-threads=1
 
-# Validate placeholder deployment works
-# (requires k3d/kind installation)
-make bootstrap-smoke ARGS="--dry-run-only --verbose"
-make bootstrap-smoke ARGS="--verbose --cleanup"
+# Validate bootstrap against GHCR builds (requires k3d/kind)
+OPERATE_UI_IMAGE_TAG=sha-<commit> RUNTIME_IMAGE_TAG=sha-<commit> ENGINE_IMAGE_TAG=sha-<commit> make bootstrap-smoke ARGS="--dry-run-only --verbose"
+OPERATE_UI_IMAGE_TAG=sha-<commit> RUNTIME_IMAGE_TAG=sha-<commit> ENGINE_IMAGE_TAG=sha-<commit> make bootstrap-smoke ARGS="--verbose --cleanup"
 ```
 
 ### Next Deployment Test
@@ -116,8 +117,8 @@ After merging these changes, the next nightly run should:
 4. Complete with green status
 
 **Expected Success Criteria**:
-- All pods reach Ready state within 240s
-- Health checks pass with "placeholder mode detected" messages
+- All pods reach Ready state within 240s using GHCR images
+- Health checks pass with HTTP 200 responses from runtime (`/health`) and operate-ui (`/health`)
 - No "No demon-runtime pod found" errors
 
 ### Monitoring & Follow-up

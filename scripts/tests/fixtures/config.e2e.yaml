@@ -44,6 +44,10 @@ demon:
     enabled: true
     storageClass: local-path  # Default k3s storage class
     size: 5Gi                # Smaller size for testing
+  imageTags:
+    operateUi: main
+    runtime: main
+    engine: main
 
 # Secret management configuration (uses environment variables)
 secrets:

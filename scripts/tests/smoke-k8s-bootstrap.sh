@@ -1,5 +1,7 @@
 #!/bin/bash
-#
+# Supported overrides:
+#   OPERATE_UI_IMAGE_TAG, RUNTIME_IMAGE_TAG, ENGINE_IMAGE_TAG can be set to GHCR tags
+#   when invoking the script to test specific container builds.
 # End-to-End Smoke Test for Kubernetes Bootstrapper
 # Automates cluster provisioning, bootstrap deployment, and verification
 #
