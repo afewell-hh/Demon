@@ -6,9 +6,9 @@ Welcome to the Demon project documentation. This is your central navigation hub 
 
 ### 👨‍💻 [Developers](personas/developers.md)
 Building with Demon, writing capsules, and integrating workflows
-- [Quick Start Guide](../README.md#quickstart)
+- [Quickstart](../README.md#quickstart)
 - [Contract Registry](../README.md#contract-registry)
-- [Development Environment](../README.md#self-host-bootstrap)
+- [Self-host Bootstrap](../README.md#self-host-bootstrap)
 
 ### 🔧 [Platform Engineers](personas/operators.md)
 Deploying, configuring, and operating Demon in production
@@ -40,6 +40,7 @@ Solutions to specific problems:
 - [How to Deploy Demon](bootstrapper/)
 - [How to Write Custom Policies](examples/)
 - [How to Configure Approvals](contracts/)
+- [How to Build & Publish Docker Images](how-to-guides/docker-pipeline.md)
 
 ### 📖 **Reference** (Information-oriented)
 Technical specifications and APIs:
@@ -50,7 +51,8 @@ Technical specifications and APIs:
 ### 💡 **Explanation** (Understanding-oriented)
 Background context and design rationale:
 - [Why Demon Exists](mvp/01-mvp-contract.md#problem--personas)
-- [Architecture Overview](../README.md#layout)
+- [Agent-first Automation](../README.md#agent-first-automation)
+- [Platform Layout](../README.md#layout)
 - [Design Decisions](adr/)
 
 ## 🗂️ Directory Index
@@ -83,7 +85,7 @@ Background context and design rationale:
 - **Integrate with APIs?** → [API Documentation](../README.md#approvals-api)
 - **Check project status?** → [MVP Progress](mvp/01-mvp-contract.md)
 - **Find examples?** → [Examples Directory](examples/)
-- **Troubleshoot issues?** → [Operations Guide](ops/)
+- **Troubleshoot issues?** → [Docker Troubleshooting](ops/docker-troubleshooting.md) or broader [Operations Guides](ops/)
 
 ### Documentation Status
 - 📈 **Coverage**: 95% of user journeys documented

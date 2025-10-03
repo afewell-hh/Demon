@@ -3,248 +3,180 @@
 [![CI](https://github.com/afewell-hh/demon/actions/workflows/ci.yml/badge.svg)](https://github.com/afewell-hh/demon/actions/workflows/ci.yml)
 [![Preview: Alpha](https://img.shields.io/badge/Preview-Alpha-6f42c1.svg)](https://github.com/afewell-hh/demon/releases/tag/preview-alpha-1)
 
-**Secure, auditable workflow automation with human approval gates and policy enforcement.**
+**Secure, auditable workflow automation built for regulated delivery teams.**
 
-Demon is a meta-platform that bridges the gap between rigid CI/CD pipelines and ungoverned automation.
-Platform teams get programmable workflow control with built-in approval gates, policy enforcement, and
-complete audit trails—without sacrificing developer velocity.
+## Why Demon
 
-## What is Demon?
+Modern platform and security groups are stuck between brittle CI/CD pipelines and manual runbooks that quietly drift. Demon exists to let those teams script complex operations with the same rigor they bring to code: declared once, replayed safely, and inspected afterward. A single ritual capsule can roll out a release, rotate credentials, or steer an incident bridge, yet every action is still gated by explicit policy and human approval where needed. Instead of duct-taping bespoke bots, Demon provides a dependable control plane with transparent audit trails that operations, compliance, and engineering can trust.
 
-Demon provides three core pillars for controlled automation:
+### Track C: Contracts, Envelopes & Replay
 
-- **Ritual Engine**: Define workflows as declarative YAML "rituals" that execute with full event
-  traceability
-- **Policy Wards**: Enforce quotas, time windows, and approval requirements before any action executes
-- **Approval Gates**: Human-in-the-loop controls with configurable TTLs and escalation paths
+Every workflow step emits a **signed envelope** that captures inputs, outputs, and policy context. The runtime persists those envelopes in NATS JetStream so they can be replayed deterministically, compared across environments, and verified offline. **Idempotency** is enforced by re-hydrating envelopes before executing a capsule; if the payload matches, Demon proves nothing new happened and skips the duplicate. This lets teams retry failed automation, recover from transient outages, and build "approve once, run many" rituals without fear of double execution.
 
-Unlike general workflow orchestrators, Demon is purpose-built for scenarios where governance, security,
-and audit requirements are paramount—think production deployments, infrastructure changes, and
-security-sensitive operations.
+- **Contracts** (JSON Schemas + WIT) govern capsule interfaces and event shapes, ensuring runtime compatibility across dev, staging, and prod.
+- **Envelopes** wrap each event with metadata (timestamp, nonce, signature), making every step portable, auditable, and reproducible.
+- **Replay guarantees** allow operations teams to re-run rituals from checkpoint or re-verify completed workflows without side effects, powered by fingerprint matching and deterministic execution.
 
-## Track C: Agent-First Automation
+The contract registry keeps schema changes honest, while approval gates ensure humans stay in the loop exactly where their judgment matters.
 
-Modern platform teams face a new challenge: **AI agents are writing and executing automation at scale**.
-Traditional CI/CD assumes humans write workflows once and run them many times. But when agents generate
-workflows dynamically, you need:
+## Agent-first Automation
 
-- **Contract enforcement** — Agents must speak a versioned API (schemas, WIT definitions) so workflows
-  remain compatible across updates
-- **Event envelopes** — Every action produces a timestamped, schema-validated event for audit and
-  replay; agents can't bypass the paper trail
-- **Replay guarantees** — Deterministic event streams let you reconstruct what an agent did, why it
-  decided to act, and roll back if needed
+Demon is designed for automated workflows that must survive restarts, handle retries gracefully, and provide audit trails that satisfy compliance requirements. Capsules are agent-like processes that respond to ritual steps, emit events, and declare their capabilities via contracts.
 
-Demon treats **every workflow as data**: the ritual definition, the policy decisions, the approval
-interactions—all captured in immutable event streams. This makes agent-driven automation safe to audit,
-easy to debug, and simple to govern.
+- **Contracts stay ahead of code**: Capsule workflows negotiate via versioned JSON Schemas and WIT definitions stored in `contracts/`, keeping runtime compatibility across environments. Schema validation runs in CI (`contracts-validate` required check) to catch breaking changes before they reach production.
+- **Envelopes make state portable**: Every capsule call, policy decision, and emitted event produces an envelope stored on JetStream, ready for replay, audit, or downstream automation. Each envelope includes a cryptographic signature for offline verification.
+- **Idempotent replays by default**: Rituals hydrate prior envelopes, compare their fingerprints, and only re-execute when inputs change—perfect for "retry without side effects" approvals. This lets operators re-run failed workflows or recover from transient infrastructure issues without double-applying changes.
+- **Guardrails are built in**: Policy wards enforce quotas, time windows, and escalation paths, while approval gates provide human checkpoints with first-writer-wins semantics. All policy decisions emit `policy.decision:v1` events that become part of the audit log.
 
-### Why This Matters
+**Expectations for capsule authors**: Capsules must be idempotent, emit deterministic events given the same envelope inputs, and respect contract schemas. Non-compliant capsules will fail schema validation or produce replay drift.
 
-- **Agents as first-class actors**: When an agent generates a deployment ritual, Demon validates it
-  against the contract registry, enforces policy wards, and logs every decision.
-- **Replay for trust**: If an agent-triggered workflow fails, replay the event stream to see the exact
-  sequence of actions. No guessing, no lost context.
-- **Evolution without breakage**: Update your capsule logic or policy rules—contract versioning ensures
-  old and new workflows coexist gracefully.
+## Governance Guardrails
 
-## Overview & Use Cases
+Demon enforces process discipline through required CI checks, code review hygiene, and cryptographic provenance for all contract bundles. These guardrails protect `main` from untested changes, ensure every review comment receives a response, and guarantee that promoted artifacts match their signed manifests.
 
-### For Evaluators
-- **Controlled Deployments**: Gate production releases behind approvals with automatic rollback on
-  timeout
-- **Infrastructure Automation**: Provision cloud resources with policy-enforced quotas and multi-level
-  approvals
-- **Security Workflows**: Automate incident response with mandatory security team sign-off
-- **Agent-Driven Ops**: Let AI agents propose changes; Demon enforces human approval and policy checks
-  before execution
+### Required Checks (DO NOT RENAME)
 
-### For Builders
-- **WASM-Powered Capsules**: Write workflow logic in any language that compiles to WebAssembly
-- **Event-Driven Architecture**: Every action generates structured events for monitoring and debugging
-- **Contract Registry**: Versioned schemas ensure API compatibility across teams, environments, and
-  agent-generated workflows
-- **Envelope Protocol**: Standardized event payloads with metadata (timestamp, actor, signature) for
-  provenance and replay
+Five status checks must pass before any PR merges to `main`. Job names are protected and **must** match exactly:
 
-### For Operators
-- **Real-Time Monitoring**: Web UI shows live workflow execution with complete event histories
-- **Policy Management**: Configure quotas, approval chains, and timeout behaviors without code changes
-- **Audit Compliance**: Immutable event streams provide complete audit trails for regulatory
-  requirements
-- **Replay & Debug**: Reconstruct any workflow run from its event stream—essential for agent-driven
-  automation where you need to understand "what did it do?"
+1. **`Bootstrapper bundles — verify (offline, signature ok)`** — Confirms that signed contract bundles can be verified offline without network access.
+2. **`Bootstrapper bundles — negative verify (tamper ⇒ failed)`** — Tests that tampered bundles fail verification, proving signature integrity.
+3. **`contracts-validate`** — Runs `scripts/contracts-validate.sh` to ensure JSON Schemas, fixtures, and WIT definitions are internally consistent and backward-compatible.
+4. **`review-lock-guard`** — Enforces that the PR body contains `Review-lock: <sha>` matching the current HEAD, preventing stale approvals from merging changed code.
+5. **`review-threads-guard (PR) / guard`** — Verifies that every review comment has received an explicit author reply before merge.
 
-## Try Demon in 5 Minutes
+If you rename a job or context in `.github/workflows/ci.yml`, branch protection will fail and PRs will be blocked. Always update protection snapshots (`.github/snapshots/branch-protection-YYYY-MM-DD.json`) when changing CI structure.
 
-See Demon in action with a simple workflow that showcases the ritual engine, event streams, and
-approval flow:
+### Review-lock Discipline
+
+Every pull request body **must** include:
+
+```
+Review-lock: <40-character-sha>
+```
+
+This SHA must match the current HEAD of the PR branch. Update it on every push:
 
 ```bash
-# Start the development environment
+PR=123
+HEAD=$(gh pr view $PR --json headRefOid -q .headRefOid)
+gh pr edit $PR -b "$(gh pr view $PR -q .body)\n\nReview-lock: $HEAD"
+```
+
+Review-lock prevents approvals from carrying forward when new commits land, ensuring reviewers always see the final code that will merge.
+
+### Replies Policy
+
+**Every review comment must receive an explicit author reply before merge.** Use one of:
+
+- `"Fixed in <short-sha>"`
+- `"Clarified: …"`
+- `"Won't fix because …"`
+
+Conversation resolution is enabled on `main`; resolve threads **after** replying. Docs-only PRs are exempt from `review-threads-guard` (the guard self-skips), but substantive feedback still deserves a reply.
+
+### Provenance Verification
+
+Contract bundles are signed at build time and verified before deployment:
+
+```bash
+# Local verification
+cargo run -p demonctl -- bootstrap --verify-only
+
+# CI enforcement
+scripts/contracts-validate.sh
+```
+
+Tampered bundles fail verification; only artifacts with valid signatures can be promoted to staging or production. See [docs/bootstrapper/bundles.md](docs/bootstrapper/bundles.md) for offline verification workflows.
+
+## Quickstart
+
+```bash
+# Start the development environment (NATS + workspace build)
 make dev
 
-# Run a sample ritual
+# Run the sample echo ritual
 cargo run -p demonctl -- run examples/rituals/echo.yaml
 ```
 
-**What you just saw:**
-- The **ritual engine** interpreted the YAML workflow and executed the echo capsule
-- **Events** were published to NATS JetStream with full traceability (`ritual.started`,
-  `ritual.completed`)
-- **Policy decisions** were evaluated (quotas, approval gates) before execution
-- A **JSON event stream** captured the entire workflow lifecycle for audit and replay
-- Each event follows the **envelope protocol**: schema version, timestamp, actor metadata
+You will see envelopes emitted for `ritual.started` and `ritual.completed`; approvals can be injected via Operate UI or the REST API.
 
-The echo ritual is intentionally simple—real workflows can orchestrate complex approval chains, enforce
-time-based policies, and integrate with existing CI/CD systems or agent-driven automation platforms.
-
-### Bootstrap for Self-Hosting
-
-Deploy Demon in your environment with zero-config setup:
+## Self-host Bootstrap
 
 ```bash
-# Complete bootstrap (stream + events + UI verification)
+# End-to-end bootstrap: stream, seed data, UI verification
 cargo run -p demonctl -- bootstrap --ensure-stream --seed --verify
 
-# Individual steps available
-cargo run -p demonctl -- bootstrap --ensure-stream    # Create NATS stream
-cargo run -p demonctl -- bootstrap --seed            # Seed sample events
-cargo run -p demonctl -- bootstrap --verify          # Verify Operate UI
+# Targeted steps
+cargo run -p demonctl -- bootstrap --ensure-stream
+cargo run -p demonctl -- bootstrap --seed
+cargo run -p demonctl -- bootstrap --verify
 
-# Environment overrides supported
+# Override defaults when promoting to higher environments
 RITUAL_STREAM_NAME=PROD_STREAM cargo run -p demonctl -- bootstrap --ensure-stream
 ```
 
-See [docs/bootstrapper/README.md](docs/bootstrapper/README.md) for production deployment guides.
+Production deployment patterns and offline verification live in [docs/bootstrapper/README.md](docs/bootstrapper/README.md).
 
-## Core Capabilities
-
-- **🔒 Approval Gates**: REST API for granting/denying approvals with first-writer-wins semantics and
-  TTL auto-deny
-- **📊 Policy Engine**: Configurable quotas, time windows, and approval chains with real-time policy
-  decisions
-- **🎯 Event Persistence**: All workflow actions stored in NATS JetStream with deterministic replay
-  capability
-- **🖥️ Operate UI**: Real-time dashboard showing runs, events, and approval status with filtering and
-  search
-- **📦 Contract Registry**: Versioned schemas and WIT definitions for API compatibility and integration
-- **🚀 Self-Hosting**: Zero-config bootstrap for NATS streams, seed data, and UI verification
-- **🔁 Replay Protocol**: Reconstruct any workflow run from its immutable event stream for debugging
-  and compliance
-
-## Current Release Status
-
-**Alpha Preview**: All M0 capabilities complete and battle-tested. The platform successfully handles
-basic rituals, approval workflows, and policy enforcement in development environments.
-
-**Coming in Beta**: Enhanced UI dashboard, multi-tenant support, and advanced policy engine with
-escalation chains.
-
-**Production Readiness**: Planned for M2 with hardened security, scale testing, and operational
-runbooks.
-
-→ [**Try the Alpha Preview Kit**](docs/preview/alpha/README.md)
-
-## Architecture & Components
-
-- **`engine/`** — Ritual interpreter that executes workflows and emits events
-- **`runtime/`** — WASM capsule runtime with link-name routing for secure execution
-- **`demonctl/`** — CLI for running rituals, managing contracts, and bootstrapping environments
-- **`operate-ui/`** — Web dashboard for monitoring runs and managing approvals
-- **`contracts/`** — JSON schemas and WIT definitions for API contracts
-- **`capsules/echo/`** — Reference WASM capsule demonstrating the runtime interface
-
-### Event Envelope Format
-
-Every Demon event follows a standardized envelope:
-
-```json
-{
-  "schema_version": "1.0.0",
-  "event_type": "ritual.started",
-  "timestamp": "2025-10-02T14:32:10Z",
-  "actor": "agent-id-or-user-email",
-  "payload": { /* event-specific data */ },
-  "metadata": {
-    "run_id": "uuid",
-    "correlation_id": "uuid",
-    "signature": "optional-cryptographic-proof"
-  }
-}
-```
-
-This structure enables:
-- **Provenance**: Who triggered the action (human or agent)?
-- **Replay**: Deterministic reconstruction of workflow history
-- **Validation**: Schema-checked payloads prevent malformed events
-- **Audit**: Immutable log of every decision and action
-
-## Vision & Community
-
-Demon aims to become the standard for governed automation in cloud-native environments. We're building
-toward:
-
-- **Universal Integration**: Native connectors for major CI/CD platforms, cloud providers, and security
-  tools
-- **Policy-as-Code**: Git-managed policy definitions with automated testing and deployment
-- **Enterprise Features**: Advanced audit reporting, compliance frameworks, and organizational controls
-- **Agent Marketplace**: Curated library of AI agents that safely compose Demon rituals with built-in
-  policy enforcement
-
-**Get Involved**:
-- 📋 [View our roadmap and current milestones](https://github.com/users/afewell-hh/projects/1)
-- 🐛 [Report issues or request features](https://github.com/afewell-hh/demon/issues)
-- 📖 [Read our documentation](docs/)
-- 💬 [Join discussions](https://github.com/afewell-hh/demon/discussions)
-
-## Development
+## Contract Registry
 
 ```bash
-# Build and test the workspace
-make build && make test
-
-# Format and lint (required for CI)
-make fmt && make lint
-
-# Quick smoke test
-cargo run -p demonctl -- run examples/rituals/echo.yaml
-```
-
-**API Examples**:
-
-```bash
-# Grant approval (first-writer-wins)
-curl -X POST http://localhost:3000/api/approvals/{run_id}/{gate_id}/grant \
-  -H "Content-Type: application/json" \
-  -d '{"approver": "ops@example.com", "note": "approved for production"}'
-
-# Fetch contract bundles
+# Fetch the latest bundle (requires GitHub token)
 GH_TOKEN=your_token cargo run -p demonctl -- contracts fetch-bundle
 
-# Export all contracts
+# Export contracts for integration testing
 cargo run -p demonctl -- contracts bundle --format json --include-wit
 ```
 
+Schemas, fixtures, and WIT interfaces live under [`contracts/`](contracts/); update goldens whenever events change so automated compatibility checks stay reliable.
+
+## Approvals API
+
+```bash
+curl -X POST http://localhost:3000/api/approvals/{run_id}/{gate_id}/grant \
+  -H "Content-Type: application/json" \
+  -d '{"approver": "ops@example.com", "note": "approved for production"}'
+```
+
+First-writer-wins semantics and TTL auto-deny keep approvals deterministic. See [docs/operate-ui/README.md](docs/operate-ui/README.md) for UI workflows and REST responses.
+
+## Layout
+
+- **`engine/`** — Ritual interpreter that executes workflows and emits envelopes
+- **`runtime/`** — Capsule runtime with link-name routing and sandboxing
+- **`demonctl/`** — CLI for rituals, contract management, and bootstrapping
+- **`operate-ui/`** — Read-only dashboard for monitoring runs and approvals
+- **`contracts/`** — JSON Schemas, fixtures, and WIT definitions that govern automation
+- **`capsules/echo/`** — Reference capsule showcasing the runtime contract
+
+## Docker Build & Publish
+
+The alpha Docker pipeline publishes `engine`, `runtime`, and `operate-ui` images to GHCR with `latest`, branch, and `sha-<commit>` tags.
+
+- Local verification: run `make build`, then build container images (`docker build -f <component>/Dockerfile ...`) as detailed in [docs/how-to-guides/docker-pipeline.md](docs/how-to-guides/docker-pipeline.md).
+- CI workflow: [`.github/workflows/docker-build.yml`](.github/workflows/docker-build.yml) builds on pull requests and publishes on merges; caching shortens retries.
+- Troubleshooting: [docs/ops/docker-troubleshooting.md](docs/ops/docker-troubleshooting.md) covers profiling, retries, and multi-arch considerations.
+
+## Community & Roadmap
+
+- 📋 [Roadmap and milestones](https://github.com/users/afewell-hh/projects/1)
+- 🐛 [Issue tracker](https://github.com/afewell-hh/demon/issues)
+- 📖 [Documentation hub](docs/)
+- 💬 [Project discussions](https://github.com/afewell-hh/demon/discussions)
+
 ## Project Process
 
-- **MVP Contract**: [docs/mvp/01-mvp-contract.md](docs/mvp/01-mvp-contract.md) — Problem definition and
-  M0 must-haves
-- **Branch Protection**: [docs/process/branch_protection_mvp.md](docs/process/branch_protection_mvp.md)
-  — Required CI checks and review policies
-- **Project Board**: [GitHub Project](https://github.com/users/afewell-hh/projects/1) — Stories, epics,
-  and milestone tracking
+- **MVP Contract**: [docs/mvp/01-mvp-contract.md](docs/mvp/01-mvp-contract.md) captures personas, M0 must-haves, and acceptance criteria.
+- **Branch Protection**: [docs/process/branch_protection_mvp.md](docs/process/branch_protection_mvp.md) details required checks, review-lock cadence, and replies guard expectations.
+- **PM Playbook**: [docs/process/PM_REBOOT_PLAYBOOK.md](docs/process/PM_REBOOT_PLAYBOOK.md) keeps Track C terminology aligned across docs and rituals.
 
----
+## Preview Resources
 
-## Preview Kit & Resources
+- 🔧 [Alpha Preview Kit](docs/preview/alpha/README.md) — hands-on evaluation checklist.
+- 📦 [Bundle Library & Signatures](docs/bootstrapper/bundles.md) — offline verification and CI enforcement.
+- 📋 [Contract Bundle Releases](docs/contracts/releases.md) — automated schema distribution.
 
-- 🔧 [Alpha Preview Kit](docs/preview/alpha/README.md) — Hands-on evaluation guide
-- 📦 [Bundle Library & Signatures](docs/bootstrapper/bundles.md) — Offline verification and CI
-  enforcement
-- 📋 [Contract Bundle Releases](docs/contracts/releases.md) — Automated schema distribution
+<sub>**Local verification snippet**</sub>
 
-<sub>**Local verification**:</sub>
 ```bash
 target/debug/demonctl bootstrap --verify-only --bundle lib://local/preview-local-dev@0.0.1 \
 | jq -e 'select(.phase=="verify" and .signature=="ok")' >/dev/null && echo "signature ok"
