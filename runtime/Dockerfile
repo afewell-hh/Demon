@@ -1,6 +1,6 @@
 # Multi-stage build for runtime
 # Stage 1: cargo-chef planner for dependency caching
-FROM rust:alpine AS chef
+FROM --platform=$BUILDPLATFORM rust:alpine AS chef
 RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static gcc
 RUN cargo install cargo-chef
 WORKDIR /app
@@ -21,9 +21,18 @@ RUN cargo chef prepare --recipe-path recipe.json
 
 # Stage 3: Build dependencies (cached layer)
 FROM chef AS builder
-RUN rustup target add x86_64-unknown-linux-musl
+ARG TARGETPLATFORM
+# Install musl target for the platform we're building
+RUN case "$TARGETPLATFORM" in \
+      "linux/amd64") rustup target add x86_64-unknown-linux-musl ;; \
+      "linux/arm64") rustup target add aarch64-unknown-linux-musl ;; \
+      *) echo "Unsupported platform: $TARGETPLATFORM" && exit 1 ;; \
+    esac
 COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --release --target x86_64-unknown-linux-musl --recipe-path recipe.json
+RUN case "$TARGETPLATFORM" in \
+      "linux/amd64") cargo chef cook --release --target x86_64-unknown-linux-musl --recipe-path recipe.json ;; \
+      "linux/arm64") cargo chef cook --release --target aarch64-unknown-linux-musl --recipe-path recipe.json ;; \
+    esac
 
 # Stage 4: Build application
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
@@ -38,13 +47,16 @@ COPY demonctl/ ./demonctl/
 COPY bootstrapper/ ./bootstrapper/
 
 ENV RUSTFLAGS="-C target-feature=+crt-static"
-RUN cargo build --release --bin runtime --target x86_64-unknown-linux-musl
+RUN case "$TARGETPLATFORM" in \
+      "linux/amd64") cargo build --release --bin runtime --target x86_64-unknown-linux-musl ;; \
+      "linux/arm64") cargo build --release --bin runtime --target aarch64-unknown-linux-musl ;; \
+    esac
 
 # Runtime stage - use static distroless for musl-built binaries
 FROM gcr.io/distroless/static-debian12
 
-# Copy the binary
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/runtime /usr/local/bin/runtime
+# Copy the binary (wildcard matches either x86_64 or aarch64)
+COPY --from=builder /app/target/*/release/runtime /usr/local/bin/runtime
 
 # Expose port
 EXPOSE 8080
