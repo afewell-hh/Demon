@@ -1,7 +1,7 @@
 # Multi-stage build for engine
 # Stage 1: cargo-chef planner for dependency caching
 FROM rust:alpine AS chef
-RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static
+RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static gcc
 RUN cargo install cargo-chef
 WORKDIR /app
 
