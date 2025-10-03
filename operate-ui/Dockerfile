@@ -1,6 +1,6 @@
 # Multi-stage build for operate-ui
 # Stage 1: cargo-chef planner for dependency caching
-FROM --platform=$BUILDPLATFORM rust:alpine AS chef
+FROM rust:alpine AS chef
 RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static gcc
 RUN cargo install cargo-chef
 WORKDIR /app
