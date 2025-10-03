@@ -52,30 +52,32 @@
 - Workaround: Run with `--test-threads=1` for CI or development
 - Root cause: Global environment variable manipulation in concurrent tests
 
-### Docker Infrastructure Status
+### Docker Infrastructure Progress
 
-From `DOCKER_PIPELINE_PLAN.md`, phases:
+From `DOCKER_PIPELINE_PLAN.md`, tracking the multi-phase implementation:
 
-#### Phase 1: Dockerfiles ✅ COMPLETE (2025-10-02)
+#### Phase 1: Component Dockerfiles ✅ **COMPLETED** (2025-10-02)
 - ✅ **Created multi-stage Dockerfiles** for operate-ui, runtime, and engine
+  - PR #225: Merged component Dockerfiles
   - Uses cargo-chef for efficient dependency caching
   - Alpine-based builder, distroless runtime (secure & minimal)
   - Image sizes: operate-ui (~34MB), runtime (~13MB), engine (~5MB)
 - ✅ **Validated local builds** for all three components
 - ✅ **Documentation updated** in component READMEs with build/run instructions
-- See commit: PR TBD
 
-#### Phase 2: CI/CD Workflow (NEXT)
-- [ ] Implement GitHub Actions workflow to build and push images to GHCR
-- [ ] Tag strategy and versioning
-- [ ] Multi-arch builds (amd64/arm64)
+#### Phase 2: GHCR Build Workflow ✅ **COMPLETED** (2025-10-02)
+- ✅ **Implemented CI workflow** to build and push images to GHCR
+  - PR #226: Merged Docker build workflow
+  - Workflow: `.github/workflows/docker-build.yml`
+  - Multi-arch support (main pushes): linux/amd64, linux/arm64; PR builds stay on linux/amd64 for dry-run safety
+  - Auto-triggers on push to main, PR changes, and manual dispatch
+  - Images: ghcr.io/afewell-hh/demon-{operate-ui,runtime,engine}:{latest,sha-*}
+  - **Cache resilience**: Added `ignore-error=true` to tolerate Azure storage contention
+  - GitHub Actions cache optimization for faster rebuilds
 
-#### Phase 3: K8s Integration
-- [ ] Update K8s manifests to reference GHCR images
-- [ ] Remove placeholder nginx images
-- [ ] Restore HTTP health checks for real services
-
-**Timeline Estimate**: Phase 2-3 implementation ~1-2 weeks
+#### Phase 3: K8s Manifests 📋 **PLANNED**
+- **Update K8s manifests** to reference real images instead of placeholders
+- **Restore HTTP health checks** once real services are available
 
 ### File Changes Made
 
@@ -187,4 +189,3 @@ The handoff is designed to be seamless with no immediate action required beyond 
 - GHCR images operational with correct endpoints
 - CI/CD pipeline functioning correctly
 - Ready for handoff
-
