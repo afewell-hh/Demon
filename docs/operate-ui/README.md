@@ -16,6 +16,7 @@ cargo run -p operate-ui          # starts the UI server
 Then visit:
 - `/runs` — recent runs, stable ordering (legacy - defaults to tenant "default")
 - `/runs/:runId` — ordered timeline per run (legacy - defaults to tenant "default")
+- `/graph` — graph viewer for commits, tags, and DAG visualization
 - `/api/runs`, `/api/runs/:runId` — JSON APIs (502 when NATS unavailable) (legacy - defaults to tenant "default")
 
 ## Multi-tenant Support
@@ -181,6 +182,31 @@ Connection established via `EventSource` API when workflow is loaded. Graph comm
 - Endpoint: `/admin/templates/report` returns JSON `{ template_ready, has_filter_tojson, templates }` used by the bootstrapper verify phase.
 - Optional auth: set `ADMIN_TOKEN` in the environment to require header `X-Admin-Token: <token>`; without it, the probe is unauthenticated (dev-only).
 - Admin: `/admin/templates/report` shows `template_ready=true` and `has_filter_tojson=true`.
+
+## Graph Viewer
+
+The Operate UI provides a web-based graph viewer at `/graph` for visualizing graph commits, tags, and the commit DAG.
+
+### Features
+- **Commit History**: Browse recent commits with metadata (parent, timestamp, mutation count)
+- **Tag Management**: View all tags and their associated commits
+- **Live Updates**: SSE integration for real-time commit/tag notifications
+- **Filtering**: Filter commits by text search or mutation type (add-node, add-edge, etc.)
+- **DAG Visualization**: Interactive SVG-based commit graph showing parent-child relationships
+- **Commit Details**: Drill down into individual commits to view full mutation payloads
+
+### Usage
+Navigate to `/graph`:
+```
+http://localhost:3000/graph
+```
+
+Query parameters allow pre-populating graph scope:
+```
+http://localhost:3000/graph?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1
+```
+
+See `docs/api/graph.md` for detailed API documentation and usage examples.
 
 ## In-UI Approval Actions
 

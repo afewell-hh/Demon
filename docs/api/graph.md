@@ -456,10 +456,66 @@ demonctl graph commit \
 
 ---
 
+## Operate UI Graph Viewer
+
+The Operate UI provides a web-based graph viewer for visualizing and exploring graph commits, tags, and the commit DAG.
+
+### Features
+
+- **Commit History**: Browse recent commits with metadata (parent, timestamp, mutation count)
+- **Tag Management**: View all tags and their associated commits
+- **Live Updates**: SSE (Server-Sent Events) integration for real-time commit/tag notifications
+- **Filtering**: Filter commits by text search or mutation type (add-node, add-edge, etc.)
+- **DAG Visualization**: Interactive SVG-based commit graph showing parent-child relationships
+- **Commit Details**: Drill down into individual commits to view full mutation payloads
+
+### Accessing the Viewer
+
+Navigate to `/graph` in the Operate UI:
+
+```
+http://localhost:3000/graph
+```
+
+Query parameters allow pre-populating graph scope:
+```
+http://localhost:3000/graph?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1
+```
+
+### Live Updates
+
+The viewer automatically subscribes to graph events via SSE when a valid scope is loaded. New commits and tags appear in real-time without requiring manual refresh.
+
+**SSE Endpoint** (used internally by viewer):
+```
+GET /api/graph/events/stream?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1
+```
+
+**Event Types**:
+- `graph.commit.created` - New commit published to GRAPH_COMMITS stream
+- `graph.tag.created` - New tag added to GRAPH_TAGS KV bucket
+
+### Filtering and Search
+
+- **Text Search**: Filter commits by commit ID or parent commit ID
+- **Mutation Type**: Filter commits by specific mutation operations (add-node, add-edge, update-node, delete-node, delete-edge)
+- Filters are applied client-side and update in real-time
+
+### DAG Visualization
+
+Click "Show DAG" to render the commit graph as an interactive SVG diagram:
+- Nodes represent commits (labeled with short commit ID and mutation count)
+- Edges represent parent-child relationships
+- Click any node to view commit details
+- Layout is linear (newest commits on the left, oldest on the right)
+
+---
+
 ## Future Enhancements
 
 - Pagination tokens for large commit lists
 - Conditional requests (If-None-Match) for cache validation
 - GraphQL endpoint for flexible queries
-- WebSocket support for real-time commit notifications
+- Advanced DAG layouts (branching, multi-parent support)
 - Graph query result caching and snapshot-based replay optimization
+- Export commit history as JSON/CSV

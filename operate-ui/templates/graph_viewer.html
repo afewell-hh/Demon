@@ -53,8 +53,30 @@
 <div class="card" id="commitsCard" style="display: none;">
     <div class="card-header">
         <h3 class="card-title">Recent Commits</h3>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <input type="text" id="commitFilter" placeholder="Filter commits..."
+                   style="padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;">
+            <select id="mutationTypeFilter" style="padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;">
+                <option value="">All Mutations</option>
+                <option value="add-node">Add Node</option>
+                <option value="add-edge">Add Edge</option>
+                <option value="update-node">Update Node</option>
+                <option value="delete-node">Delete Node</option>
+                <option value="delete-edge">Delete Edge</option>
+            </select>
+        </div>
     </div>
     <div id="commitsContainer"></div>
+</div>
+
+<div class="card" id="dagCard" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title">Commit DAG</h3>
+        <button id="toggleDagBtn" class="btn btn-secondary">Show DAG</button>
+    </div>
+    <div id="dagContainer" style="display: none; padding: 1rem; background: #f9f9f9; border-radius: 4px; overflow-x: auto;">
+        <svg id="dagSvg" width="100%" height="400"></svg>
+    </div>
 </div>
 
 <div class="card" id="commitDetailCard" style="display: none;">
@@ -75,8 +97,13 @@ let currentScope = {
     graphId: "{{ graph_id }}"
 };
 
+let allCommits = [];
+let allTags = [];
+
 document.getElementById('scopeForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    disconnectSSE();
 
     currentScope = {
         tenantId: document.getElementById('tenantId').value,
@@ -86,11 +113,54 @@ document.getElementById('scopeForm').addEventListener('submit', async (e) => {
     };
 
     await loadGraphData();
+    connectSSE();
 });
 
 document.getElementById('closeDetailBtn').addEventListener('click', () => {
     document.getElementById('commitDetailCard').style.display = 'none';
 });
+
+document.getElementById('toggleDagBtn').addEventListener('click', () => {
+    const dagContainer = document.getElementById('dagContainer');
+    const toggleBtn = document.getElementById('toggleDagBtn');
+
+    if (dagContainer.style.display === 'none') {
+        dagContainer.style.display = 'block';
+        toggleBtn.textContent = 'Hide DAG';
+        renderDAG(allCommits);
+    } else {
+        dagContainer.style.display = 'none';
+        toggleBtn.textContent = 'Show DAG';
+    }
+});
+
+document.getElementById('commitFilter').addEventListener('input', (e) => {
+    applyFilters();
+});
+
+document.getElementById('mutationTypeFilter').addEventListener('change', (e) => {
+    applyFilters();
+});
+
+function applyFilters() {
+    const searchText = document.getElementById('commitFilter').value.toLowerCase();
+    const mutationType = document.getElementById('mutationTypeFilter').value;
+
+    let filtered = allCommits.filter(commit => {
+        // Text search
+        const matchesSearch = !searchText ||
+            commit.commitId.toLowerCase().includes(searchText) ||
+            (commit.parentCommitId && commit.parentCommitId.toLowerCase().includes(searchText));
+
+        // Mutation type filter
+        const matchesMutation = !mutationType ||
+            (commit.mutations && commit.mutations.some(m => m.op === mutationType));
+
+        return matchesSearch && matchesMutation;
+    });
+
+    displayCommits(filtered);
+}
 
 async function loadGraphData() {
     showLoading(true);
@@ -103,8 +173,17 @@ async function loadGraphData() {
             fetchCommits()
         ]);
 
+        allTags = tags;
+        allCommits = commits;
+
         displayTags(tags);
         displayCommits(commits);
+
+        // Show DAG card if we have commits
+        if (commits.length > 0) {
+            document.getElementById('dagCard').style.display = 'block';
+        }
+
         showLoading(false);
     } catch (err) {
         showLoading(false);
@@ -271,9 +350,196 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Load data on page load
+function renderDAG(commits) {
+    const svg = document.getElementById('dagSvg');
+    if (!commits || commits.length === 0) {
+        svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#666">No commits to display</text>';
+        return;
+    }
+
+    // Build parent-child map
+    const commitMap = new Map();
+    commits.forEach(c => commitMap.set(c.commitId, c));
+
+    // Simple linear layout (newest to oldest, left to right)
+    const nodeWidth = 100;
+    const nodeHeight = 40;
+    const horizontalSpacing = 120;
+    const verticalSpacing = 60;
+
+    // Sort commits by timestamp (newest first)
+    const sortedCommits = [...commits].sort((a, b) => new Date(b.ts) - new Date(a.ts));
+
+    let svgContent = '';
+    const positions = new Map();
+
+    // Position nodes
+    sortedCommits.forEach((commit, idx) => {
+        const x = 50 + idx * horizontalSpacing;
+        const y = 100;
+        positions.set(commit.commitId, { x, y });
+
+        const shortId = commit.commitId.substring(0, 8);
+        const mutCount = commit.mutationsCount || commit.mutations?.length || 0;
+
+        // Draw node
+        svgContent += `
+            <g class="commit-node" data-commit-id="${commit.commitId}" style="cursor: pointer;">
+                <rect x="${x}" y="${y}" width="${nodeWidth}" height="${nodeHeight}"
+                      rx="4" fill="#4CAF50" stroke="#388E3C" stroke-width="2"/>
+                <text x="${x + nodeWidth/2}" y="${y + 20}" text-anchor="middle" fill="white" font-size="12" font-weight="bold">
+                    ${shortId}
+                </text>
+                <text x="${x + nodeWidth/2}" y="${y + 35}" text-anchor="middle" fill="white" font-size="10">
+                    ${mutCount} mut
+                </text>
+            </g>
+        `;
+    });
+
+    // Draw edges (parent links)
+    sortedCommits.forEach(commit => {
+        if (commit.parentCommitId) {
+            const parentPos = positions.get(commit.parentCommitId);
+            const childPos = positions.get(commit.commitId);
+
+            if (parentPos && childPos) {
+                const x1 = childPos.x + nodeWidth;
+                const y1 = childPos.y + nodeHeight / 2;
+                const x2 = parentPos.x;
+                const y2 = parentPos.y + nodeHeight / 2;
+
+                svgContent += `
+                    <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"
+                          stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+                `;
+            }
+        }
+    });
+
+    // Arrow marker definition
+    const defs = `
+        <defs>
+            <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                <polygon points="0 0, 10 3, 0 6" fill="#666" />
+            </marker>
+        </defs>
+    `;
+
+    svg.innerHTML = defs + svgContent;
+
+    // Add click handlers
+    svg.querySelectorAll('.commit-node').forEach(node => {
+        node.addEventListener('click', () => {
+            const commitId = node.getAttribute('data-commit-id');
+            viewCommit(commitId);
+        });
+    });
+
+    // Adjust SVG width based on number of commits
+    const totalWidth = Math.max(800, 100 + sortedCommits.length * horizontalSpacing);
+    svg.setAttribute('width', totalWidth);
+}
+
+// SSE connection for live updates
+let sseConnection = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+
+function connectSSE() {
+    if (!currentScope.tenantId || !currentScope.projectId || !currentScope.namespace || !currentScope.graphId) {
+        return;
+    }
+
+    const params = new URLSearchParams(currentScope);
+    const url = `${RUNTIME_API_URL}/api/graph/events/stream?${params}`;
+
+    try {
+        sseConnection = new EventSource(url);
+
+        sseConnection.onopen = () => {
+            console.log('SSE connection opened');
+            reconnectAttempts = 0;
+        };
+
+        sseConnection.addEventListener('graph.commit.created', (event) => {
+            try {
+                const commit = JSON.parse(event.data);
+                console.log('New commit received:', commit);
+                // Refresh commits list
+                refreshCommits();
+            } catch (err) {
+                console.error('Failed to parse commit event:', err);
+            }
+        });
+
+        sseConnection.addEventListener('graph.tag.created', (event) => {
+            try {
+                const tag = JSON.parse(event.data);
+                console.log('New tag received:', tag);
+                // Refresh tags list
+                refreshTags();
+            } catch (err) {
+                console.error('Failed to parse tag event:', err);
+            }
+        });
+
+        sseConnection.onerror = (err) => {
+            console.error('SSE connection error:', err);
+            sseConnection.close();
+
+            if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                reconnectAttempts++;
+                const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+                console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+                setTimeout(connectSSE, delay);
+            }
+        };
+    } catch (err) {
+        console.error('Failed to create SSE connection:', err);
+    }
+}
+
+function disconnectSSE() {
+    if (sseConnection) {
+        sseConnection.close();
+        sseConnection = null;
+    }
+}
+
+async function refreshCommits() {
+    try {
+        const commits = await fetchCommits();
+        allCommits = commits;
+        applyFilters(); // Re-apply current filters
+        if (document.getElementById('dagContainer').style.display !== 'none') {
+            renderDAG(allCommits);
+        }
+    } catch (err) {
+        console.error('Failed to refresh commits:', err);
+    }
+}
+
+async function refreshTags() {
+    try {
+        const tags = await fetchTags();
+        allTags = tags;
+        displayTags(tags);
+    } catch (err) {
+        console.error('Failed to refresh tags:', err);
+    }
+}
+
+// Load data on page load and connect SSE
 window.addEventListener('DOMContentLoaded', () => {
-    loadGraphData();
+    loadGraphData().then(() => {
+        connectSSE();
+    });
+});
+
+// Clean up SSE on page unload
+window.addEventListener('beforeunload', () => {
+    disconnectSSE();
 });
 </script>
 {% endblock %}
