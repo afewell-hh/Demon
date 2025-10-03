@@ -83,7 +83,7 @@ fn setup_server() -> (Server, Value) {
         Expectation::matching(all_of![
             request::method_path("GET", "/repos/acme/demon/actions/artifacts/456/zip",),
             request::headers(contains(("authorization", "Bearer fake-token"))),
-            request::headers(contains(("accept", "application/zip"))),
+            request::headers(contains(("accept", "application/vnd.github+json"))),
         ])
         .respond_with(
             status_code(200)

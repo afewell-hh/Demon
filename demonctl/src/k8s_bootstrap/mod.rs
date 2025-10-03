@@ -157,7 +157,7 @@ pub struct DemonConfig {
     pub ui_url: String,
     pub persistence: PersistenceConfig,
     pub bundle: Option<BundleConfig>,
-    #[serde(default = "default_image_config")]
+    #[serde(default = "default_image_config", rename = "imageTags")]
     pub images: ImageConfig,
 }
 
