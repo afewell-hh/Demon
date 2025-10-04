@@ -58,8 +58,8 @@ jobs:
               return;
             }
             if (lock.toLowerCase() !== headSha.toLowerCase()) {
-            core.setFailed(`Review-lock mismatch after retries: lock=${lock.slice(0,12)} headSha=${headSha.slice(0,12)}`);
-          }
+              core.setFailed(`Review-lock mismatch after retries: lock=${lock.slice(0,12)} headSha=${headSha.slice(0,12)}`);
+            }
   docker-build:
     uses: ./.github/workflows/docker-build.yml
     secrets: inherit
