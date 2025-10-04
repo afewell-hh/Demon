@@ -107,7 +107,7 @@ jobs:
           fi
 
           repository="${{ env.IMAGE_PREFIX }}-${{ matrix.component }}"
-          cat <<'JSON' > image-digests/${{ matrix.component }}.json
+          cat <<JSON > image-digests/${{ matrix.component }}.json
           {
             "component": "${{ matrix.component }}",
             "repository": "${repository}",
