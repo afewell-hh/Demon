@@ -80,12 +80,18 @@ From `DOCKER_PIPELINE_PLAN.md`, tracking the multi-phase implementation:
 - ✅ Added `demon.imageTags` to bootstrap config + schema with defaults (`main`) and env overrides (`OPERATE_UI_IMAGE_TAG`, `RUNTIME_IMAGE_TAG`, `ENGINE_IMAGE_TAG`)
 - ✅ Smoke workflow continues to run real HTTP health checks against runtime/engine/operate-ui using GHCR builds
 
-#### Phase 4: CI Integration 🚧 **IN PROGRESS** (2025-10-03)
+#### Phase 4: CI Integration ✅ **COMPLETED** (2025-10-04)
 - ✅ `.github/workflows/docker-build.yml` now emits a `docker-image-digests` artifact and exposes a JSON output for downstream jobs (component → `repository`, `digest`, `image`, `gitShaTag`).
 - ✅ `ci.yml` now installs `demonctl` and calls `demonctl docker digests fetch --format env` to hydrate `OPERATE_UI_IMAGE_TAG`, `RUNTIME_IMAGE_TAG`, and `ENGINE_IMAGE_TAG`, eliminating the bespoke `jq` parsing of reusable workflow outputs.
 - ✅ Scheduled smoke workflow (`bootstrapper-smoke.yml`) reuses the same command to download/validate digests, publishes tags as job outputs, and shares them with the cluster run—no more GitHub Script + artifact plumbing.
 - ✅ New `demonctl docker digests fetch` command mirrors the CI flow so operators can fetch the latest GHCR digests locally (supports `--format env|json`, optional `--workflow`/`--branch`, and writes `docker-image-digests.json`).
-- 🔄 Validation: nightly run pending to confirm k3d pulls GHCR digests without local image import. Capture run ID + summary once the first scheduled execution completes on the new plumbing.
+- ✅ **Validation Complete**: Main-branch validation run [#18239570085](https://github.com/afewell-hh/Demon/actions/runs/18239570085) succeeded. Multi-arch builds completed in ~3 hours. Bootstrap dry-run confirmed digest resolution works end-to-end.
+- 🔧 **Bug Fixed**: Heredoc quoting issue in docker-build.yml:110 (changed `<<'JSON'` to `<<JSON`) - shell variables now expand correctly in artifacts.
+
+**Documentation:**
+- ✅ Updated [docs/examples/k8s-bootstrap/README.md](../examples/k8s-bootstrap/README.md#fetch-ghcr-digests-outside-ci) with operator workflow for fetching digests via `demonctl docker digests fetch`
+- 📋 References validation checklist in issue #228 for testing procedures
+- 📝 See PR #227 for implementation details of digest fetch commands
 
 ### File Changes Made
 
@@ -99,6 +105,34 @@ From `DOCKER_PIPELINE_PLAN.md`, tracking the multi-phase implementation:
 - `scripts/tests/smoke-k8s-bootstrap.sh`: Updated header comments to reflect new capability (GHCR image tags via env)
 - `docs/releases/README-HANDOFF.md`: This handoff document
 - `docs/examples/k8s-bootstrap/README.md`: Documented `demon.imageTags` and env override flow
+
+### Validation Results (2025-10-04)
+
+**Run Details:**
+- Workflow Run: [#18239570085](https://github.com/afewell-hh/Demon/actions/runs/18239570085) (#110)
+- Status: ✅ Success (all 3 multi-arch builds + digest manifest published)
+- Duration: ~3 hours (multi-arch: amd64 + arm64)
+
+**Digests Extracted:**
+```bash
+export OPERATE_UI_IMAGE_TAG=ghcr.io/afewell-hh/demon-operate-ui@sha256:34b1eb2bf9528eb01f9a06c2e2fc16a257d5653405b19ba4254b10faa54d2b5a
+export RUNTIME_IMAGE_TAG=ghcr.io/afewell-hh/demon-runtime@sha256:66f72381156386cfa59a60a8e710815544e00ca20f0e0e55038d48ab187a51a2
+export ENGINE_IMAGE_TAG=ghcr.io/afewell-hh/demon-engine@sha256:93b0e5743caae6114c4b9f495066043d7c52e93a9aafd17fc146db7cfd547bd1
+```
+
+**Bootstrap Dry-Run:**
+```
+Resolved docker-image-digests from workflow run #110 (id 18239570085).
+✓ Configuration is valid
+Dry run mode - no changes will be made
+Cluster: demon-smoke-test (namespace: demon-system)
+6 manifests will be generated.
+```
+
+**Issues Found & Fixed:**
+- Heredoc quoting bug in `.github/workflows/docker-build.yml:110` prevented variable expansion in artifacts
+- Fixed by removing quotes from `cat <<'JSON'` → `cat <<JSON`
+- Next build will produce properly formatted digest artifacts
 
 ### Validation Commands
 
