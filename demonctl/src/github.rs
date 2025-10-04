@@ -4,7 +4,7 @@ use reqwest::{Client, Url};
 use serde::Deserialize;
 
 const DEFAULT_API_URL: &str = "https://api.github.com/";
-const DEFAULT_REPOSITORY: &str = "afewell-hh/demon";
+const DEFAULT_REPOSITORY: &str = "afewell-hh/Demon";
 
 #[derive(Debug, Clone)]
 pub struct WorkflowRun {
@@ -248,7 +248,7 @@ mod tests {
     fn resolve_repository_defaults_when_not_set() {
         let (owner, repo) = resolve_repository(None).unwrap();
         assert_eq!(owner, "afewell-hh");
-        assert_eq!(repo, "demon");
+        assert_eq!(repo, "Demon");
     }
 
     #[test]
