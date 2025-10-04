@@ -75,9 +75,17 @@ From `DOCKER_PIPELINE_PLAN.md`, tracking the multi-phase implementation:
   - **Cache resilience**: Added `ignore-error=true` to tolerate Azure storage contention
   - GitHub Actions cache optimization for faster rebuilds
 
-#### Phase 3: K8s Manifests 📋 **PLANNED**
-- **Update K8s manifests** to reference real images instead of placeholders
-- **Restore HTTP health checks** once real services are available
+#### Phase 3: K8s Manifests ✅ **COMPLETED** (2025-10-03)
+- ✅ `demonctl` manifests now render GHCR image tags from config/env overrides (`demonctl/resources/k8s/*.yaml`)
+- ✅ Added `demon.imageTags` to bootstrap config + schema with defaults (`main`) and env overrides (`OPERATE_UI_IMAGE_TAG`, `RUNTIME_IMAGE_TAG`, `ENGINE_IMAGE_TAG`)
+- ✅ Smoke workflow continues to run real HTTP health checks against runtime/engine/operate-ui using GHCR builds
+
+#### Phase 4: CI Integration 🚧 **IN PROGRESS** (2025-10-03)
+- ✅ `.github/workflows/docker-build.yml` now emits a `docker-image-digests` artifact and exposes a JSON output for downstream jobs (component → `repository`, `digest`, `image`, `gitShaTag`).
+- ✅ `ci.yml` now installs `demonctl` and calls `demonctl docker digests fetch --format env` to hydrate `OPERATE_UI_IMAGE_TAG`, `RUNTIME_IMAGE_TAG`, and `ENGINE_IMAGE_TAG`, eliminating the bespoke `jq` parsing of reusable workflow outputs.
+- ✅ Scheduled smoke workflow (`bootstrapper-smoke.yml`) reuses the same command to download/validate digests, publishes tags as job outputs, and shares them with the cluster run—no more GitHub Script + artifact plumbing.
+- ✅ New `demonctl docker digests fetch` command mirrors the CI flow so operators can fetch the latest GHCR digests locally (supports `--format env|json`, optional `--workflow`/`--branch`, and writes `docker-image-digests.json`).
+- 🔄 Validation: nightly run pending to confirm k3d pulls GHCR digests without local image import. Capture run ID + summary once the first scheduled execution completes on the new plumbing.
 
 ### File Changes Made
 
@@ -88,8 +96,9 @@ From `DOCKER_PIPELINE_PLAN.md`, tracking the multi-phase implementation:
   - Lines 397-474: Applied to all three components (runtime, UI, engine)
 
 #### Documentation Updates
-- `scripts/tests/smoke-k8s-bootstrap.sh`: Updated header comments to reflect new capability
+- `scripts/tests/smoke-k8s-bootstrap.sh`: Updated header comments to reflect new capability (GHCR image tags via env)
 - `docs/releases/README-HANDOFF.md`: This handoff document
+- `docs/examples/k8s-bootstrap/README.md`: Documented `demon.imageTags` and env override flow
 
 ### Validation Commands
 
@@ -101,10 +110,22 @@ cargo fmt
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace --all-features -- --test-threads=1
 
-# Validate placeholder deployment works
-# (requires k3d/kind installation)
+# Validate bootstrap against GHCR builds (requires k3d/kind)
+# Preferred: fetch digests via demonctl and export for the session
+export GH_TOKEN=$(gh auth token)
+demonctl docker digests fetch --workflow docker-build.yml --branch main --format env --output /tmp/docker-image-digests.json \
+  | tee /tmp/demon-ghcr.env
+source /tmp/demon-ghcr.env
 make bootstrap-smoke ARGS="--dry-run-only --verbose"
-make bootstrap-smoke ARGS="--verbose --cleanup"
+
+OPERATE_UI_IMAGE_TAG=${OPERATE_UI_IMAGE_TAG:-ghcr.io/afewell-hh/demon-operate-ui:main} \
+RUNTIME_IMAGE_TAG=${RUNTIME_IMAGE_TAG:-ghcr.io/afewell-hh/demon-runtime:main} \
+ENGINE_IMAGE_TAG=${ENGINE_IMAGE_TAG:-ghcr.io/afewell-hh/demon-engine:main} \
+  make bootstrap-smoke ARGS="--verbose --cleanup"
+
+# Fallback: manually download the artifact if retention expired
+# RUN_ID=$(gh run list --repo afewell-hh/demon --workflow docker-build.yml --branch main --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+# gh run download $RUN_ID --repo afewell-hh/demon --name docker-image-digests --dir /tmp/docker-digests
 ```
 
 ### Next Deployment Test
@@ -116,8 +137,8 @@ After merging these changes, the next nightly run should:
 4. Complete with green status
 
 **Expected Success Criteria**:
-- All pods reach Ready state within 240s
-- Health checks pass with "placeholder mode detected" messages
+- All pods reach Ready state within 240s using GHCR images
+- Health checks pass with HTTP 200 responses from runtime (`/health`) and operate-ui (`/health`)
 - No "No demon-runtime pod found" errors
 
 ### Monitoring & Follow-up

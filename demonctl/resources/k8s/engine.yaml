@@ -43,7 +43,7 @@ spec:
     spec:
       containers:
       - name: engine
-        image: ghcr.io/afewell-hh/demon-engine:main
+        image: {{ .imageTags.engine }}
         ports:
         - containerPort: 8081
           name: http

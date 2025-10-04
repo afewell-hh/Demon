@@ -137,6 +137,28 @@
         "bundle": {
           "type": "string",
           "description": "Optional bundle URI for advanced configuration"
+        },
+        "imageTags": {
+          "type": "object",
+          "description": "Container image tags for Demon components",
+          "properties": {
+            "operateUi": {
+              "type": "string",
+              "description": "Tag for ghcr.io/afewell-hh/demon-operate-ui",
+              "default": "main"
+            },
+            "runtime": {
+              "type": "string",
+              "description": "Tag for ghcr.io/afewell-hh/demon-runtime",
+              "default": "main"
+            },
+            "engine": {
+              "type": "string",
+              "description": "Tag for ghcr.io/afewell-hh/demon-engine",
+              "default": "main"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "required": ["natsUrl", "streamName", "subjects", "uiUrl", "namespace"],

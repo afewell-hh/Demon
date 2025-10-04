@@ -107,6 +107,28 @@ impl TemplateRenderer {
         let registry_context = self.build_registry_context(&config.registries)?;
         context.insert("registries".to_string(), Value::Object(registry_context));
 
+        let operate_ui_image = build_image_reference(
+            "OPERATE_UI_IMAGE_TAG",
+            &demon_config.images.operate_ui,
+            "ghcr.io/afewell-hh/demon-operate-ui",
+        );
+        let runtime_image = build_image_reference(
+            "RUNTIME_IMAGE_TAG",
+            &demon_config.images.runtime,
+            "ghcr.io/afewell-hh/demon-runtime",
+        );
+        let engine_image = build_image_reference(
+            "ENGINE_IMAGE_TAG",
+            &demon_config.images.engine,
+            "ghcr.io/afewell-hh/demon-engine",
+        );
+
+        let mut image_tags_obj = serde_json::Map::new();
+        image_tags_obj.insert("operateUi".to_string(), Value::String(operate_ui_image));
+        image_tags_obj.insert("runtime".to_string(), Value::String(runtime_image));
+        image_tags_obj.insert("engine".to_string(), Value::String(engine_image));
+        context.insert("imageTags".to_string(), Value::Object(image_tags_obj));
+
         Ok(context)
     }
 
@@ -567,6 +589,26 @@ impl TemplateRenderer {
     }
 }
 
+fn resolve_image_tag(env_var: &str, fallback: &str) -> String {
+    std::env::var(env_var)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| fallback.to_string())
+}
+
+fn build_image_reference(env_var: &str, fallback: &str, repository: &str) -> String {
+    let raw = resolve_image_tag(env_var, fallback);
+
+    if raw.contains('/') || raw.contains('@') {
+        raw
+    } else if raw.starts_with("sha256:") {
+        format!("{}@{}", repository, raw)
+    } else {
+        format!("{}:{}", repository, raw)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -608,6 +650,11 @@ mod tests {
                     size: "10Gi".to_string(),
                 },
                 bundle: None,
+                images: crate::k8s_bootstrap::ImageConfig {
+                    operate_ui: "main".to_string(),
+                    runtime: "main".to_string(),
+                    engine: "main".to_string(),
+                },
             },
             secrets: crate::k8s_bootstrap::SecretsConfig {
                 provider: "env".to_string(),
@@ -648,6 +695,159 @@ mod tests {
             context.get("natsUrl").unwrap(),
             &Value::String("nats://nats.test-ns.svc.cluster.local:4222".to_string())
         );
+
+        if let Some(Value::Object(image_tags)) = context.get("imageTags") {
+            assert_eq!(
+                image_tags.get("operateUi"),
+                Some(&Value::String(
+                    "ghcr.io/afewell-hh/demon-operate-ui:main".to_string()
+                ))
+            );
+            assert_eq!(
+                image_tags.get("runtime"),
+                Some(&Value::String(
+                    "ghcr.io/afewell-hh/demon-runtime:main".to_string()
+                ))
+            );
+            assert_eq!(
+                image_tags.get("engine"),
+                Some(&Value::String(
+                    "ghcr.io/afewell-hh/demon-engine:main".to_string()
+                ))
+            );
+        } else {
+            panic!("imageTags context missing");
+        }
+    }
+
+    #[test]
+    fn test_build_template_context_respects_env_image_tags() {
+        let renderer = TemplateRenderer::new("test");
+        let config = K8sBootstrapConfig {
+            api_version: "v1".to_string(),
+            kind: "K8sBootstrap".to_string(),
+            metadata: crate::k8s_bootstrap::ConfigMetadata {
+                name: "env-test".to_string(),
+            },
+            cluster: crate::k8s_bootstrap::ClusterConfig {
+                name: "env-test".to_string(),
+                runtime: "k3s".to_string(),
+                k3s: crate::k8s_bootstrap::K3sConfig {
+                    version: "v1.28.0+k3s1".to_string(),
+                    install: crate::k8s_bootstrap::K3sInstallConfig {
+                        channel: "stable".to_string(),
+                        disable: vec![],
+                    },
+                    data_dir: "/var/lib/rancher/k3s".to_string(),
+                    node_name: "env-node".to_string(),
+                    extra_args: vec![],
+                },
+            },
+            demon: DemonConfig {
+                nats_url: "nats://localhost:4222".to_string(),
+                namespace: "env-ns".to_string(),
+                stream_name: "env-stream".to_string(),
+                subjects: vec!["subject".to_string()],
+                dedupe_window_secs: 30,
+                ui_url: "http://localhost:3000".to_string(),
+                persistence: PersistenceConfig {
+                    enabled: false,
+                    storage_class: "standard".to_string(),
+                    size: "1Gi".to_string(),
+                },
+                bundle: None,
+                images: crate::k8s_bootstrap::ImageConfig {
+                    operate_ui: "main".to_string(),
+                    runtime: "main".to_string(),
+                    engine: "main".to_string(),
+                },
+            },
+            secrets: crate::k8s_bootstrap::SecretsConfig {
+                provider: "env".to_string(),
+                vault: None,
+                env: None,
+            },
+            addons: vec![],
+            networking: crate::k8s_bootstrap::NetworkingConfig {
+                ingress: crate::k8s_bootstrap::IngressConfig {
+                    enabled: false,
+                    hostname: None,
+                    ingress_class: None,
+                    annotations: None,
+                    tls: crate::k8s_bootstrap::TlsConfig {
+                        enabled: false,
+                        secret_name: None,
+                    },
+                },
+                service_mesh: crate::k8s_bootstrap::ServiceMeshConfig {
+                    enabled: false,
+                    annotations: crate::k8s_bootstrap::default_mesh_annotations(),
+                },
+            },
+            registries: None,
+        };
+
+        std::env::set_var("OPERATE_UI_IMAGE_TAG", "sha-operate");
+        std::env::set_var("RUNTIME_IMAGE_TAG", "sha-runtime");
+        std::env::set_var("ENGINE_IMAGE_TAG", "sha-engine");
+
+        let context = renderer.build_template_context(&config).unwrap();
+
+        if let Some(Value::Object(image_tags)) = context.get("imageTags") {
+            assert_eq!(
+                image_tags.get("operateUi"),
+                Some(&Value::String(
+                    "ghcr.io/afewell-hh/demon-operate-ui:sha-operate".to_string()
+                ))
+            );
+            assert_eq!(
+                image_tags.get("runtime"),
+                Some(&Value::String(
+                    "ghcr.io/afewell-hh/demon-runtime:sha-runtime".to_string()
+                ))
+            );
+            assert_eq!(
+                image_tags.get("engine"),
+                Some(&Value::String(
+                    "ghcr.io/afewell-hh/demon-engine:sha-engine".to_string()
+                ))
+            );
+        } else {
+            panic!("imageTags context missing");
+        }
+
+        std::env::remove_var("OPERATE_UI_IMAGE_TAG");
+        std::env::remove_var("RUNTIME_IMAGE_TAG");
+        std::env::remove_var("ENGINE_IMAGE_TAG");
+    }
+
+    #[test]
+    fn test_build_image_reference_with_digest() {
+        let reference = build_image_reference(
+            "OPERATE_UI_IMAGE_TAG",
+            "sha256:abc",
+            "ghcr.io/afewell-hh/demon-operate-ui",
+        );
+
+        assert_eq!(reference, "ghcr.io/afewell-hh/demon-operate-ui@sha256:abc");
+    }
+
+    #[test]
+    fn test_build_image_reference_preserves_full_reference() {
+        std::env::set_var(
+            "OPERATE_UI_IMAGE_TAG",
+            "ghcr.io/custom/operate-ui@sha256:def",
+        );
+
+        let reference = build_image_reference(
+            "OPERATE_UI_IMAGE_TAG",
+            "main",
+            "ghcr.io/afewell-hh/demon-operate-ui",
+        );
+
+        assert_eq!(reference, "ghcr.io/custom/operate-ui@sha256:def");
+
+        std::env::remove_var("OPERATE_UI_IMAGE_TAG");
     }
 
     #[test]
@@ -901,6 +1101,11 @@ spec:
                 size: "1Gi".to_string(),
             },
             bundle: None,
+            images: crate::k8s_bootstrap::ImageConfig {
+                operate_ui: "main".to_string(),
+                runtime: "main".to_string(),
+                engine: "main".to_string(),
+            },
         };
 
         let url = renderer.build_nats_url(&demon_config);
@@ -1053,6 +1258,11 @@ volumes:
                     size: "20Gi".to_string(),
                 },
                 bundle: None,
+                images: crate::k8s_bootstrap::ImageConfig {
+                    operate_ui: "main".to_string(),
+                    runtime: "main".to_string(),
+                    engine: "main".to_string(),
+                },
             },
             secrets: crate::k8s_bootstrap::SecretsConfig {
                 provider: "env".to_string(),

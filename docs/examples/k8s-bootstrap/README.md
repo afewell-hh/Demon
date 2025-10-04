@@ -72,6 +72,46 @@ demonctl k8s-bootstrap bootstrap --config config.yaml
 - `demon.persistence.storageClass`: Storage class (default: `local-path`)
 - `demon.persistence.size`: Storage size (default: `10Gi`)
 
+#### Image Tags
+- `demon.imageTags.operateUi`: Tag for `ghcr.io/afewell-hh/demon-operate-ui` (default: `main`)
+- `demon.imageTags.runtime`: Tag for `ghcr.io/afewell-hh/demon-runtime` (default: `main`)
+- `demon.imageTags.engine`: Tag for `ghcr.io/afewell-hh/demon-engine` (default: `main`)
+
+**Runtime overrides:** set the following environment variables before running `demonctl k8s-bootstrap bootstrap` to override tags without editing the config file:
+
+```bash
+export OPERATE_UI_IMAGE_TAG=sha-abcdef1234567890
+export RUNTIME_IMAGE_TAG=sha-fedcba0987654321
+export ENGINE_IMAGE_TAG=sha-1122334455667788
+```
+
+Environment variables take precedence over configuration values, enabling CI/CD pipelines to inject the current image digest.
+
+**Fetching digests automatically:**
+
+- `demonctl docker digests fetch --workflow docker-build.yml --branch main --format env` — downloads the latest successful GHCR manifests and prints `export` lines.
+- `demonctl k8s-bootstrap bootstrap --config config.yaml --dry-run --use-latest-digests` — resolves the digest manifest before rendering manifests. Use `--branch <name>` to inspect a non-main branch (e.g., feature or staging builds).
+
+> 🔄 **CI automation:** GitHub Actions workflows (`ci.yml` dry-run job and `bootstrapper-smoke.yml`) install `demonctl` and call `demonctl docker digests fetch --format env`, which downloads and validates the `docker-image-digests.json` artifact from the latest successful docker-build run before exporting immutable `ghcr.io/...@sha256:<digest>` references. If the digest manifest is unavailable (e.g., retention expired), the workflows fail with guidance to fall back to the public `:main` tags or re-run the build.
+
+#### Fetch GHCR digests outside CI
+
+Operators can mirror the CI behavior with the dedicated CLI workflow:
+
+```bash
+# GH_TOKEN must be set to a token with `actions:read`
+export GH_TOKEN=$(gh auth token)
+demonctl docker digests fetch --format env | tee /tmp/demon-digests.env
+source /tmp/demon-digests.env
+
+demonctl k8s-bootstrap bootstrap --config config.yaml
+```
+
+- `--format env` emits `export OPERATE_UI_IMAGE_TAG=…`, `RUNTIME_IMAGE_TAG`, and `ENGINE_IMAGE_TAG` lines for immediate shell use.
+- `--format json` prints the raw manifest while still saving it to `docker-image-digests.json` (override via `--output <file>`).
+- `--workflow <id|name>` defaults to the latest successful `docker-build.yml` run on `main`; override to retry historical runs when troubleshooting.
+- Set `DEMONCTL_GITHUB_REPOSITORY` or `DEMONCTL_GITHUB_API_URL` if you need to target a fork or GitHub Enterprise appliance.
+
 #### Secret Management
 The bootstrapper generates a Kubernetes Secret manifest with your configured secrets, which is applied before other Demon components. The secret is named `demon-secrets` by default.
 
