@@ -48,7 +48,7 @@ jobs:
                 break;
               }
               if (i < maxAttempts) {
-                core.info(`Review-lock not aligned yet (attempt ${i}/${maxAttempts}): lock=${(lock||'none').slice(0,12)} headSha=${headSha.slice(0,12)}; retrying...`);
+                core.info(`Review-lock not aligned yet (attempt ${i}/${maxAttempts}): lock=${(lock||'none').slice(0,12)} headSha=${headSha.slice(0,12)}; retrying…`);
                 await wait(3000);
               }
             }
