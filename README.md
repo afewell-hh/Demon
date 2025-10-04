@@ -154,6 +154,7 @@ The alpha Docker pipeline publishes `engine`, `runtime`, and `operate-ui` images
 
 - Local verification: run `make build`, then build container images (`docker build -f <component>/Dockerfile ...`) as detailed in [docs/how-to-guides/docker-pipeline.md](docs/how-to-guides/docker-pipeline.md).
 - CI workflow: [`.github/workflows/docker-build.yml`](.github/workflows/docker-build.yml) builds on pull requests and publishes on merges; caching shortens retries.
+- **Digest fetching**: Operators can fetch immutable `sha256:...` digests via `demonctl docker digests fetch` for reproducible deployments — see [K8s Bootstrap README](docs/examples/k8s-bootstrap/README.md#fetch-ghcr-digests-outside-ci) for usage.
 - Troubleshooting: [docs/ops/docker-troubleshooting.md](docs/ops/docker-troubleshooting.md) covers profiling, retries, and multi-arch considerations.
 
 ## Community & Roadmap

@@ -303,6 +303,26 @@ async fn given_health_endpoint_when_requested_then_returns_ok() -> Result<()> {
 
 #[tokio::test]
 #[serial]
+async fn given_ready_endpoint_when_requested_then_returns_ok() -> Result<()> {
+    // Act
+    let server = start_test_server().await?;
+
+    let client = reqwest::Client::new();
+    let response = client
+        .get(format!("http://{}/ready", server.addr()))
+        .send()
+        .await?;
+
+    // Assert
+    assert_eq!(response.status(), 200);
+    let body = response.text().await?;
+    assert_eq!(body, "OK");
+
+    Ok(())
+}
+
+#[tokio::test]
+#[serial]
 #[ignore] // Requires NATS; run via CI with --ignored
 async fn given_sse_endpoint_when_connected_then_receives_init_and_heartbeats() -> Result<()> {
     use futures_util::StreamExt;

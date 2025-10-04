@@ -94,23 +94,49 @@ Environment variables take precedence over configuration values, enabling CI/CD 
 
 > 🔄 **CI automation:** GitHub Actions workflows (`ci.yml` dry-run job and `bootstrapper-smoke.yml`) install `demonctl` and call `demonctl docker digests fetch --format env`, which downloads and validates the `docker-image-digests.json` artifact from the latest successful docker-build run before exporting immutable `ghcr.io/...@sha256:<digest>` references. If the digest manifest is unavailable (e.g., retention expired), the workflows fail with guidance to fall back to the public `:main` tags or re-run the build.
 
-#### Fetch GHCR digests outside CI
+#### Fetch GHCR Digests Outside CI
 
-Operators can mirror the CI behavior with the dedicated CLI workflow:
+Operators can fetch the latest GHCR digests using the dedicated `demonctl` commands introduced in PR #227:
+
+**Prerequisites:**
+- `GH_TOKEN` environment variable with `actions:read` scope
+
+**Workflow:**
 
 ```bash
-# GH_TOKEN must be set to a token with `actions:read`
+# 1. Fetch the latest digests from the docker-build workflow
 export GH_TOKEN=$(gh auth token)
-demonctl docker digests fetch --format env | tee /tmp/demon-digests.env
+demonctl docker digests fetch \
+  --workflow docker-build.yml \
+  --branch main \
+  --format env \
+  | tee /tmp/demon-digests.env
+
+# 2. Source the environment variables
 source /tmp/demon-digests.env
 
-demonctl k8s-bootstrap bootstrap --config config.yaml
+# 3. Run bootstrap with the pinned digests
+demonctl k8s-bootstrap bootstrap --config config.yaml --dry-run
+
+# Or use --use-latest-digests to fetch inline
+demonctl k8s-bootstrap bootstrap \
+  --config config.yaml \
+  --dry-run \
+  --use-latest-digests \
+  --branch main
 ```
 
-- `--format env` emits `export OPERATE_UI_IMAGE_TAG=…`, `RUNTIME_IMAGE_TAG`, and `ENGINE_IMAGE_TAG` lines for immediate shell use.
-- `--format json` prints the raw manifest while still saving it to `docker-image-digests.json` (override via `--output <file>`).
-- `--workflow <id|name>` defaults to the latest successful `docker-build.yml` run on `main`; override to retry historical runs when troubleshooting.
-- Set `DEMONCTL_GITHUB_REPOSITORY` or `DEMONCTL_GITHUB_API_URL` if you need to target a fork or GitHub Enterprise appliance.
+**Options:**
+- `--format env` — Emits `export OPERATE_UI_IMAGE_TAG=…`, `RUNTIME_IMAGE_TAG`, and `ENGINE_IMAGE_TAG` for shell use
+- `--format json` — Prints raw manifest (still saves to `docker-image-digests.json`)
+- `--workflow <name>` — Defaults to `docker-build.yml` on `main`
+- `--branch <name>` — Override to fetch digests from feature/staging branches
+- `--output <file>` — Custom path for JSON manifest (default: `docker-image-digests.json`)
+
+**Notes:**
+- Set `DEMONCTL_GITHUB_REPOSITORY` or `DEMONCTL_GITHUB_API_URL` for forks or GitHub Enterprise
+- Digests are immutable `sha256:...` references that ensure reproducible deployments
+- See validation checklist in issue #228 for testing procedures
 
 #### Secret Management
 The bootstrapper generates a Kubernetes Secret manifest with your configured secrets, which is applied before other Demon components. The secret is named `demon-secrets` by default.

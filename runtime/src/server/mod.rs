@@ -12,6 +12,8 @@ pub fn create_app() -> Router {
     Router::new()
         // Health check endpoint
         .route("/health", get(health_check))
+        // Readiness probe endpoint
+        .route("/ready", get(readiness_check))
         // Mount graph API routes
         .nest("/api/graph", graph::routes())
         // Add tracing layer
@@ -20,6 +22,11 @@ pub fn create_app() -> Router {
 
 /// Health check handler
 async fn health_check() -> &'static str {
+    "OK"
+}
+
+/// Readiness check handler
+async fn readiness_check() -> &'static str {
     "OK"
 }
 
