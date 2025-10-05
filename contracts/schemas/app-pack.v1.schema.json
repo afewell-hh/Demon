@@ -1,0 +1,322 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demon.dev/schemas/app-pack.v1.schema.json",
+  "title": "Demon App Pack (v1)",
+  "description": "Portable, signed bundle definition for installing applications onto the Demon platform.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "const": "demon.io/v1",
+      "description": "API contract for the App Pack schema."
+    },
+    "kind": {
+      "type": "string",
+      "const": "AppPack",
+      "description": "Identifies the manifest type."
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Identifiers and metadata associated with the App Pack.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])$",
+          "description": "DNS-compatible slug for this App Pack."
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[A-Za-z0-9.-]+)?$",
+          "description": "Semantic version of the App Pack bundle."
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable name shown in UI listings."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional details about the App Pack."
+        },
+        "homepage": {
+          "type": "string",
+          "format": "uri",
+          "description": "Optional homepage or documentation URL."
+        }
+      },
+      "required": ["name", "version"]
+    },
+    "signing": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional signature verification settings.",
+      "properties": {
+        "cosign": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Cosign verification configuration.",
+          "properties": {
+            "keyRef": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Reference to a public key used for verification (file path, KMS URI, etc.)."
+            },
+            "certificateIdentity": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Identity URI that must be present in certificate claims."
+            },
+            "certificateIssuer": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Issuer URI that must be present in certificate claims."
+            },
+            "rekorUrl": {
+              "type": "string",
+              "format": "uri",
+              "description": "Optional transparency log URL for verification."
+            }
+          }
+        }
+      }
+    },
+    "requires": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Version ranges required by this App Pack.",
+      "properties": {
+        "appPackSchema": {
+          "$ref": "#/$defs/semverRange",
+          "description": "Required compatibility range for the App Pack schema."
+        },
+        "platformApis": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Required compatibility ranges for Demon platform APIs.",
+          "properties": {
+            "engine": { "$ref": "#/$defs/semverRange" },
+            "runtime": { "$ref": "#/$defs/semverRange" },
+            "operateUi": { "$ref": "#/$defs/semverRange" }
+          }
+        }
+      }
+    },
+    "contracts": {
+      "type": "array",
+      "description": "Contracts bundled with the App Pack.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+            "description": "Stable identifier for the contract."
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[A-Za-z0-9.-]+)?$",
+            "description": "Semantic version of the contract."
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^contracts\/.*",
+            "description": "Relative path to the contract file within the bundle."
+          }
+        },
+        "required": ["id", "version", "path"]
+      },
+      "minItems": 1
+    },
+    "capsules": {
+      "type": "array",
+      "description": "Capsule definitions available to rituals.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["container-exec"],
+            "description": "Capsule implementation type."
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+            "description": "Unique capsule name referenced by rituals."
+          },
+          "imageDigest": {
+            "type": "string",
+            "pattern": "^.+@sha256:[0-9a-fA-F]{64}$",
+            "description": "Digest-pinned container image reference (e.g., ghcr.io/org/image@sha256:...)."
+          },
+          "command": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1,
+            "description": "Entrypoint command executed by the runtime."
+          },
+          "env": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "description": "Environment variables injected into the capsule."
+          },
+          "workingDir": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional working directory inside the container."
+          },
+          "outputs": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Output artifacts produced by the capsule.",
+            "properties": {
+              "envelopePath": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Absolute path inside the container where the result envelope is written."
+              }
+            },
+            "required": ["envelopePath"]
+          }
+        },
+        "required": ["type", "name", "imageDigest", "command", "outputs"]
+      },
+      "minItems": 1
+    },
+    "rituals": {
+      "type": "array",
+      "description": "Ritual definitions exposed by the App Pack.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+            "description": "Unique ritual identifier."
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Human-friendly label for the ritual."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional ritual details."
+          },
+          "steps": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "capsule": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+                  "description": "Capsule name this step invokes."
+                },
+                "with": {
+                  "type": "object",
+                  "description": "Arbitrary configuration merged into the capsule invocation."
+                }
+              },
+              "required": ["capsule"]
+            },
+            "description": "Ordered list of steps executed by the ritual."
+          }
+        },
+        "required": ["name", "steps"]
+      },
+      "minItems": 1
+    },
+    "ui": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "UI manifest definitions consumed by Operate UI.",
+      "properties": {
+        "cards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+                "description": "Unique card identifier."
+              },
+              "kind": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Card renderer kind understood by Operate UI."
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Display title for the card."
+              },
+              "match": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "rituals": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+                    },
+                    "minItems": 1,
+                    "description": "Ritual identifiers this card applies to."
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "Optional tag filters applied to runs."
+                  }
+                },
+                "required": ["rituals"]
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "show": {
+                    "type": "array",
+                    "items": { "type": "string", "minLength": 1 },
+                    "description": "List of envelope fields to render."
+                  },
+                  "map": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "Optional field aliases where key is display label and value is an envelope path."
+                  }
+                }
+              }
+            },
+            "required": ["id", "kind", "match"]
+          }
+        }
+      }
+    }
+  },
+  "required": ["apiVersion", "kind", "metadata", "contracts", "capsules", "rituals"],
+  "$defs": {
+    "semverRange": {
+      "type": "string",
+      "pattern": "^[^\n\r]+$",
+      "description": "Semantic version range specification (e.g., ">=1.0.0 <2.0.0")."
+    }
+  }
+}

@@ -7,6 +7,7 @@ use std::time::Duration;
 use tracing::{info, Level};
 use tracing_subscriber::{fmt, EnvFilter};
 
+mod commands;
 mod docker;
 mod github;
 mod k8s_bootstrap;
@@ -151,6 +152,11 @@ enum Commands {
     Docker {
         #[command(subcommand)]
         cmd: DockerCommands,
+    },
+    /// App Pack lifecycle commands
+    App {
+        #[command(subcommand)]
+        cmd: commands::app::AppCommand,
     },
     /// Print version and exit
     Version,
@@ -566,6 +572,9 @@ async fn main() -> Result<()> {
         }
         Commands::Docker { cmd } => {
             handle_docker_command(cmd).await?;
+        }
+        Commands::App { cmd } => {
+            commands::app::handle(cmd)?;
         }
         Commands::Version => {
             println!("{}", env!("CARGO_PKG_VERSION"));

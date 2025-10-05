@@ -20,6 +20,9 @@ serde = { workspace = true }
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
 config-loader = { path = "../crates/config-loader" }
 serde_yaml = { workspace = true }
+jsonschema = { workspace = true }
+once_cell = { workspace = true }
+chrono = { workspace = true }
 base64 = "0.22.1"
 zip = { version = "0.6", default-features = false, features = ["deflate"] }
 
