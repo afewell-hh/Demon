@@ -31,6 +31,8 @@ let config = ContainerExecConfig {
     working_dir: None,
     envelope_path: "/workspace/.artifacts/result.json".into(),
     capsule_name: Some("sample".into()),
+    app_pack_dir: Some(std::path::PathBuf::from("/path/to/app-pack")),
+    artifacts_dir: Some(std::path::PathBuf::from("/tmp/demon-run/artifacts")),
 };
 
 let envelope = execute(&config);
@@ -45,6 +47,9 @@ let envelope = execute(&config);
   returned when `DEMON_CONTAINER_RUNTIME=stub`.
 - `DEMON_CONTAINER_USER` — user (`uid:gid`) to run containers as (default:
   `65534:65534`).
+- Provide `workspaceDir` / `artifactsDir` in the request (or via
+  `ContainerExecConfig`) so the App Pack is mounted read-only at `/workspace`
+  and result artifacts are written to `/workspace/.artifacts`.
 
 ## Future Work
 
