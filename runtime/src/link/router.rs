@@ -5,6 +5,8 @@ use config_loader::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::collections::BTreeMap;
+use tokio::task;
 
 /// Link-name router stub: resolves a functionRef to a capsule call.
 /// Milestone 0 supports only the `echo` capsule with `{ message: String }`.
@@ -103,6 +105,7 @@ impl Router {
                     }
                 }
             }
+            "container-exec" => self.dispatch_container_exec(args).await,
             "graph" => self.dispatch_graph(args).await,
             other => anyhow::bail!("unknown functionRef: {other}"),
         }
@@ -395,6 +398,54 @@ impl Router {
             })
             .collect();
         formatted_errors.join("; ")
+    }
+
+    async fn dispatch_container_exec(&self, args: &Value) -> Result<Value> {
+        let request: ContainerExecRequest = serde_json::from_value(args.clone())
+            .context("Failed to parse container-exec request")?;
+
+        let config: capsules_container_exec::ContainerExecConfig = request.into();
+
+        let envelope = task::spawn_blocking(move || capsules_container_exec::execute(&config))
+            .await
+            .context("container-exec task join error")?;
+
+        Ok(serde_json::to_value(envelope)?)
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ContainerExecRequest {
+    #[serde(rename = "imageDigest")]
+    image_digest: String,
+    command: Vec<String>,
+    #[serde(default)]
+    env: BTreeMap<String, String>,
+    #[serde(default, rename = "workingDir")]
+    working_dir: Option<String>,
+    outputs: ContainerExecOutputs,
+    #[serde(default, rename = "capsuleName")]
+    capsule_name: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ContainerExecOutputs {
+    #[serde(rename = "envelopePath")]
+    envelope_path: String,
+}
+
+impl From<ContainerExecRequest> for capsules_container_exec::ContainerExecConfig {
+    fn from(request: ContainerExecRequest) -> Self {
+        Self {
+            image_digest: request.image_digest,
+            command: request.command,
+            env: request.env,
+            working_dir: request.working_dir,
+            envelope_path: request.outputs.envelope_path,
+            capsule_name: request.capsule_name,
+        }
     }
 }
 

@@ -1,0 +1,18 @@
+[package]
+name = "capsules_container_exec"
+version = "0.0.1"
+edition = "2021"
+license.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+chrono = { workspace = true }
+envelope = { path = "../../crates/envelope" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tempfile = "3.10"
+thiserror = { workspace = true }
+tracing = { workspace = true }

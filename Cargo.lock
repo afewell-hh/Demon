@@ -458,6 +458,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "capsules_container_exec"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "envelope",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
 name = "capsules_echo"
 version = "0.0.1"
 dependencies = [
@@ -781,11 +795,14 @@ dependencies = [
  "base64 0.22.1",
  "bootstrapper-demonctl",
  "capsules_graph",
+ "chrono",
  "clap",
  "config-loader",
  "engine",
  "envelope",
  "httptest",
+ "jsonschema 0.18.3",
+ "once_cell",
  "predicates",
  "reqwest 0.11.27",
  "serde",
@@ -2824,6 +2841,7 @@ dependencies = [
  "async-nats",
  "async-stream",
  "axum",
+ "capsules_container_exec",
  "capsules_echo",
  "capsules_graph",
  "chrono",

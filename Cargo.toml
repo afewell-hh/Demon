@@ -4,6 +4,7 @@ members = [
   "runtime",
   "wards",
   "capsules/echo",
+  "capsules/container-exec",
   "capsules/graph",
   "demonctl",
   "operate-ui",

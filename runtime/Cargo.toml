@@ -20,6 +20,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 capsules_echo = { path = "../capsules/echo" }
 capsules_graph = { path = "../capsules/graph" }
+capsules_container_exec = { path = "../capsules/container-exec" }
 async-nats = { workspace = true }
 tokio = { workspace = true }
 chrono = { workspace = true }

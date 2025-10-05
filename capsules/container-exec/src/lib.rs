@@ -1,0 +1,632 @@
+use anyhow::{anyhow, Result};
+use chrono::Utc;
+use envelope::{
+    Diagnostic, DiagnosticLevel, DurationMetrics, Metrics, Provenance, ResultEnvelope, SourceInfo,
+};
+use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
+use std::collections::BTreeMap;
+use std::env;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::{Command, ExitStatus, Output, Stdio};
+use std::time::Instant;
+use tempfile::TempDir;
+use thiserror::Error;
+
+type Envelope = ResultEnvelope<JsonValue>;
+
+/// Configuration for executing a containerized capsule invocation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerExecConfig {
+    pub image_digest: String,
+    pub command: Vec<String>,
+    #[serde(default)]
+    pub env: BTreeMap<String, String>,
+    #[serde(default)]
+    pub working_dir: Option<String>,
+    pub envelope_path: String,
+    #[serde(default)]
+    pub capsule_name: Option<String>,
+}
+
+impl ContainerExecConfig {
+    pub fn validate(&self) -> Result<()> {
+        if !self.image_digest.contains("@sha256:") {
+            anyhow::bail!(
+                "Container image must be digest-pinned (expected '@sha256:' in reference)"
+            );
+        }
+
+        if self.command.is_empty() {
+            anyhow::bail!("Container command cannot be empty");
+        }
+
+        if self.envelope_path.trim().is_empty() {
+            anyhow::bail!("Envelope path cannot be empty");
+        }
+
+        if !self.envelope_path.starts_with('/') {
+            anyhow::bail!("Envelope path '{}' must be absolute", self.envelope_path);
+        }
+
+        Ok(())
+    }
+}
+
+/// Result of running the container execution capsule.
+#[derive(Debug, Clone)]
+pub struct ContainerExecResult {
+    pub envelope: Envelope,
+    pub duration_ms: f64,
+    pub exit_status: Option<i32>,
+}
+
+/// Execute a containerized capsule and return its result envelope.
+///
+/// This function enforces sandboxing guards, captures stdout/stderr for diagnostics,
+/// and validates the emitted envelope. If any step fails, a canonical error envelope
+/// is produced with diagnostic context.
+pub fn execute(config: &ContainerExecConfig) -> Envelope {
+    match execute_internal(config) {
+        Ok(mut result) => {
+            annotate_success(&mut result, config);
+            result.envelope
+        }
+        Err(error) => build_error_envelope(error, config),
+    }
+}
+
+fn execute_internal(config: &ContainerExecConfig) -> Result<ContainerExecResult, ExecError> {
+    config.validate().map_err(|err| ExecError::InvalidConfig {
+        message: err.to_string(),
+    })?;
+
+    match detect_runtime_kind() {
+        RuntimeKind::Stub => execute_stub(config),
+        RuntimeKind::Binary(runtime_bin) => execute_with_runtime(config, runtime_bin),
+    }
+}
+
+fn execute_stub(config: &ContainerExecConfig) -> Result<ContainerExecResult, ExecError> {
+    let stub_path = env::var("DEMON_CONTAINER_EXEC_STUB_ENVELOPE")
+        .map(PathBuf::from)
+        .map_err(|_| ExecError::Stub {
+            message:
+                "stub runtime requires DEMON_CONTAINER_EXEC_STUB_ENVELOPE to point to an envelope"
+                    .to_string(),
+        })?;
+
+    let raw = fs::read(&stub_path).map_err(|err| ExecError::Stub {
+        message: format!(
+            "Failed to read stub envelope at {}: {}",
+            stub_path.display(),
+            err
+        ),
+    })?;
+
+    let mut envelope: Envelope = serde_json::from_slice(&raw).map_err(|err| ExecError::Stub {
+        message: format!("Failed to parse stub envelope JSON: {}", err),
+    })?;
+
+    if let Err(err) = envelope.validate() {
+        return Err(ExecError::Stub {
+            message: format!("Stub envelope validation failed: {}", err),
+        });
+    }
+
+    envelope.diagnostics.push(
+        Diagnostic::info(format!(
+            "container-exec stub envelope loaded from {}",
+            stub_path.display()
+        ))
+        .with_source("container-exec")
+        .with_context(serde_json::json!({
+            "mode": "stub",
+            "image": config.image_digest,
+        })),
+    );
+
+    Ok(ContainerExecResult {
+        envelope,
+        duration_ms: 0.0,
+        exit_status: Some(0),
+    })
+}
+
+fn execute_with_runtime(
+    config: &ContainerExecConfig,
+    runtime_bin: String,
+) -> Result<ContainerExecResult, ExecError> {
+    let temp_dir = TempDir::new().map_err(|err| ExecError::Io {
+        message: format!("Failed to create temp directory: {}", err),
+    })?;
+
+    let mount = EnvelopeMount::prepare(&config.envelope_path, temp_dir.path())?;
+
+    let host_target = mount.container_root.clone();
+    fs::create_dir_all(mount.host_root()).map_err(|err| ExecError::Io {
+        message: format!(
+            "Failed to create host mount directory {}: {}",
+            mount.host_root().display(),
+            err
+        ),
+    })?;
+
+    if let Some(parent) = mount.host_envelope_path.parent() {
+        fs::create_dir_all(parent).map_err(|err| ExecError::Io {
+            message: format!(
+                "Failed to create envelope parent directory {}: {}",
+                parent.display(),
+                err
+            ),
+        })?;
+    }
+
+    let mut command = Command::new(&runtime_bin);
+    configure_command(&mut command, config, &mount)?;
+
+    let start = Instant::now();
+    let output = command.output().map_err(|err| ExecError::RuntimeSpawn {
+        runtime: runtime_bin.clone(),
+        source: err,
+    })?;
+    let duration = start.elapsed();
+
+    let logs = CommandLogs::from_output(&output);
+
+    let envelope_bytes =
+        fs::read(&mount.host_envelope_path).map_err(|err| ExecError::EnvelopeMissing {
+            path: mount.host_envelope_path.clone(),
+            status: output.status,
+            logs: logs.clone(),
+            source: err,
+        })?;
+
+    let envelope: Envelope =
+        serde_json::from_slice(&envelope_bytes).map_err(|err| ExecError::EnvelopeInvalid {
+            path: mount.host_envelope_path.clone(),
+            status: output.status,
+            logs: logs.clone(),
+            source: anyhow!(err),
+        })?;
+
+    if let Err(err) = envelope.validate() {
+        return Err(ExecError::EnvelopeInvalid {
+            path: mount.host_envelope_path.clone(),
+            status: output.status,
+            logs,
+            source: err,
+        });
+    }
+
+    Ok(ContainerExecResult {
+        envelope,
+        duration_ms: duration.as_secs_f64() * 1000.0,
+        exit_status: exit_code(&output.status),
+    }
+    .tap(|result| annotate_logs(&mut result.envelope, &logs, &host_target, config)))
+}
+
+fn annotate_logs(
+    envelope: &mut Envelope,
+    logs: &CommandLogs,
+    container_target: &str,
+    config: &ContainerExecConfig,
+) {
+    if let Some(code) = logs.exit_status {
+        let message = format!("container runtime exited with code {}", code);
+        let level = if code == 0 {
+            DiagnosticLevel::Info
+        } else {
+            DiagnosticLevel::Warning
+        };
+        envelope.diagnostics.push(
+            Diagnostic::new(level, message)
+                .with_source("container-exec")
+                .with_context(serde_json::json!({
+                    "image": config.image_digest,
+                    "mount": container_target,
+                })),
+        );
+    }
+
+    if !logs.stdout.trim().is_empty() {
+        envelope.diagnostics.push(
+            Diagnostic::info(format!("stdout: {}", truncate(&logs.stdout, 2048)))
+                .with_source("container-exec"),
+        );
+    }
+
+    if !logs.stderr.trim().is_empty() {
+        envelope.diagnostics.push(
+            Diagnostic::warning(format!("stderr: {}", truncate(&logs.stderr, 2048)))
+                .with_source("container-exec"),
+        );
+    }
+}
+
+fn annotate_success(result: &mut ContainerExecResult, config: &ContainerExecConfig) {
+    if result.envelope.metrics.is_none() {
+        result.envelope.metrics = Some(Metrics {
+            duration: Some(DurationMetrics {
+                total_ms: Some(result.duration_ms),
+                phases: Default::default(),
+            }),
+            resources: None,
+            counters: Default::default(),
+            custom: None,
+        });
+    } else if let Some(metrics) = &mut result.envelope.metrics {
+        metrics.duration.get_or_insert(DurationMetrics {
+            total_ms: Some(result.duration_ms),
+            phases: Default::default(),
+        });
+    }
+
+    result
+        .envelope
+        .provenance
+        .get_or_insert_with(|| Provenance {
+            source: Some(SourceInfo {
+                system: "container-exec".to_string(),
+                version: Some(env!("CARGO_PKG_VERSION").to_string()),
+                instance: config.capsule_name.clone(),
+            }),
+            timestamp: Some(Utc::now()),
+            trace_id: None,
+            span_id: None,
+            parent_span_id: None,
+            chain: vec![],
+        });
+}
+
+fn configure_command(
+    command: &mut Command,
+    config: &ContainerExecConfig,
+    mount: &EnvelopeMount,
+) -> Result<(), ExecError> {
+    command.arg("run");
+    command.arg("--rm");
+    command.arg("--pull").arg("never");
+    command.arg("--network").arg("none");
+    command.arg("--read-only");
+    command.arg("--security-opt").arg("no-new-privileges");
+    command.arg("--user").arg(container_user());
+    command
+        .arg("--tmpfs")
+        .arg("/tmp:rw,noexec,nosuid,nodev,size=67108864");
+    command.arg("--mount").arg(format!(
+        "type=bind,source={},target={},readonly=false",
+        mount.host_root().display(),
+        mount.container_root
+    ));
+
+    if let Some(dir) = &config.working_dir {
+        command.arg("--workdir").arg(dir);
+    }
+
+    for (key, value) in &config.env {
+        command.arg("--env").arg(format!("{}={}", key, value));
+    }
+
+    command.arg(&config.image_digest);
+
+    for part in &config.command {
+        command.arg(part);
+    }
+
+    command.stdin(Stdio::null());
+    command.stdout(Stdio::piped());
+    command.stderr(Stdio::piped());
+
+    Ok(())
+}
+
+fn container_user() -> String {
+    env::var("DEMON_CONTAINER_USER").unwrap_or_else(|_| "65534:65534".to_string())
+}
+
+fn exit_code(status: &ExitStatus) -> Option<i32> {
+    status.code()
+}
+
+fn truncate(text: &str, limit: usize) -> String {
+    if text.len() <= limit {
+        text.to_string()
+    } else {
+        let mut truncated = text[..limit].to_string();
+        truncated.push_str("… (truncated)");
+        truncated
+    }
+}
+
+fn build_error_envelope(error: ExecError, config: &ContainerExecConfig) -> Envelope {
+    let message = error.message();
+    let mut builder = Envelope::builder()
+        .error_with_code(&message, error.code())
+        .add_diagnostic(Diagnostic::error(&message).with_source("container-exec"));
+
+    if let Some(logs) = error.logs() {
+        if !logs.stdout.trim().is_empty() {
+            builder = builder.add_diagnostic(
+                Diagnostic::debug(format!("stdout: {}", truncate(&logs.stdout, 2048)))
+                    .with_source("container-exec"),
+            );
+        }
+
+        if !logs.stderr.trim().is_empty() {
+            builder = builder.add_diagnostic(
+                Diagnostic::warning(format!("stderr: {}", truncate(&logs.stderr, 2048)))
+                    .with_source("container-exec"),
+            );
+        }
+    }
+
+    builder
+        .with_source_info(
+            "container-exec",
+            Some(env!("CARGO_PKG_VERSION")),
+            config.capsule_name.clone(),
+        )
+        .add_diagnostic(
+            Diagnostic::info("container execution failed")
+                .with_source("container-exec")
+                .with_context(serde_json::json!({
+                    "image": config.image_digest,
+                    "command": config.command,
+                    "envelopePath": config.envelope_path,
+                })),
+        )
+        .build()
+        .unwrap_or_else(|_| Envelope {
+            result: envelope::OperationResult::error("Container execution failed"),
+            diagnostics: vec![],
+            suggestions: vec![],
+            metrics: None,
+            provenance: None,
+        })
+}
+
+fn detect_runtime_kind() -> RuntimeKind {
+    match env::var("DEMON_CONTAINER_RUNTIME") {
+        Ok(val) if val.trim().eq_ignore_ascii_case("stub") => RuntimeKind::Stub,
+        Ok(val) if !val.trim().is_empty() => RuntimeKind::Binary(val),
+        _ => RuntimeKind::Binary("docker".to_string()),
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum RuntimeKind {
+    Binary(String),
+    Stub,
+}
+
+#[derive(Debug, Clone)]
+struct CommandLogs {
+    stdout: String,
+    stderr: String,
+    exit_status: Option<i32>,
+}
+
+impl CommandLogs {
+    fn from_output(output: &Output) -> Self {
+        Self {
+            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+            exit_status: exit_code(&output.status),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct EnvelopeMount {
+    container_root: String,
+    host_mount_root: PathBuf,
+    host_envelope_path: PathBuf,
+}
+
+impl EnvelopeMount {
+    fn prepare(envelope_path: &str, temp_root: &Path) -> Result<Self, ExecError> {
+        if !envelope_path.starts_with('/') {
+            return Err(ExecError::InvalidConfig {
+                message: format!("Envelope path '{}' must be absolute", envelope_path),
+            });
+        }
+
+        let trimmed = envelope_path.trim_start_matches('/');
+        let mut parts = trimmed.split('/');
+        let first = parts.next().ok_or_else(|| ExecError::InvalidConfig {
+            message: "Envelope path missing components".to_string(),
+        })?;
+
+        let host_mount_root = temp_root.join("mount").join(first);
+        let mut host_envelope_path = host_mount_root.clone();
+        for comp in parts {
+            host_envelope_path = host_envelope_path.join(comp);
+        }
+
+        Ok(Self {
+            container_root: format!("/{}", first),
+            host_mount_root,
+            host_envelope_path,
+        })
+    }
+
+    fn host_root(&self) -> &Path {
+        &self.host_mount_root
+    }
+}
+
+#[derive(Debug, Error)]
+enum ExecError {
+    #[error("Invalid container execution config: {message}")]
+    InvalidConfig { message: String },
+    #[error("Failed to spawn container runtime {runtime}: {source}")]
+    RuntimeSpawn {
+        runtime: String,
+        source: std::io::Error,
+    },
+    #[error("Failed to prepare envelope: {message}")]
+    Io { message: String },
+    #[error("Envelope missing at {path}: {source}")]
+    EnvelopeMissing {
+        path: PathBuf,
+        status: ExitStatus,
+        logs: CommandLogs,
+        source: std::io::Error,
+    },
+    #[error("Envelope invalid at {path}: {source}")]
+    EnvelopeInvalid {
+        path: PathBuf,
+        status: ExitStatus,
+        logs: CommandLogs,
+        source: anyhow::Error,
+    },
+    #[error("Stub mode error: {message}")]
+    Stub { message: String },
+}
+
+impl ExecError {
+    fn message(&self) -> String {
+        match self {
+            ExecError::InvalidConfig { message } => message.clone(),
+            ExecError::RuntimeSpawn { runtime, source } => {
+                format!(
+                    "Failed to spawn container runtime '{}': {}",
+                    runtime, source
+                )
+            }
+            ExecError::Io { message } => message.clone(),
+            ExecError::EnvelopeMissing { path, .. } => {
+                format!("Container envelope not found at {}", path.display())
+            }
+            ExecError::EnvelopeInvalid { path, source, .. } => {
+                format!(
+                    "Invalid container envelope at {}: {}",
+                    path.display(),
+                    source
+                )
+            }
+            ExecError::Stub { message } => message.clone(),
+        }
+    }
+
+    fn code(&self) -> &'static str {
+        match self {
+            ExecError::InvalidConfig { .. } => "CONTAINER_EXEC_INVALID_CONFIG",
+            ExecError::RuntimeSpawn { .. } => "CONTAINER_EXEC_RUNTIME_ERROR",
+            ExecError::Io { .. } => "CONTAINER_EXEC_IO_ERROR",
+            ExecError::EnvelopeMissing { .. } => "CONTAINER_EXEC_ENVELOPE_MISSING",
+            ExecError::EnvelopeInvalid { .. } => "CONTAINER_EXEC_ENVELOPE_INVALID",
+            ExecError::Stub { .. } => "CONTAINER_EXEC_STUB_ERROR",
+        }
+    }
+
+    fn logs(&self) -> Option<&CommandLogs> {
+        match self {
+            ExecError::EnvelopeMissing { logs, .. } | ExecError::EnvelopeInvalid { logs, .. } => {
+                Some(logs)
+            }
+            _ => None,
+        }
+    }
+}
+
+trait Tap<T> {
+    fn tap<F: FnOnce(&mut T)>(self, func: F) -> Self;
+}
+
+impl<T> Tap<T> for T {
+    fn tap<F: FnOnce(&mut T)>(mut self, func: F) -> Self {
+        func(&mut self);
+        self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use envelope::OperationResult;
+    use std::fs::File;
+    use std::io::Write;
+
+    fn sample_envelope() -> Envelope {
+        ResultEnvelope {
+            result: OperationResult::success(serde_json::json!({"ok": true})),
+            diagnostics: vec![],
+            suggestions: vec![],
+            metrics: None,
+            provenance: None,
+        }
+    }
+
+    #[test]
+    fn truncate_limits_output() {
+        let long = "a".repeat(3000);
+        let truncated = truncate(&long, 1000);
+        assert!(truncated.len() > 1000);
+        assert!(truncated.ends_with("… (truncated)"));
+    }
+
+    #[test]
+    fn envelope_mount_builds_host_path() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let mount =
+            EnvelopeMount::prepare("/workspace/.artifacts/result.json", temp_dir.path()).unwrap();
+        assert!(mount
+            .host_envelope_path
+            .display()
+            .to_string()
+            .contains("workspace"));
+        assert_eq!(mount.container_root, "/workspace");
+    }
+
+    #[test]
+    fn stub_mode_loads_envelope() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("stub.json");
+        let envelope = sample_envelope();
+        let mut file = File::create(&path).unwrap();
+        file.write_all(serde_json::to_vec(&envelope).unwrap().as_slice())
+            .unwrap();
+
+        env::set_var("DEMON_CONTAINER_RUNTIME", "stub");
+        env::set_var(
+            "DEMON_CONTAINER_EXEC_STUB_ENVELOPE",
+            path.to_string_lossy().to_string(),
+        );
+
+        let config = ContainerExecConfig {
+            image_digest: "ghcr.io/example/app@sha256:abcdef".to_string(),
+            command: vec!["/bin/true".to_string()],
+            env: BTreeMap::new(),
+            working_dir: None,
+            envelope_path: "/workspace/result.json".to_string(),
+            capsule_name: Some("test".to_string()),
+        };
+
+        let result = execute(&config);
+        assert!(matches!(result.result, OperationResult::Success { .. }));
+
+        env::remove_var("DEMON_CONTAINER_RUNTIME");
+        env::remove_var("DEMON_CONTAINER_EXEC_STUB_ENVELOPE");
+    }
+
+    #[test]
+    fn invalid_config_builds_error_envelope() {
+        env::remove_var("DEMON_CONTAINER_RUNTIME");
+        let config = ContainerExecConfig {
+            image_digest: "not-digest".to_string(),
+            command: vec!["run".to_string()],
+            env: BTreeMap::new(),
+            working_dir: None,
+            envelope_path: "/workspace/result.json".to_string(),
+            capsule_name: None,
+        };
+
+        let result = execute(&config);
+        assert!(matches!(result.result, OperationResult::Error { .. }));
+    }
+}
