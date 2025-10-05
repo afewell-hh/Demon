@@ -41,6 +41,16 @@
           "minLength": 1,
           "description": "Optional details about the App Pack."
         },
+        "repository": {
+          "type": "string",
+          "format": "uri",
+          "description": "Source repository URL for the App Pack."
+        },
+        "license": {
+          "type": "string",
+          "minLength": 1,
+          "description": "SPDX identifier describing the App Pack license."
+        },
         "homepage": {
           "type": "string",
           "format": "uri",
@@ -55,31 +65,54 @@
       "description": "Optional signature verification settings.",
       "properties": {
         "cosign": {
-          "type": "object",
-          "additionalProperties": false,
           "description": "Cosign verification configuration.",
-          "properties": {
-            "keyRef": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Reference to a public key used for verification (file path, KMS URI, etc.)."
+          "oneOf": [
+            {
+              "type": "boolean",
+              "description": "Boolean shorthand enabling cosign verification with default settings."
             },
-            "certificateIdentity": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Identity URI that must be present in certificate claims."
-            },
-            "certificateIssuer": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Issuer URI that must be present in certificate claims."
-            },
-            "rekorUrl": {
-              "type": "string",
-              "format": "uri",
-              "description": "Optional transparency log URL for verification."
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "keyRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Reference to a public key used for verification (file path, KMS URI, etc.)."
+                },
+                "certificateIdentity": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Identity URI that must be present in certificate claims."
+                },
+                "certificateIssuer": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Issuer URI that must be present in certificate claims."
+                },
+                "rekorUrl": {
+                  "type": "string",
+                  "format": "uri",
+                  "description": "Optional transparency log URL for verification."
+                }
+              }
             }
-          }
+          ]
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Version compatibility requirements declared by the App Pack.",
+      "properties": {
+        "appPackSchema": {
+          "$ref": "#/$defs/semverRange",
+          "description": "Supported App Pack schema range."
+        },
+        "platformAPI": {
+          "$ref": "#/$defs/semverRange",
+          "description": "Supported Demon platform API range."
         }
       }
     },
@@ -113,7 +146,7 @@
         "properties": {
           "id": {
             "type": "string",
-            "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+            "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
             "description": "Stable identifier for the contract."
           },
           "version": {
@@ -181,6 +214,31 @@
               }
             },
             "required": ["envelopePath"]
+          },
+          "sandbox": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Sandbox overrides for container execution.",
+            "properties": {
+              "network": {
+                "type": "string",
+                "description": "Container network mode (e.g., none)."
+              },
+              "readOnly": {
+                "type": "boolean",
+                "description": "Whether to mount the root filesystem as read-only."
+              },
+              "tmpfs": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "description": "Paths to mount as tmpfs volumes."
+              },
+              "securityOpt": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "description": "Security options passed to the container runtime."
+              }
+            }
           }
         },
         "required": ["type", "name", "imageDigest", "command", "outputs"]
@@ -261,6 +319,11 @@
                 "minLength": 1,
                 "description": "Display title for the card."
               },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional descriptive text for the card."
+              },
               "match": {
                 "type": "object",
                 "additionalProperties": false,
@@ -316,7 +379,7 @@
     "semverRange": {
       "type": "string",
       "pattern": "^[^\n\r]+$",
-      "description": "Semantic version range specification (e.g., ">=1.0.0 <2.0.0")."
+      "description": "Semantic version range specification (e.g., >=1.0.0 <2.0.0)."
     }
   }
 }

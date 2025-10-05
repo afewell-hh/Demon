@@ -150,8 +150,15 @@ pub struct Signing {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum Cosign {
+    Enabled(bool),
+    Settings(CosignSettings),
+}
+
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Cosign {
+pub struct CosignSettings {
     #[serde(default)]
     pub key_ref: Option<String>,
     #[serde(default)]
