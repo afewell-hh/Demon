@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use envelope::{
     Diagnostic, DiagnosticLevel, DurationMetrics, Metrics, Provenance, ResultEnvelope, SourceInfo,
@@ -8,6 +8,8 @@ use serde_json::Value as JsonValue;
 use std::collections::BTreeMap;
 use std::env;
 use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Output, Stdio};
 use std::time::Instant;
@@ -29,6 +31,10 @@ pub struct ContainerExecConfig {
     pub envelope_path: String,
     #[serde(default)]
     pub capsule_name: Option<String>,
+    #[serde(default)]
+    pub app_pack_dir: Option<PathBuf>,
+    #[serde(default)]
+    pub artifacts_dir: Option<PathBuf>,
 }
 
 impl ContainerExecConfig {
@@ -49,6 +55,33 @@ impl ContainerExecConfig {
 
         if !self.envelope_path.starts_with('/') {
             anyhow::bail!("Envelope path '{}' must be absolute", self.envelope_path);
+        }
+
+        if let Some(dir) = &self.app_pack_dir {
+            if !dir.is_absolute() {
+                anyhow::bail!(
+                    "App Pack directory '{}' must be an absolute path",
+                    dir.display()
+                );
+            }
+
+            if !dir.exists() {
+                anyhow::bail!("App Pack directory '{}' does not exist", dir.display());
+            }
+        }
+
+        if let Some(dir) = &self.artifacts_dir {
+            if !dir.is_absolute() {
+                anyhow::bail!(
+                    "Artifacts directory '{}' must be an absolute path",
+                    dir.display()
+                );
+            }
+            if !dir.exists() {
+                fs::create_dir_all(dir).with_context(|| {
+                    format!("Failed to create artifacts directory '{}'", dir.display())
+                })?;
+            }
         }
 
         Ok(())
@@ -139,20 +172,60 @@ fn execute_with_runtime(
     config: &ContainerExecConfig,
     runtime_bin: String,
 ) -> Result<ContainerExecResult, ExecError> {
+    if let Some(artifacts_dir) = &config.artifacts_dir {
+        fs::create_dir_all(artifacts_dir).map_err(|err| ExecError::Io {
+            message: format!(
+                "Failed to create artifacts directory {}: {}",
+                artifacts_dir.display(),
+                err
+            ),
+        })?;
+
+        #[cfg(unix)]
+        {
+            let permissions = fs::Permissions::from_mode(0o777);
+            fs::set_permissions(artifacts_dir, permissions).map_err(|err| ExecError::Io {
+                message: format!(
+                    "Failed to set permissions on artifacts directory {}: {}",
+                    artifacts_dir.display(),
+                    err
+                ),
+            })?;
+        }
+    }
+
+    if let Some(app_pack_dir) = &config.app_pack_dir {
+        let mount_point = app_pack_dir.join(".artifacts");
+        fs::create_dir_all(&mount_point).map_err(|err| ExecError::Io {
+            message: format!(
+                "Failed to ensure App Pack artifacts mount point {}: {}",
+                mount_point.display(),
+                err
+            ),
+        })?;
+    }
+
     let temp_dir = TempDir::new().map_err(|err| ExecError::Io {
         message: format!("Failed to create temp directory: {}", err),
     })?;
 
-    let mount = EnvelopeMount::prepare(&config.envelope_path, temp_dir.path())?;
+    let artifacts_dir = config.artifacts_dir.as_ref();
+    let mount = EnvelopeMount::prepare(
+        &config.envelope_path,
+        temp_dir.path(),
+        artifacts_dir.map(Path::new),
+    )?;
 
     let host_target = mount.container_root.clone();
-    fs::create_dir_all(mount.host_root()).map_err(|err| ExecError::Io {
-        message: format!(
-            "Failed to create host mount directory {}: {}",
-            mount.host_root().display(),
-            err
-        ),
-    })?;
+    if let Some(root) = mount.host_root() {
+        fs::create_dir_all(root).map_err(|err| ExecError::Io {
+            message: format!(
+                "Failed to create host mount directory {}: {}",
+                root.display(),
+                err
+            ),
+        })?;
+    }
 
     if let Some(parent) = mount.host_envelope_path.parent() {
         fs::create_dir_all(parent).map_err(|err| ExecError::Io {
@@ -297,15 +370,56 @@ fn configure_command(
     command
         .arg("--tmpfs")
         .arg("/tmp:rw,noexec,nosuid,nodev,size=67108864");
-    command.arg("--mount").arg(format!(
-        "type=bind,source={},target={},readonly=false",
-        mount.host_root().display(),
-        mount.container_root
-    ));
+    if let Some(app_dir) = &config.app_pack_dir {
+        let app_dir = fs::canonicalize(app_dir).map_err(|err| ExecError::Io {
+            message: format!(
+                "Failed to canonicalize App Pack directory {}: {}",
+                app_dir.display(),
+                err
+            ),
+        })?;
+        command.arg("--mount").arg(format!(
+            "type=bind,source={},target=/workspace,readonly=true",
+            app_dir.display()
+        ));
+    }
 
+    if let Some(artifacts_dir) = &config.artifacts_dir {
+        let artifacts_dir = fs::canonicalize(artifacts_dir).map_err(|err| ExecError::Io {
+            message: format!(
+                "Failed to canonicalize artifacts directory {}: {}",
+                artifacts_dir.display(),
+                err
+            ),
+        })?;
+        command.arg("--mount").arg(format!(
+            "type=bind,source={},target=/workspace/.artifacts,readonly=false",
+            artifacts_dir.display()
+        ));
+    }
+
+    if let Some(host_root) = mount.host_root() {
+        command.arg("--mount").arg(format!(
+            "type=bind,source={},target={},readonly=false",
+            host_root.display(),
+            mount.container_root
+        ));
+    }
+
+    let mut workdir_set = false;
     if let Some(dir) = &config.working_dir {
         command.arg("--workdir").arg(dir);
+        workdir_set = true;
     }
+
+    if !workdir_set && config.app_pack_dir.is_some() {
+        command.arg("--workdir").arg("/workspace");
+    }
+
+    // Ensure capsule receives the enforced envelope path regardless of manifest env.
+    command
+        .arg("--env")
+        .arg(format!("ENVELOPE_PATH={}", config.envelope_path));
 
     for (key, value) in &config.env {
         command.arg("--env").arg(format!("{}={}", key, value));
@@ -423,39 +537,76 @@ impl CommandLogs {
 #[derive(Debug, Clone)]
 struct EnvelopeMount {
     container_root: String,
-    host_mount_root: PathBuf,
+    host_mount_root: Option<PathBuf>,
     host_envelope_path: PathBuf,
 }
 
 impl EnvelopeMount {
-    fn prepare(envelope_path: &str, temp_root: &Path) -> Result<Self, ExecError> {
+    fn prepare(
+        envelope_path: &str,
+        temp_root: &Path,
+        artifacts_dir: Option<&Path>,
+    ) -> Result<Self, ExecError> {
         if !envelope_path.starts_with('/') {
             return Err(ExecError::InvalidConfig {
                 message: format!("Envelope path '{}' must be absolute", envelope_path),
             });
         }
 
-        let trimmed = envelope_path.trim_start_matches('/');
-        let mut parts = trimmed.split('/');
-        let first = parts.next().ok_or_else(|| ExecError::InvalidConfig {
+        let container_path = Path::new(envelope_path);
+        let container_parent = container_path
+            .parent()
+            .ok_or_else(|| ExecError::InvalidConfig {
+                message: "Envelope path must include parent directory".to_string(),
+            })?;
+
+        if let Some(dir) = artifacts_dir {
+            let rel = container_path
+                .strip_prefix(Path::new("/workspace/.artifacts"))
+                .map_err(|_| ExecError::InvalidConfig {
+                    message: format!(
+                        "Envelope path '{}' must live under /workspace/.artifacts when artifactsDir is provided",
+                        envelope_path
+                    ),
+                })?;
+
+            let host_envelope_path = dir.join(rel);
+
+            return Ok(Self {
+                container_root: container_parent
+                    .to_str()
+                    .ok_or_else(|| ExecError::InvalidConfig {
+                        message: "Container envelope path contains invalid UTF-8".to_string(),
+                    })?
+                    .to_string(),
+                host_mount_root: None,
+                host_envelope_path,
+            });
+        }
+
+        let trimmed = container_path
+            .strip_prefix(Path::new("/"))
+            .unwrap_or(container_path);
+        let mut components = trimmed.components();
+        let first = components.next().ok_or_else(|| ExecError::InvalidConfig {
             message: "Envelope path missing components".to_string(),
         })?;
 
-        let host_mount_root = temp_root.join("mount").join(first);
+        let host_mount_root = temp_root.join("mount").join(first.as_os_str());
         let mut host_envelope_path = host_mount_root.clone();
-        for comp in parts {
-            host_envelope_path = host_envelope_path.join(comp);
+        for comp in components {
+            host_envelope_path = host_envelope_path.join(comp.as_os_str());
         }
 
         Ok(Self {
-            container_root: format!("/{}", first),
-            host_mount_root,
+            container_root: format!("/{}", first.as_os_str().to_string_lossy()),
+            host_mount_root: Some(host_mount_root),
             host_envelope_path,
         })
     }
 
-    fn host_root(&self) -> &Path {
-        &self.host_mount_root
+    fn host_root(&self) -> Option<&Path> {
+        self.host_mount_root.as_deref()
     }
 }
 
@@ -574,7 +725,8 @@ mod tests {
     fn envelope_mount_builds_host_path() {
         let temp_dir = tempfile::tempdir().unwrap();
         let mount =
-            EnvelopeMount::prepare("/workspace/.artifacts/result.json", temp_dir.path()).unwrap();
+            EnvelopeMount::prepare("/workspace/.artifacts/result.json", temp_dir.path(), None)
+                .unwrap();
         assert!(mount
             .host_envelope_path
             .display()
@@ -605,6 +757,8 @@ mod tests {
             working_dir: None,
             envelope_path: "/workspace/result.json".to_string(),
             capsule_name: Some("test".to_string()),
+            app_pack_dir: None,
+            artifacts_dir: None,
         };
 
         let result = execute(&config);
@@ -624,9 +778,66 @@ mod tests {
             working_dir: None,
             envelope_path: "/workspace/result.json".to_string(),
             capsule_name: None,
+            app_pack_dir: None,
+            artifacts_dir: None,
         };
 
         let result = execute(&config);
         assert!(matches!(result.result, OperationResult::Error { .. }));
+    }
+
+    #[test]
+    fn configure_command_includes_workspace_and_artifacts_mounts() {
+        let base = tempfile::tempdir().unwrap();
+        let app_pack_dir = base.path().join("pack");
+        let artifacts_dir = base.path().join("artifacts");
+        fs::create_dir_all(&app_pack_dir).unwrap();
+        fs::create_dir_all(&artifacts_dir).unwrap();
+
+        let config = ContainerExecConfig {
+            image_digest: "ghcr.io/example/app@sha256:abcdef".to_string(),
+            command: vec!["/bin/true".to_string()],
+            env: BTreeMap::new(),
+            working_dir: None,
+            envelope_path: "/workspace/.artifacts/result.json".to_string(),
+            capsule_name: None,
+            app_pack_dir: Some(app_pack_dir.clone()),
+            artifacts_dir: Some(artifacts_dir.clone()),
+        };
+
+        config.validate().unwrap();
+
+        let temp_root = tempfile::tempdir().unwrap();
+        let mount = EnvelopeMount::prepare(
+            &config.envelope_path,
+            temp_root.path(),
+            config.artifacts_dir.as_deref(),
+        )
+        .unwrap();
+
+        let mut command = Command::new("docker");
+        configure_command(&mut command, &config, &mount).unwrap();
+
+        let args: Vec<String> = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect();
+
+        let workspace_mount = format!(
+            "type=bind,source={},target=/workspace,readonly=true",
+            fs::canonicalize(&app_pack_dir).unwrap().display()
+        );
+        let artifacts_mount = format!(
+            "type=bind,source={},target=/workspace/.artifacts,readonly=false",
+            fs::canonicalize(&artifacts_dir).unwrap().display()
+        );
+        let envelope_env = format!("ENVELOPE_PATH={}", config.envelope_path);
+
+        assert!(args.contains(&"--mount".to_string()));
+        assert!(args.iter().any(|arg| arg == &workspace_mount));
+        assert!(args.iter().any(|arg| arg == &artifacts_mount));
+        assert!(args.contains(&"--workdir".to_string()));
+        assert!(args.contains(&"/workspace".to_string()));
+        assert!(args.contains(&envelope_env));
     }
 }
