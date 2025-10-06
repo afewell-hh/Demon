@@ -8,6 +8,7 @@ use serde_json::Value as JsonValue;
 use std::collections::BTreeMap;
 use std::env;
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Output, Stdio};
 use std::time::Instant;
@@ -154,6 +155,17 @@ fn execute_with_runtime(
         ),
     })?;
 
+    // Set permissions to 0777 so non-root container user (uid 65534) can write
+    fs::set_permissions(mount.host_root(), fs::Permissions::from_mode(0o777)).map_err(|err| {
+        ExecError::Io {
+            message: format!(
+                "Failed to set permissions on mount directory {}: {}",
+                mount.host_root().display(),
+                err
+            ),
+        }
+    })?;
+
     if let Some(parent) = mount.host_envelope_path.parent() {
         fs::create_dir_all(parent).map_err(|err| ExecError::Io {
             message: format!(
@@ -161,6 +173,16 @@ fn execute_with_runtime(
                 parent.display(),
                 err
             ),
+        })?;
+        // Also set permissions on envelope parent directory
+        fs::set_permissions(parent, fs::Permissions::from_mode(0o777)).map_err(|err| {
+            ExecError::Io {
+                message: format!(
+                    "Failed to set permissions on envelope parent directory {}: {}",
+                    parent.display(),
+                    err
+                ),
+            }
         })?;
     }
 
