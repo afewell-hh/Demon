@@ -2,6 +2,7 @@ pub mod install;
 pub mod list;
 pub mod uninstall;
 
+pub mod alias;
 mod manifest;
 mod registry;
 

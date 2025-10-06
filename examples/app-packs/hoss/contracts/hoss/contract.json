@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HOSS Result Envelope",
+  "type": "object",
+  "properties": {
+    "result": {
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean" },
+        "data": { "type": "object" }
+      },
+      "required": ["success", "data"]
+    }
+  },
+  "required": ["result"]
+}

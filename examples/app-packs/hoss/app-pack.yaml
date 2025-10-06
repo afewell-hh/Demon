@@ -1,0 +1,32 @@
+apiVersion: demon.io/v1
+kind: AppPack
+metadata:
+  name: hoss
+  version: 0.1.0
+  displayName: HOSS Preview Pack
+  description: Declarative assets for HOSS orchestration smoke tests.
+signing:
+  cosign:
+    enabled: true
+    signaturePath: signing/cosign.sig
+    publicKeyPath: signing/cosign.pub
+    publicKeyHash:
+      algorithm: sha256
+      value: a9efc93b8a7bf4262333d9cd0c8c308973cc2d1afee03c8c6f2cc7a02722cafc
+contracts:
+  - id: hoss/contracts/demo
+    version: 0.1.0
+    path: contracts/hoss/contract.json
+capsules:
+  - type: container-exec
+    name: noop
+    imageDigest: ghcr.io/example/noop@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    command:
+      - /bin/true
+    outputs:
+      envelopePath: /workspace/.artifacts/result.json
+rituals:
+  - name: noop
+    displayName: HOSS orchestration smoke test
+    steps:
+      - capsule: noop

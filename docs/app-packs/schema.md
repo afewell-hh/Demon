@@ -10,10 +10,12 @@ The App Pack manifest is declared in YAML (or JSON) and validated against `contr
   - `name` — DNS-safe slug used as the registration namespace.
   - `version` — Semantic version of the pack (`MAJOR.MINOR.PATCH[-PRERELEASE]`).
   - `displayName` / `description` / `homepage` — Optional operator-facing metadata.
-- `signing` — Optional signature verification. `signing.cosign` supports:
-  - `keyRef` — Reference to a public key (file path, KMS, etc.).
-  - `certificateIdentity` / `certificateIssuer` — Keyless verification matchers.
-  - `rekorUrl` — Transparency log endpoint.
+- `signing` — Optional signature verification configuration.
+  - `cosign.enabled` — When `true` (default), the installer must verify the bundle before completing install.
+  - `cosign.signaturePath` — Relative path to the Cosign signature (or bundle) within the pack.
+  - `cosign.publicKeyPath` — Relative path to the PEM-encoded public key shipped with the pack.
+  - `cosign.publicKeyHash` — Digest of the PEM bytes (`algorithm` currently supports `sha256`).
+  - `cosign.keyRef` / `certificateIdentity` / `certificateIssuer` / `rekorUrl` — Additional inputs for future keyless verification flows.
 - `requires` — Declares compatible version ranges:
   - `appPackSchema` — Range string (e.g., `>=1.0.0 <2.0.0`).
   - `platformApis.engine` / `platformApis.runtime` / `platformApis.operateUi` — Semver range strings describing required platform API versions.

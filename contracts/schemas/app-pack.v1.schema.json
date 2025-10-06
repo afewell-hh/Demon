@@ -69,12 +69,31 @@
           "oneOf": [
             {
               "type": "boolean",
-              "description": "Boolean shorthand enabling cosign verification with default settings."
+              "description": "Boolean shorthand enabling cosign verification with default settings (deprecated)."
             },
             {
               "type": "object",
               "additionalProperties": false,
               "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "When true, the installer must verify the bundle before completing installation."
+                },
+                "signaturePath": {
+                  "type": "string",
+                  "pattern": "^signing/.*",
+                  "description": "Relative path to the Cosign signature (or bundle) file included with the pack."
+                },
+                "publicKeyPath": {
+                  "type": "string",
+                  "pattern": "^signing/.*",
+                  "description": "Relative path to the PEM-encoded public key used to verify signatures."
+                },
+                "publicKeyHash": {
+                  "$ref": "#/$defs/hashDigest",
+                  "description": "Digest of the PEM-encoded public key bytes."
+                },
                 "keyRef": {
                   "type": "string",
                   "minLength": 1,
@@ -95,7 +114,22 @@
                   "format": "uri",
                   "description": "Optional transparency log URL for verification."
                 }
-              }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "not": {
+                      "properties": {
+                        "enabled": { "const": false }
+                      },
+                      "required": ["enabled"]
+                    }
+                  },
+                  "then": {
+                    "required": ["signaturePath", "publicKeyPath", "publicKeyHash"]
+                  }
+                }
+              ]
             }
           ]
         }
@@ -380,6 +414,23 @@
       "type": "string",
       "pattern": "^[^\n\r]+$",
       "description": "Semantic version range specification (e.g., >=1.0.0 <2.0.0)."
+    },
+    "hashDigest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "enum": ["sha256"],
+          "description": "Hash algorithm used to compute the digest."
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$",
+          "description": "Hex-encoded digest value."
+        }
+      },
+      "required": ["algorithm", "value"]
     }
   }
 }

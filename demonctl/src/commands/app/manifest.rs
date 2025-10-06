@@ -7,6 +7,7 @@ use serde::Deserialize;
 use serde_json::Value as JsonValue;
 use serde_yaml::Value as YamlValue;
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::path::Path;
 
 static APP_PACK_SCHEMA: Lazy<JSONSchema> = Lazy::new(|| {
     let schema_str = include_str!("../../../../contracts/schemas/app-pack.v1.schema.json");
@@ -125,7 +126,124 @@ impl AppPackManifest {
             }
         }
 
+        if let Some(signing) = &self.signing {
+            if let Some(cosign) = &signing.cosign {
+                match cosign {
+                    Cosign::Enabled(true) => {
+                        bail!(
+                            "signing.cosign must be an object with signature settings; boolean form is no longer supported"
+                        );
+                    }
+                    Cosign::Enabled(false) => {}
+                    Cosign::Settings(settings) => {
+                        if settings.is_enabled() {
+                            ensure!(
+                                settings.signature_path.is_some(),
+                                "signing.cosign.signaturePath must be provided when enabled"
+                            );
+                            ensure!(
+                                settings.public_key_path.is_some(),
+                                "signing.cosign.publicKeyPath must be provided when enabled"
+                            );
+                            ensure!(
+                                settings.public_key_hash.is_some(),
+                                "signing.cosign.publicKeyHash must be provided when enabled"
+                            );
+
+                            if let Some(sig_path) = settings.signature_path() {
+                                validate_relative_path(sig_path, "signing.cosign.signaturePath")?;
+                            }
+                            if let Some(key_path) = settings.public_key_path() {
+                                validate_relative_path(key_path, "signing.cosign.publicKeyPath")?;
+                            }
+
+                            if let Some(hash) = settings.public_key_hash() {
+                                ensure!(
+                                    hash.algorithm.eq_ignore_ascii_case("sha256"),
+                                    "signing.cosign.publicKeyHash.algorithm must be 'sha256'"
+                                );
+                                ensure!(
+                                    hash.value.chars().all(|c| c.is_ascii_hexdigit())
+                                        && hash.value.len() == 64,
+                                    "signing.cosign.publicKeyHash.value must be a 64-character hex string"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Ok(())
+    }
+}
+
+fn validate_relative_path(path: &str, field: &str) -> Result<()> {
+    let path_ref = Path::new(path);
+    ensure!(
+        !path_ref.is_absolute(),
+        "{} must be a relative path inside the bundle",
+        field
+    );
+    for component in path_ref.components() {
+        ensure!(
+            !matches!(component, std::path::Component::ParentDir),
+            "{} cannot contain '..'",
+            field
+        );
+    }
+    Ok(())
+}
+
+impl CosignSettings {
+    pub fn is_enabled(&self) -> bool {
+        self.enabled.unwrap_or(true)
+    }
+
+    pub fn signature_path(&self) -> Option<&str> {
+        self.signature_path.as_deref()
+    }
+
+    pub fn public_key_path(&self) -> Option<&str> {
+        self.public_key_path.as_deref()
+    }
+
+    pub fn public_key_hash(&self) -> Option<&HashDigest> {
+        self.public_key_hash.as_ref()
+    }
+}
+
+impl HashDigest {
+    pub fn algorithm(&self) -> &str {
+        &self.algorithm
+    }
+
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+}
+
+impl AppPackManifest {
+    pub fn cosign_settings(&self) -> Result<Option<&CosignSettings>> {
+        let Some(signing) = &self.signing else {
+            return Ok(None);
+        };
+
+        let Some(cosign) = &signing.cosign else {
+            return Ok(None);
+        };
+
+        match cosign {
+            Cosign::Enabled(true) => bail!(
+                "signing.cosign must be an object with signature settings; boolean form is no longer supported"
+            ),
+            Cosign::Enabled(false) => Ok(None),
+            Cosign::Settings(settings) => Ok(if settings.is_enabled() {
+                Some(settings)
+            } else {
+                None
+            }),
+        }
     }
 }
 
@@ -160,6 +278,14 @@ pub enum Cosign {
 #[serde(rename_all = "camelCase")]
 pub struct CosignSettings {
     #[serde(default)]
+    pub enabled: Option<bool>,
+    #[serde(default)]
+    pub signature_path: Option<String>,
+    #[serde(default)]
+    pub public_key_path: Option<String>,
+    #[serde(default)]
+    pub public_key_hash: Option<HashDigest>,
+    #[serde(default)]
     pub key_ref: Option<String>,
     #[serde(default)]
     pub certificate_identity: Option<String>,
@@ -167,6 +293,13 @@ pub struct CosignSettings {
     pub certificate_issuer: Option<String>,
     #[serde(default)]
     pub rekor_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HashDigest {
+    pub algorithm: String,
+    pub value: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]

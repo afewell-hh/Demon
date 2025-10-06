@@ -39,8 +39,8 @@ pub fn run(args: ListArgs) -> Result<()> {
     }
 
     println!(
-        "{:<24} {:<12} {:<25} {}",
-        "NAME", "VERSION", "INSTALLED", "SOURCE"
+        "{:<24} {:<12} {:<25} SOURCE",
+        "NAME", "VERSION", "INSTALLED"
     );
     for (name, pack) in entries {
         println!(

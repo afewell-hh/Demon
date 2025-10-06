@@ -1,9 +1,11 @@
 use crate::commands::app::manifest::AppPackManifest;
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{DateTime, Utc};
+use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
+use std::mem;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -109,7 +111,7 @@ impl Registry {
                 .ok_or_else(|| anyhow!("App Pack '{}@{}' is not installed", name, version))?;
             vec![installs.remove(idx)]
         } else {
-            installs.drain(..).collect()
+            mem::take(installs)
         };
 
         if installs.is_empty() {
@@ -132,8 +134,45 @@ impl Registry {
             .with_context(|| format!("Failed to write registry file '{}'", self.path.display()))?;
         Ok(())
     }
+
+    pub fn resolve_install(&self, name: &str, version: Option<&str>) -> Result<InstalledPack> {
+        let installs = self
+            .state
+            .apps
+            .get(name)
+            .ok_or_else(|| anyhow!("No App Pack named '{}' is installed", name))?;
+
+        let selected = if let Some(version) = version {
+            installs
+                .iter()
+                .find(|install| install.version == version)
+                .ok_or_else(|| anyhow!("App Pack '{}@{}' is not installed", name, version))?
+        } else {
+            select_latest(installs)
+                .ok_or_else(|| anyhow!("App Pack '{}' has no installations", name))?
+        };
+
+        Ok(selected.clone())
+    }
 }
 
 pub fn registry_path(base_dir: &Path) -> PathBuf {
     base_dir.join("registry.json")
+}
+
+fn select_latest(installs: &[InstalledPack]) -> Option<&InstalledPack> {
+    let mut best: Option<(&InstalledPack, Version)> = None;
+
+    for install in installs {
+        if let Ok(ver) = Version::parse(&install.version) {
+            match &best {
+                Some((_, current)) if ver <= *current => {}
+                _ => best = Some((install, ver)),
+            }
+        } else if best.is_none() {
+            best = Some((install, Version::new(0, 0, 0)));
+        }
+    }
+
+    best.map(|(install, _)| install).or_else(|| installs.last())
 }

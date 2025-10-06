@@ -368,8 +368,10 @@ pub fn merge_digests_into_config(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
     #[test]
+    #[serial]
     fn merge_digests_into_config_overrides_images_and_env() {
         let mut config = K8sBootstrapConfig {
             api_version: "v1".to_string(),
@@ -502,6 +504,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn merge_digests_into_config_errors_when_component_missing() {
         let mut config = K8sBootstrapConfig {
             api_version: "v1".to_string(),
