@@ -2886,3 +2886,119 @@ fn list_local_workflows(dir_path: &str) -> anyhow::Result<Vec<WorkflowListItem>>
 
     Ok(workflows)
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// App Pack Cards
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+pub struct AppPackCardsQuery {
+    pub ritual: Option<String>,
+}
+
+/// App Pack cards viewer - HTML response
+#[axum::debug_handler]
+pub async fn app_pack_cards_html(
+    State(state): State<AppState>,
+    Query(query): Query<AppPackCardsQuery>,
+) -> Html<String> {
+    debug!(
+        "Handling HTML app pack cards view, ritual filter: {:?}",
+        query.ritual
+    );
+
+    // Get card definitions from registry
+    let (cards, registry_available) = match &state.app_pack_registry {
+        Some(registry) => {
+            let cards = if let Some(ref ritual) = query.ritual {
+                registry.get_cards_for_ritual(ritual)
+            } else {
+                registry.get_all_cards()
+            };
+            (cards, true)
+        }
+        None => (vec![], false),
+    };
+
+    // Get runs from JetStream (limit to recent 100)
+    let (runs, jetstream_available, error) = match &state.jetstream_client {
+        Some(client) => match client.list_runs_for_tenant("default", Some(100)).await {
+            Ok(runs) => {
+                info!("Retrieved {} runs for app pack cards", runs.len());
+                (runs, true, None)
+            }
+            Err(e) => {
+                error!("Failed to retrieve runs: {}", e);
+                (
+                    vec![],
+                    true,
+                    Some(format!("Failed to retrieve runs: {}", e)),
+                )
+            }
+        },
+        None => (
+            vec![],
+            false,
+            Some("JetStream is not available".to_string()),
+        ),
+    };
+
+    let mut context = tera::Context::new();
+    context.insert("cards", &cards);
+    context.insert("runs", &runs);
+    context.insert("error", &error);
+    context.insert("registry_available", &registry_available);
+    context.insert("jetstream_available", &jetstream_available);
+    context.insert("current_page", &"app_pack_cards");
+    context.insert("ritual_filter", &query.ritual);
+
+    let html = state
+        .tera
+        .render("app_pack_cards.html", &context)
+        .map_err(|e| {
+            error!("Template rendering failed: {}", e);
+            AppError::from(e as tera::Error)
+        })
+        .unwrap_or_else(|e| {
+            error!("Failed to render app pack cards page: {}", e);
+            format!(
+                "<h1>Internal Server Error</h1><p>Failed to render page: {}</p>",
+                e
+            )
+        });
+
+    Html(html)
+}
+
+/// App Pack cards API - JSON response
+#[axum::debug_handler]
+pub async fn app_pack_cards_api(
+    State(state): State<AppState>,
+    Query(query): Query<AppPackCardsQuery>,
+) -> Response {
+    debug!(
+        "Handling JSON API app pack cards, ritual filter: {:?}",
+        query.ritual
+    );
+
+    let cards = match &state.app_pack_registry {
+        Some(registry) => {
+            if let Some(ref ritual) = query.ritual {
+                registry.get_cards_for_ritual(ritual)
+            } else {
+                registry.get_all_cards()
+            }
+        }
+        None => {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(serde_json::json!({
+                    "error": "App Pack registry not available"
+                })),
+            )
+                .into_response()
+        }
+    };
+
+    (StatusCode::OK, Json(serde_json::json!({ "cards": cards }))).into_response()
+}

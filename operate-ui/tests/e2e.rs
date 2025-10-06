@@ -63,6 +63,7 @@ fn create_test_app() -> axum::Router {
         tera,
         admin_token: None,
         bundle_loader: runtime::bundle::BundleLoader::new(None),
+        app_pack_registry: None,
     };
 
     operate_ui::create_app(state)
