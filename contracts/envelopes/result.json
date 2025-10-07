@@ -182,6 +182,24 @@
             "type": "integer"
           }
         },
+        "runtime": {
+          "type": "object",
+          "description": "Runtime subsystem metrics (structured data reported by capsules/runtime)",
+          "additionalProperties": true
+        },
+        "counts": {
+          "type": "object",
+          "description": "Aggregated count metrics keyed by category",
+          "additionalProperties": {
+            "anyOf": [
+              { "type": "number" },
+              {
+                "type": "object",
+                "additionalProperties": true
+              }
+            ]
+          }
+        },
         "custom": {
           "type": "object",
           "description": "Custom application-specific metrics",

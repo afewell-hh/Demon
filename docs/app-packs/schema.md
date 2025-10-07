@@ -64,6 +64,15 @@ Cards enable the Operate UI to render manifest-driven views without shipping app
 
 Operate UI will ingest these manifests at install time and render cards dynamically.
 
+## Result Envelope Metrics
+
+Capsules should continue to emit Explainable Result Envelopes that conform to `contracts/envelopes/result.json`. In addition to the existing `duration`, `resources`, `counters`, and `custom` objects, the platform now accepts two structured metrics blocks:
+
+- `metrics.runtime` — container/runtime level measurements (e.g., capsule timings, scheduler metadata). This is an open-ended object so capsules can project whatever nested structure is useful for operators.
+- `metrics.counts` — grouped counter summaries keyed by subsystem. Each entry may be a primitive value or a nested object (for example, `{ "artifacts": { "written": 5, "uploaded": 4 } }`).
+
+These additions were introduced to support Hoss hhfab telemetry and are optional for other packs.
+
 ## Contracts
 
 Contract entries reference JSON schema or fixture assets bundled with the pack. Paths must live under `contracts/` inside the bundle. Contracts are registered under the pack namespace during installation so they can be queried via the Contracts API.
