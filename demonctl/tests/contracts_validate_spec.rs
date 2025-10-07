@@ -92,6 +92,46 @@ fn given_invalid_envelope_on_stdin_when_validate_then_exits_with_error() {
 }
 
 #[test]
+fn given_envelope_with_runtime_and_counts_when_validate_then_exits_successfully() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("metrics_envelope.json");
+
+    let envelope = json!({
+        "result": {
+            "success": true,
+            "data": {"message": "ok"}
+        },
+        "metrics": {
+            "runtime": {
+                "capsule": {
+                    "name": "hoss-hfab",
+                    "duration_ms": 1234
+                }
+            },
+            "counts": {
+                "artifacts": {
+                    "written": 5,
+                    "uploaded": 4
+                }
+            }
+        }
+    });
+
+    fs::write(&file_path, serde_json::to_string(&envelope).unwrap()).unwrap();
+
+    Command::cargo_bin("demonctl")
+        .unwrap()
+        .args([
+            "contracts",
+            "validate-envelope",
+            file_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(str::contains("✓ Valid envelope"));
+}
+
+#[test]
 fn given_directory_with_result_files_when_bulk_validate_then_processes_all() {
     let temp_dir = TempDir::new().unwrap();
 

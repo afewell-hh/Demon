@@ -111,6 +111,32 @@
       "cache_hits": 89,
       "cache_misses": 61
     },
+    "runtime": {
+      "capsule": {
+        "image": "ghcr.io/hoss/hfab@sha256:abc123",
+        "exitCode": 0,
+        "duration_ms": 68432
+      },
+      "runtime": {
+        "scheduler": {
+          "queueDepth": 2,
+          "workerCount": 4
+        }
+      }
+    },
+    "counts": {
+      "artifacts": {
+        "written": 5,
+        "uploaded": 4
+      },
+      "steps": {
+        "completed": {
+          "total": 12,
+          "retry": 1
+        },
+        "failed": 0
+      }
+    },
     "custom": {
       "business_value_generated": 15000.50,
       "api_calls_made": 25,
