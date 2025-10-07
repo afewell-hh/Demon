@@ -80,6 +80,8 @@ pub fn echo(message: String) -> ResultEnvelope<EchoResult> {
         }),
         resources: None,
         counters,
+        runtime: None,
+        counts: HashMap::new(),
         custom: None,
     };
 

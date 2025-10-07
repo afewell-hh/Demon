@@ -60,6 +60,8 @@ fn given_full_fixture_when_deserializing_then_matches_schema() {
     assert!(metrics.duration.is_some());
     assert!(metrics.resources.is_some());
     assert!(!metrics.counters.is_empty());
+    assert!(metrics.runtime.is_some());
+    assert!(!metrics.counts.is_empty());
     assert!(metrics.custom.is_some());
 
     // Check provenance structure
@@ -133,6 +135,8 @@ fn given_fixture_when_round_trip_serializing_then_preserves_structure() {
     assert!(serialized["diagnostics"].is_array());
     assert!(serialized["suggestions"].is_array());
     assert!(serialized["metrics"].is_object());
+    assert!(serialized["metrics"]["runtime"].is_object());
+    assert!(serialized["metrics"]["counts"].is_object());
     assert!(serialized["provenance"].is_object());
 }
 

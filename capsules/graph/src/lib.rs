@@ -151,6 +151,8 @@ pub async fn create(scope: GraphScope, seed: Vec<Mutation>) -> ResultEnvelope<Co
         }),
         resources: None,
         counters,
+        runtime: None,
+        counts: HashMap::new(),
         custom: None,
     });
 
@@ -237,6 +239,8 @@ pub async fn commit(
         }),
         resources: None,
         counters,
+        runtime: None,
+        counts: HashMap::new(),
         custom: None,
     });
 
@@ -349,6 +353,8 @@ pub async fn tag(scope: GraphScope, tag: String, commit_id: String) -> ResultEnv
         }),
         resources: None,
         counters: HashMap::new(),
+        runtime: None,
+        counts: HashMap::new(),
         custom: None,
     });
 
@@ -478,6 +484,8 @@ pub async fn delete_tag(scope: GraphScope, tag: String) -> ResultEnvelope<TagRes
         }),
         resources: None,
         counters: HashMap::new(),
+        runtime: None,
+        counts: HashMap::new(),
         custom: None,
     });
 
@@ -565,6 +573,8 @@ pub async fn list_tags(scope: GraphScope) -> ResultEnvelope<Vec<TaggedCommit>> {
         }),
         resources: None,
         counters: HashMap::new(),
+        runtime: None,
+        counts: HashMap::new(),
         custom: None,
     });
 
@@ -627,6 +637,8 @@ pub async fn get_node(
         }),
         resources: None,
         counters,
+        runtime: None,
+        counts: HashMap::new(),
         custom: None,
     });
 
@@ -695,6 +707,8 @@ pub async fn neighbors(
         }),
         resources: None,
         counters,
+        runtime: None,
+        counts: HashMap::new(),
         custom: None,
     });
 
@@ -764,6 +778,8 @@ pub async fn path_exists(
         }),
         resources: None,
         counters,
+        runtime: None,
+        counts: HashMap::new(),
         custom: None,
     });
 

@@ -112,6 +112,8 @@ impl<T> ResultEnvelopeBuilder<T> {
             }),
             resources: None,
             counters: HashMap::new(),
+            runtime: None,
+            counts: HashMap::new(),
             custom: None,
         };
 

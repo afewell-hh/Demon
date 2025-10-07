@@ -117,6 +117,11 @@ pub struct Metrics {
     #[serde(default)]
     pub counters: HashMap<String, i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub runtime: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default)]
+    pub counts: HashMap<String, serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub custom: Option<serde_json::Value>,
 }
 

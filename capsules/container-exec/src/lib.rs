@@ -355,6 +355,8 @@ fn annotate_success(result: &mut ContainerExecResult, config: &ContainerExecConf
             }),
             resources: None,
             counters: Default::default(),
+            runtime: None,
+            counts: Default::default(),
             custom: None,
         });
     } else if let Some(metrics) = &mut result.envelope.metrics {
