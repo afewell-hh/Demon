@@ -473,7 +473,23 @@ fn configure_command(
 }
 
 fn container_user() -> String {
-    env::var("DEMON_CONTAINER_USER").unwrap_or_else(|_| "65534:65534".to_string())
+    if let Ok(value) = env::var("DEMON_CONTAINER_USER") {
+        if !value.trim().is_empty() {
+            return value;
+        }
+    }
+
+    #[cfg(unix)]
+    {
+        let uid = unsafe { libc::geteuid() };
+        let gid = unsafe { libc::getegid() };
+        format!("{}:{}", uid, gid)
+    }
+
+    #[cfg(not(unix))]
+    {
+        "65534:65534".to_string()
+    }
 }
 
 fn exit_code(status: &ExitStatus) -> Option<i32> {

@@ -500,6 +500,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "envelope",
+ "libc",
  "serde",
  "serde_json",
  "tempfile",
