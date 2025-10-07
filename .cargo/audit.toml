@@ -1,0 +1,6 @@
+[advisories]
+ignore = [
+    # RUSTSEC-2023-0071 (rsa: Marvin attack). sigstore verification uses public keys only.
+    # TODO: https://github.com/afewell-hh/Demon/issues/246 — remove by 2026-01-31 or when sigstore ships without rsa
+    "RUSTSEC-2023-0071",
+]

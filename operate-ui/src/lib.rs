@@ -1,5 +1,6 @@
 // Library interface for operate-ui
 
+pub mod app_packs;
 pub mod contracts;
 pub mod jetstream;
 pub mod routes;
@@ -25,6 +26,7 @@ pub struct AppState {
     pub tera: Tera,
     pub admin_token: Option<String>,
     pub bundle_loader: runtime::bundle::BundleLoader,
+    pub app_pack_registry: Option<app_packs::AppPackRegistry>,
 }
 
 impl AppState {
@@ -81,16 +83,51 @@ impl AppState {
         tera.register_filter("json", tojson);
         tera.register_filter("tojson", tojson);
 
+        // Register json_query filter for nested field access (e.g., "counts.validated")
+        let json_query = |value: &tera::Value,
+                          args: &std::collections::HashMap<String, tera::Value>|
+         -> tera::Result<tera::Value> {
+            let query = args
+                .get("query")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| tera::Error::msg("json_query requires 'query' parameter"))?;
+
+            let parts: Vec<&str> = query.split('.').collect();
+            let mut current = value;
+
+            for part in parts {
+                current = current.get(part).ok_or_else(|| {
+                    tera::Error::msg(format!("Field '{}' not found in path '{}'", part, query))
+                })?;
+            }
+
+            Ok(current.clone())
+        };
+        tera.register_filter("json_query", json_query);
+
         let admin_token = std::env::var("ADMIN_TOKEN").ok();
 
         // Initialize bundle loader
         let bundle_loader = runtime::bundle::BundleLoader::new(None);
+
+        // Initialize App Pack registry
+        let app_pack_registry = match app_packs::AppPackRegistry::load() {
+            Ok(registry) => {
+                info!("Successfully loaded App Pack registry");
+                Some(registry)
+            }
+            Err(e) => {
+                warn!("Failed to load App Pack registry: {}", e);
+                None
+            }
+        };
 
         Self {
             jetstream_client,
             tera,
             admin_token,
             bundle_loader,
+            app_pack_registry,
         }
     }
 
@@ -305,6 +342,9 @@ pub fn create_app(state: AppState) -> Router {
         )
         // Graph viewer
         .route("/graph", get(routes::graph_viewer_html))
+        // App Pack cards viewer
+        .route("/app-pack-cards", get(routes::app_pack_cards_html))
+        .route("/api/app-pack-cards", get(routes::app_pack_cards_api))
         // Schema form renderer
         .route("/ui/form", get(routes::schema_form_html))
         .route("/api/schema/metadata", get(routes::schema_metadata_api))

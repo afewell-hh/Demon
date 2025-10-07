@@ -10,6 +10,7 @@ async fn list_runs_api_rejects_invalid_status() {
         tera: tera::Tera::new("nonexistent/*").unwrap(),
         admin_token: None,
         bundle_loader: runtime::bundle::BundleLoader::new(None),
+        app_pack_registry: None,
     };
     let app = operate_ui::create_app(state);
     let resp = app
@@ -31,6 +32,7 @@ async fn list_runs_api_rejects_invalid_limit() {
         tera: tera::Tera::new("nonexistent/*").unwrap(),
         admin_token: None,
         bundle_loader: runtime::bundle::BundleLoader::new(None),
+        app_pack_registry: None,
     };
     let app = operate_ui::create_app(state);
     for bad in [0usize, 1001usize] {

@@ -20,11 +20,22 @@ serde = { workspace = true }
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
 config-loader = { path = "../crates/config-loader" }
 serde_yaml = { workspace = true }
+jsonschema = { workspace = true }
+once_cell = { workspace = true }
+chrono = { workspace = true }
 base64 = "0.22.1"
 zip = { version = "0.6", default-features = false, features = ["deflate"] }
+hex = "0.4"
+sha2 = "0.10"
+sigstore = { version = "0.12.1", default-features = false }
+semver = "1.0"
+tempfile = "3.10"
 
 [dev-dependencies]
 assert_cmd = "2.0"
-tempfile = "3.0"
 predicates = "3.0"
 httptest = "0.16"
+rand_core = "0.6"
+pem-rfc7468 = "0.7"
+p256 = { version = "0.13", features = ["pkcs8", "pem"] }
+serial_test = "3.0"

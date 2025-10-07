@@ -22,6 +22,9 @@ make fmt && make lint
 # Quick smoke test
 cargo run -p demonctl -- run examples/rituals/echo.yaml
 
+# Run installed App Pack ritual via alias
+cargo run -p demonctl -- run hoss:hoss-validate
+
 # Graph capsule tests
 cargo test -p capsules_graph
 

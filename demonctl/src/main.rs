@@ -7,6 +7,7 @@ use std::time::Duration;
 use tracing::{info, Level};
 use tracing_subscriber::{fmt, EnvFilter};
 
+mod commands;
 mod docker;
 mod github;
 mod k8s_bootstrap;
@@ -77,11 +78,11 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Run a ritual from a YAML file
+    /// Run a ritual from a YAML file or installed App Pack alias
     Run {
-        /// Path to ritual YAML
-        #[arg(value_name = "FILE")]
-        file: String,
+        /// Path to ritual YAML or `<app>[:version]:<ritual>` alias
+        #[arg(value_name = "TARGET")]
+        target: String,
         #[arg(long, default_value = "false")]
         replay: bool,
         /// Save result envelope to result.json
@@ -151,6 +152,11 @@ enum Commands {
     Docker {
         #[command(subcommand)]
         cmd: DockerCommands,
+    },
+    /// App Pack lifecycle commands
+    App {
+        #[command(subcommand)]
+        cmd: commands::app::AppCommand,
     },
     /// Print version and exit
     Version,
@@ -489,25 +495,36 @@ async fn main() -> Result<()> {
 
     match cli.cmd {
         Commands::Run {
-            file,
+            target,
             replay: _,
             save,
             output_dir,
         } => {
             let mut engine = engine::rituals::Engine::new();
 
+            let mut _alias_spec = None;
+            let run_path = if let Some(alias_target) = commands::app::alias::parse_alias(&target) {
+                let spec = commands::app::alias::build_alias_spec(&alias_target)?;
+                let path = spec.spec_path().to_path_buf();
+                _alias_spec = Some(spec);
+                path
+            } else {
+                PathBuf::from(&target)
+            };
+
+            let run_path_str = run_path
+                .to_str()
+                .ok_or_else(|| anyhow::anyhow!("Ritual path contains invalid UTF-8"))?;
+
             if save {
-                // Use the new method that returns the result for saving
-                match engine.run_from_file_with_result(&file).await {
+                match engine.run_from_file_with_result(run_path_str).await {
                     Ok(result_event) => {
-                        // Still print to stdout for visibility
                         println!(
                             "{}",
                             serde_json::to_string_pretty(&result_event)
                                 .unwrap_or_else(|_| "Failed to serialize result".to_string())
                         );
 
-                        // Save the envelope
                         if let Err(e) = save_result_envelope(&result_event, &output_dir) {
                             eprintln!("Error saving result envelope: {:?}", e);
                             std::process::exit(1);
@@ -518,12 +535,9 @@ async fn main() -> Result<()> {
                         std::process::exit(1);
                     }
                 }
-            } else {
-                // Use the original method that prints directly
-                if let Err(e) = engine.run_from_file(&file).await {
-                    eprintln!("Error running ritual: {:?}", e);
-                    std::process::exit(1);
-                }
+            } else if let Err(e) = engine.run_from_file(run_path_str).await {
+                eprintln!("Error running ritual: {:?}", e);
+                std::process::exit(1);
             }
         }
         Commands::Bootstrap {
@@ -566,6 +580,9 @@ async fn main() -> Result<()> {
         }
         Commands::Docker { cmd } => {
             handle_docker_command(cmd).await?;
+        }
+        Commands::App { cmd } => {
+            commands::app::handle(cmd)?;
         }
         Commands::Version => {
             println!("{}", env!("CARGO_PKG_VERSION"));

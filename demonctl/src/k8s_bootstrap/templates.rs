@@ -613,9 +613,14 @@ fn build_image_reference(env_var: &str, fallback: &str, repository: &str) -> Str
 mod tests {
     use super::*;
     use crate::k8s_bootstrap::{DemonConfig, PersistenceConfig};
+    use serial_test::serial;
 
+    #[serial]
     #[test]
     fn test_build_template_context() {
+        std::env::set_var("OPERATE_UI_IMAGE_TAG", "");
+        std::env::set_var("RUNTIME_IMAGE_TAG", "");
+        std::env::set_var("ENGINE_IMAGE_TAG", "");
         let renderer = TemplateRenderer::new("test");
         let config = K8sBootstrapConfig {
             api_version: "v1".to_string(),
@@ -720,6 +725,8 @@ mod tests {
         }
     }
 
+    #[serial]
+    #[serial]
     #[test]
     fn test_build_template_context_respects_env_image_tags() {
         let renderer = TemplateRenderer::new("test");
@@ -832,6 +839,7 @@ mod tests {
         assert_eq!(reference, "ghcr.io/afewell-hh/demon-operate-ui@sha256:abc");
     }
 
+    #[serial]
     #[test]
     fn test_build_image_reference_preserves_full_reference() {
         std::env::set_var(

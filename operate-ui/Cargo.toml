@@ -20,6 +20,7 @@ async-nats.workspace = true
 futures-util.workspace = true
 tokio-stream = "0.1"
 async-stream = "0.3"
+dirs = "5.0"
 
 # Web framework
 axum = { version = "0.7", features = ["macros"] }

@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block title %}App Pack Cards - Demon Operate UI{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">App Pack Cards</h2>
+        <div>
+            {% if registry_available %}
+                <span class="status-indicator status-completed">Registry Available</span>
+            {% else %}
+                <span class="status-indicator status-failed">Registry Unavailable</span>
+            {% endif %}
+            {% if jetstream_available %}
+                <span class="status-indicator status-completed">JetStream Connected</span>
+            {% else %}
+                <span class="status-indicator status-failed">JetStream Unavailable</span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if error %}
+        <div class="alert alert-error">
+            <strong>Error:</strong> {{ error }}
+        </div>
+    {% endif %}
+
+    {% if not registry_available %}
+        <div class="alert alert-warning">
+            <strong>Warning:</strong> App Pack registry is not available. Install an App Pack to see cards.
+        </div>
+    {% endif %}
+
+    {% if not jetstream_available %}
+        <div class="alert alert-warning">
+            <strong>Warning:</strong> JetStream is not available. Unable to retrieve runs.
+        </div>
+    {% endif %}
+
+    {% if cards %}
+        <div style="margin-bottom: 1.5rem;">
+            <p style="color: var(--text-secondary);">
+                Found {{ cards|length }} card{% if cards|length != 1 %}s{% endif %}
+                {% if ritual_filter %}for ritual <strong>{{ ritual_filter }}</strong>{% endif %}
+            </p>
+        </div>
+
+        {% for card in cards %}
+            <div class="card" style="margin-bottom: 2rem;">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        {{ card.title | default(value=card.id) }}
+                    </h3>
+                    <span class="status-indicator status-running" style="font-size: 0.75rem;">
+                        {{ card.kind }}
+                    </span>
+                </div>
+
+                {% if card.description %}
+                    <p style="margin-bottom: 1rem; color: var(--text-secondary);">
+                        {{ card.description }}
+                    </p>
+                {% endif %}
+
+                <div style="margin-bottom: 1rem;">
+                    <strong>Matches rituals:</strong>
+                    {% for ritual in card.match.rituals %}
+                        <code style="background: var(--background-color); padding: 2px 6px; border-radius: 3px; margin-right: 0.5rem;">
+                            {{ ritual }}
+                        </code>
+                    {% endfor %}
+                </div>
+
+                {% if runs %}
+                    {% set matching_runs = [] %}
+                    {% for run in runs %}
+                        {% if run.ritual_id in card.match.rituals or run.ritualId in card.match.rituals %}
+                            {% set_global matching_runs = matching_runs | concat(with=run) %}
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if matching_runs | length > 0 %}
+                        <h4 style="margin-top: 1.5rem; margin-bottom: 0.75rem;">Recent Runs ({{ matching_runs | length }})</h4>
+
+                        <div style="overflow-x: auto;">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Run ID</th>
+                                        <th>Started</th>
+                                        <th>Status</th>
+                                        {% if card.fields and card.fields.show %}
+                                            {% for field in card.fields.show %}
+                                                <th>{{ field }}</th>
+                                            {% endfor %}
+                                        {% endif %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for run in matching_runs | slice(end=5) %}
+                                    <tr>
+                                        <td>
+                                            <a href="/runs/{{ run.runId | default(value=run.run_id) }}">
+                                                <code>{{ run.runId | default(value=run.run_id) | truncate(length=8) }}</code>
+                                            </a>
+                                        </td>
+                                        <td>{{ run.startTs | default(value=run.start_ts) | truncate(length=19) }}</td>
+                                        <td>
+                                            {% set status_class = "status-running" %}
+                                            {% if run.status == "Completed" %}
+                                                {% set status_class = "status-completed" %}
+                                            {% elif run.status == "Failed" %}
+                                                {% set status_class = "status-failed" %}
+                                            {% endif %}
+                                            <span class="status-indicator {{ status_class }}">{{ run.status }}</span>
+                                        </td>
+                                        {% if card.fields and card.fields.show %}
+                                            {% for field in card.fields.show %}
+                                                <td>
+                                                    {% set field_value = "" %}
+                                                    {% if run.outputs %}
+                                                        {% set field_value = run.outputs | json_query(query=field) %}
+                                                    {% endif %}
+                                                    {{ field_value | default(value="—") }}
+                                                </td>
+                                            {% endfor %}
+                                        {% endif %}
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {% if matching_runs | length > 5 %}
+                            <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.875rem;">
+                                Showing 5 of {{ matching_runs | length }} runs
+                            </p>
+                        {% endif %}
+                    {% else %}
+                        <div class="empty-state" style="margin-top: 1rem;">
+                            <p>No runs found for this card's rituals.</p>
+                        </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state">
+            <h3>No App Pack Cards Found</h3>
+            {% if registry_available %}
+                <p>Install an App Pack with UI card definitions to see them here.</p>
+                <p style="margin-top: 1rem;">
+                    <code>demonctl app install &lt;app-pack-path&gt;</code>
+                </p>
+            {% else %}
+                <p>The App Pack registry could not be loaded.</p>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+
+<style>
+.card {
+    background: var(--card-background);
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.card-title {
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.table thead {
+    background: var(--background-color);
+}
+
+.table th,
+.table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.table th {
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    font-size: 0.75rem;
+}
+
+.table tr:hover {
+    background: var(--background-color);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-secondary);
+}
+
+.empty-state h3 {
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.alert {
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.alert-error {
+    background: #ffebee;
+    color: #c62828;
+    border-left: 4px solid #f44336;
+}
+
+.alert-warning {
+    background: #fff3e0;
+    color: #e65100;
+    border-left: 4px solid #ff9800;
+}
+</style>
+
+<script>
+// Simple JSON path query helper for field extraction
+function jsonQuery(obj, path) {
+    if (!obj || !path) return undefined;
+
+    const parts = path.split('.');
+    let current = obj;
+
+    for (const part of parts) {
+        if (current && typeof current === 'object' && part in current) {
+            current = current[part];
+        } else {
+            return undefined;
+        }
+    }
+
+    return current;
+}
+</script>
+{% endblock %}

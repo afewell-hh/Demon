@@ -1,23 +1,31 @@
 //! REST API server for runtime services
 
 pub mod graph;
+pub mod rituals;
 
-use axum::{routing::get, Router};
+use axum::{routing::get, Extension, Router};
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
 /// Create the REST API application router
-pub fn create_app() -> Router {
+pub fn create_app() -> anyhow::Result<Router> {
+    let service = Arc::new(rituals::RitualService::new()?);
+    Ok(create_app_with_service(service))
+}
+
+pub fn create_app_with_service(service: Arc<rituals::RitualService>) -> Router {
+    let rituals_router = rituals::routes();
+    let graph_router = graph::routes();
+
     Router::new()
-        // Health check endpoint
         .route("/health", get(health_check))
-        // Readiness probe endpoint
         .route("/ready", get(readiness_check))
-        // Mount graph API routes
-        .nest("/api/graph", graph::routes())
-        // Add tracing layer
+        .nest("/api/graph", graph_router)
+        .nest("/api/v1/rituals", rituals_router)
         .layer(TraceLayer::new_for_http())
+        .layer(Extension(service))
 }
 
 /// Health check handler
@@ -32,7 +40,7 @@ async fn readiness_check() -> &'static str {
 
 /// Start the REST API server
 pub async fn serve(addr: SocketAddr) -> anyhow::Result<()> {
-    let app = create_app();
+    let app = create_app()?;
 
     info!("Starting REST API server on {}", addr);
 
