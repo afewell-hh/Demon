@@ -2,6 +2,7 @@
 
 use anyhow::Result;
 use assert_cmd::prelude::*;
+use serde_json::Value;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -116,6 +117,97 @@ exit 0
         .args(["run", "hoss:hoss-validate"])
         .assert()
         .success();
+
+    Ok(())
+}
+
+#[test]
+fn run_alias_emits_envelope_with_real_runtime() -> Result<()> {
+    let docker_available = Command::new("docker")
+        .arg("--version")
+        .output()
+        .map(|out| out.status.success())
+        .unwrap_or(false);
+
+    if !docker_available {
+        return Ok(());
+    }
+
+    let temp = TempDir::new()?;
+    let app_home = temp.path().join("app-home");
+    fs::create_dir_all(&app_home)?;
+
+    let pack_dir = temp.path().join("pack");
+    fs::create_dir_all(pack_dir.join("contracts/test"))?;
+    fs::write(pack_dir.join("contracts/test/result.json"), b"{}")?;
+
+    let status = Command::new("docker")
+        .args(["pull", "alpine:3.20"])
+        .status()?;
+    if !status.success() {
+        anyhow::bail!("docker pull alpine:3.20 failed");
+    }
+
+    let alpine_digest = "docker.io/library/alpine@sha256:b3119ef930faabb6b7b976780c0c7a9c1aa24d0c75e9179ac10e6bc9ac080d0d";
+
+    let manifest = format!(
+        r#"apiVersion: demon.io/v1
+kind: AppPack
+metadata:
+  name: hoss
+  version: 0.1.0
+contracts:
+  - id: hoss/contracts/result
+    version: 0.1.0
+    path: contracts/test/result.json
+capsules:
+  - type: container-exec
+    name: validator
+    imageDigest: {digest}
+    command:
+      - /bin/sh
+      - -c
+      - "umask 077 && printf '{{\"result\":{{\"success\":true,\"data\":{{}}}},\"diagnostics\":[]}}' > \"$ENVELOPE_PATH\""
+    outputs:
+      envelopePath: /workspace/.artifacts/summary.json
+rituals:
+  - name: hoss-validate
+    steps:
+      - capsule: validator
+"#,
+        digest = alpine_digest
+    );
+
+    fs::write(pack_dir.join("app-pack.yaml"), manifest)?;
+
+    let workspace = workspace_root();
+
+    Command::cargo_bin("demonctl")?
+        .current_dir(&workspace)
+        .env("DEMON_APP_HOME", &app_home)
+        .args([
+            "app",
+            "install",
+            pack_dir.join("app-pack.yaml").to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let output = Command::cargo_bin("demonctl")?
+        .current_dir(&workspace)
+        .env("DEMON_APP_HOME", &app_home)
+        .args(["run", "hoss:hoss-validate"])
+        .output()?;
+
+    assert!(output.status.success(), "demonctl run failed: {:?}", output);
+
+    let value: Value = serde_json::from_slice(&output.stdout)?;
+    assert_eq!(
+        value["outputs"]["result"]["success"].as_bool(),
+        Some(true),
+        "alias run should succeed: {}",
+        value
+    );
 
     Ok(())
 }
