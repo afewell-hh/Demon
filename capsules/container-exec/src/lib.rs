@@ -82,6 +82,14 @@ impl ContainerExecConfig {
                     format!("Failed to create artifacts directory '{}'", dir.display())
                 })?;
             }
+
+            #[cfg(unix)]
+            fs::set_permissions(dir, fs::Permissions::from_mode(0o777)).with_context(|| {
+                format!(
+                    "Failed to set permissions on artifacts directory '{}'",
+                    dir.display()
+                )
+            })?;
         }
 
         Ok(())
