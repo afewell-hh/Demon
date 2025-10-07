@@ -6,6 +6,7 @@ use config_loader::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 use tokio::task;
 
 /// Link-name router stub: resolves a functionRef to a capsule call.
@@ -427,6 +428,10 @@ struct ContainerExecRequest {
     outputs: ContainerExecOutputs,
     #[serde(default, rename = "capsuleName")]
     capsule_name: Option<String>,
+    #[serde(default, rename = "workspaceDir")]
+    workspace_dir: Option<String>,
+    #[serde(default, rename = "artifactsDir")]
+    artifacts_dir: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -445,6 +450,8 @@ impl From<ContainerExecRequest> for capsules_container_exec::ContainerExecConfig
             working_dir: request.working_dir,
             envelope_path: request.outputs.envelope_path,
             capsule_name: request.capsule_name,
+            app_pack_dir: request.workspace_dir.map(PathBuf::from),
+            artifacts_dir: request.artifacts_dir.map(PathBuf::from),
         }
     }
 }
