@@ -541,6 +541,7 @@ fn configure_command(
         command.arg("--env").arg(format!("{}={}", key, value));
     }
 
+    command.arg("--entrypoint").arg("");
     command.arg(&config.image_digest);
 
     if debug_enabled() {
