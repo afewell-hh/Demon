@@ -687,6 +687,15 @@ fn command_line_string(cmd: &Command) -> String {
 }
 
 fn annotate_host_postrun(envelope: &mut Envelope, host_path: &Path, cmdline: &str) {
+    // Always include the runtime command line when debugging
+    envelope.diagnostics.push(
+        Diagnostic::info(format!(
+            "runtime command: {}",
+            truncate(cmdline, 1024)
+        ))
+        .with_source("container-exec"),
+    );
+
     let ls_output = Command::new("/bin/ls")
         .arg("-l")
         .arg(host_path)
