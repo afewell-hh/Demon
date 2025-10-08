@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::BTreeMap;
 use std::env;
-use std::fs;
+use std::fs::{self, OpenOptions};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
@@ -271,6 +271,8 @@ fn execute_with_runtime(
         }
     }
 
+    ensure_envelope_placeholder(&mount.host_envelope_path)?;
+
     let mut command = Command::new(&runtime_bin);
     configure_command(&mut command, config, &mount)?;
 
@@ -473,23 +475,53 @@ fn configure_command(
 }
 
 fn container_user() -> String {
-    if let Ok(value) = env::var("DEMON_CONTAINER_USER") {
-        if !value.trim().is_empty() {
-            return value;
-        }
-    }
+    env::var("DEMON_CONTAINER_USER").unwrap_or_else(|_| "65534:65534".to_string())
+}
+
+fn ensure_envelope_placeholder(path: &Path) -> Result<(), ExecError> {
+    let file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(path)
+        .map_err(|err| ExecError::Io {
+            message: format!(
+                "Failed to prepare envelope file {}: {}",
+                path.display(),
+                err
+            ),
+        })?;
 
     #[cfg(unix)]
     {
-        let uid = unsafe { libc::geteuid() };
-        let gid = unsafe { libc::getegid() };
-        format!("{}:{}", uid, gid)
+        use std::os::unix::fs::PermissionsExt;
+
+        fs::set_permissions(path, fs::Permissions::from_mode(0o666)).map_err(|err| {
+            ExecError::Io {
+                message: format!(
+                    "Failed to set permissions on envelope file {}: {}",
+                    path.display(),
+                    err
+                ),
+            }
+        })?;
+
+        // Ensure file is empty for the container to overwrite cleanly.
+        file.set_len(0).map_err(|err| ExecError::Io {
+            message: format!(
+                "Failed to truncate envelope placeholder {}: {}",
+                path.display(),
+                err
+            ),
+        })?;
     }
 
     #[cfg(not(unix))]
     {
-        "65534:65534".to_string()
+        let _ = file; // suppress unused warning
     }
+
+    Ok(())
 }
 
 fn exit_code(status: &ExitStatus) -> Option<i32> {

@@ -123,13 +123,13 @@ exit 0
 
 #[test]
 fn run_alias_emits_envelope_with_real_runtime() -> Result<()> {
-    if Command::new("docker")
+    let docker_available = Command::new("docker")
         .arg("--version")
         .output()
         .map(|out| out.status.success())
-        .unwrap_or(false)
-        == false
-    {
+        .unwrap_or(false);
+
+    if !docker_available {
         return Ok(());
     }
 
