@@ -202,15 +202,70 @@ fn execute_with_runtime(
         }
     }
 
+    // Ensure the workspace mount point and, if possible, the container-visible envelope
+    // path exist under the App Pack directory. This helps Docker file-level binds succeed
+    // even when the parent `/workspace` is bound read-only.
     if let Some(app_pack_dir) = &config.app_pack_dir {
-        let mount_point = app_pack_dir.join(".artifacts");
-        fs::create_dir_all(&mount_point).map_err(|err| ExecError::Io {
+        let artifacts_mp = app_pack_dir.join(".artifacts");
+        fs::create_dir_all(&artifacts_mp).map_err(|err| ExecError::Io {
             message: format!(
                 "Failed to ensure App Pack artifacts mount point {}: {}",
-                mount_point.display(),
+                artifacts_mp.display(),
                 err
             ),
         })?;
+
+        #[cfg(unix)]
+        {
+            // Make the mount point permissive so any container UID can traverse it
+            fs::set_permissions(&artifacts_mp, fs::Permissions::from_mode(0o777)).map_err(
+                |err| ExecError::Io {
+                    message: format!(
+                        "Failed to set permissions on artifacts mount point {}: {}",
+                        artifacts_mp.display(),
+                        err
+                    ),
+                },
+            )?;
+        }
+
+        // If the envelope path is under /workspace/.artifacts, create a placeholder under
+        // the App Pack so the container-side target exists before mount wiring.
+        if let Some(rel) = config
+            .envelope_path
+            .strip_prefix("/workspace/.artifacts/")
+            .filter(|s| !s.is_empty())
+        {
+            let app_side_path = artifacts_mp.join(rel);
+            if let Some(parent) = app_side_path.parent() {
+                fs::create_dir_all(parent).map_err(|err| ExecError::Io {
+                    message: format!(
+                        "Failed to create App Pack envelope parent {}: {}",
+                        parent.display(),
+                        err
+                    ),
+                })?;
+                #[cfg(unix)]
+                fs::set_permissions(parent, fs::Permissions::from_mode(0o777)).map_err(|err| {
+                    ExecError::Io {
+                        message: format!(
+                            "Failed to set permissions on App Pack envelope parent {}: {}",
+                            parent.display(),
+                            err
+                        ),
+                    }
+                })?;
+            }
+            // Best-effort placeholder; ignore errors here since the file-level bind
+            // below will still point the container at the host-side placeholder.
+            let _ = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(&app_side_path);
+            #[cfg(unix)]
+            let _ = fs::set_permissions(&app_side_path, fs::Permissions::from_mode(0o666));
+        }
     }
 
     let temp_dir = TempDir::new().map_err(|err| ExecError::Io {
@@ -451,6 +506,14 @@ fn configure_command(
     if !workdir_set && config.app_pack_dir.is_some() {
         command.arg("--workdir").arg("/workspace");
     }
+
+    // Additionally, bind the host envelope file directly to the container target to
+    // guarantee writability regardless of parent mount semantics or UID.
+    command.arg("--mount").arg(format!(
+        "type=bind,source={},target={},readonly=false",
+        mount.host_envelope_path.display(),
+        config.envelope_path
+    ));
 
     // Ensure capsule receives the enforced envelope path regardless of manifest env.
     command
