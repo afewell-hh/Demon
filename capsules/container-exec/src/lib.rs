@@ -538,7 +538,22 @@ fn configure_command(
 }
 
 fn container_user() -> String {
-    env::var("DEMON_CONTAINER_USER").unwrap_or_else(|_| "65534:65534".to_string())
+    if let Ok(value) = env::var("DEMON_CONTAINER_USER") {
+        if !value.trim().is_empty() {
+            return value;
+        }
+    }
+    #[cfg(unix)]
+    {
+        let uid = unsafe { libc::geteuid() };
+        let gid = unsafe { libc::getegid() };
+        return format!("{}:{}", uid, gid);
+    }
+    #[cfg(not(unix))]
+    {
+        // Fallback to nobody on non-unix targets when we cannot infer a host UID/GID
+        "65534:65534".to_string()
+    }
 }
 
 fn ensure_envelope_placeholder(path: &Path) -> Result<(), ExecError> {
