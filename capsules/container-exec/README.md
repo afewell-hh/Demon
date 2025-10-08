@@ -18,6 +18,37 @@ Envelopes from a shared bind mount.
 - Supports a `stub` runtime for local testing (set `DEMON_CONTAINER_RUNTIME=stub`
   and point `DEMON_CONTAINER_EXEC_STUB_ENVELOPE` to an envelope JSON file)
 
+## Envelope Write Semantics (non-root containers)
+
+When running capsules as a real user (e.g., `--user 1000:1000`) with a hardened
+container profile (read-only root, `--network=none`, `--tmpfs /tmp`,
+`--security-opt=no-new-privileges`), the capsule must still be able to write the
+result envelope.
+
+The runtime guarantees this by:
+
+- Pre-creating `/workspace/.artifacts` in the App Pack and creating the target
+  envelope file path there with permissive modes (dirs `0777`, file `0666`).
+- Mounting the App Pack at `/workspace` as read-only and binding the artifacts
+  directory as read-write at `/workspace/.artifacts`.
+- Adding a direct file-level bind from the host envelope placeholder to the
+  container target path (rw). This ensures the envelope is written even when the
+  parent mount is read-only or owned by another UID.
+
+Notes:
+
+- The only writable locations are `/workspace/.artifacts/<file>` (the bound
+  file) and `/tmp` (tmpfs). No other paths are relaxed.
+- You can override the container user via `DEMON_CONTAINER_USER` (default
+  `65534:65534`). The runtime’s writability guarantees hold for non-root UIDs.
+
+Troubleshooting:
+
+- If Docker (or your runtime) requires the target path to exist for file binds,
+  ensure the App Pack was prepared via `demonctl app install` (the runtime will
+  pre-create the container-side target automatically during execution).
+  Inspect the host-side artifacts directory for the bound file if debugging.
+
 ## Usage
 
 ```rust
