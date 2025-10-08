@@ -547,7 +547,7 @@ fn container_user() -> String {
     {
         let uid = unsafe { libc::geteuid() };
         let gid = unsafe { libc::getegid() };
-        return format!("{}:{}", uid, gid);
+        format!("{}:{}", uid, gid)
     }
     #[cfg(not(unix))]
     {
