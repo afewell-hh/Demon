@@ -690,11 +690,8 @@ fn command_line_string(cmd: &Command) -> String {
 fn annotate_host_postrun(envelope: &mut Envelope, host_path: &Path, cmdline: &str) {
     // Always include the runtime command line when debugging
     envelope.diagnostics.push(
-        Diagnostic::info(format!(
-            "runtime command: {}",
-            truncate(cmdline, 1024)
-        ))
-        .with_source("container-exec"),
+        Diagnostic::info(format!("runtime command: {}", truncate(cmdline, 1024)))
+            .with_source("container-exec"),
     );
 
     let ls_output = Command::new("/bin/ls")
@@ -1188,6 +1185,70 @@ mod tests {
         assert!(args.contains(&"--workdir".to_string()));
         assert!(args.contains(&"/workspace".to_string()));
         assert!(args.contains(&envelope_env));
+    }
+
+    #[test]
+    fn configure_command_clears_entrypoint_and_preserves_command_order() {
+        // Ensure debug mode is off so command parts are not wrapped
+        env::remove_var("DEMON_DEBUG");
+
+        let base = tempfile::tempdir().unwrap();
+        let app_pack_dir = base.path().join("pack");
+        let artifacts_dir = base.path().join("artifacts");
+        fs::create_dir_all(&app_pack_dir).unwrap();
+        fs::create_dir_all(&artifacts_dir).unwrap();
+
+        let config = ContainerExecConfig {
+            image_digest: "ghcr.io/example/app@sha256:abcdef".to_string(),
+            command: vec![
+                "/bin/run".to_string(),
+                "-c".to_string(),
+                "echo hi".to_string(),
+            ],
+            env: BTreeMap::new(),
+            working_dir: None,
+            envelope_path: "/workspace/.artifacts/result.json".to_string(),
+            capsule_name: None,
+            app_pack_dir: Some(app_pack_dir),
+            artifacts_dir: Some(artifacts_dir),
+        };
+
+        let tmp = tempfile::tempdir().unwrap();
+        let mount = EnvelopeMount::prepare(
+            &config.envelope_path,
+            tmp.path(),
+            config.artifacts_dir.as_deref(),
+        )
+        .unwrap();
+
+        let mut command = Command::new("docker");
+        configure_command(&mut command, &config, &mount).unwrap();
+
+        let args: Vec<String> = command
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
+
+        // Find --entrypoint "" then image, then our explicit command parts
+        let idx_entry = args
+            .iter()
+            .position(|a| a == "--entrypoint")
+            .expect("--entrypoint not present");
+        assert_eq!(args.get(idx_entry + 1).map(|s| s.as_str()), Some(""));
+
+        let idx_image = args
+            .iter()
+            .position(|a| a == &config.image_digest)
+            .expect("image digest not present");
+        assert!(idx_image > idx_entry, "image must come after --entrypoint");
+
+        // Command parts must immediately follow the image unless debug wrapper is active
+        assert_eq!(
+            args.get(idx_image + 1).map(|s| s.as_str()),
+            Some("/bin/run")
+        );
+        assert_eq!(args.get(idx_image + 2).map(|s| s.as_str()), Some("-c"));
+        assert_eq!(args.get(idx_image + 3).map(|s| s.as_str()), Some("echo hi"));
     }
 
     #[test]
