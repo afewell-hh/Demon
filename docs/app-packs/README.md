@@ -14,7 +14,17 @@ An App Pack is a tarball or directory with the following structure:
 /ui/                   # Optional static assets referenced by documentation (never shipped to Demon)
 ```
 
-Only the manifest and contract assets are required by the platform. Additional artifacts (scripts, READMEs) may be included for operator convenience but are ignored during installation.
+Installation copies the entire App Pack directory tree into the local store so
+that capsule assets (for example, scripts under `capsules/`) are available to
+runtime executions. At run time, `demonctl run <app>:<ritual>` mounts the
+installed pack root read-only at `/workspace`, binds `/workspace/.artifacts`
+read–write for result files, and passes a direct file bind for the declared
+`outputs.envelopePath`. This ensures capsule commands such as
+`/workspace/capsules/<name>/scripts/<file>.sh` resolve correctly inside the
+container.
+
+Note: UI assets may be included for documentation but are not used by the
+runtime.
 
 ## Lifecycle Overview
 
@@ -35,3 +45,13 @@ Only the manifest and contract assets are required by the platform. Additional a
   rituals via `demonctl run <app>:<ritual>` (optionally `app@version:ritual`).
 - Coordinate with the App Pack consumer (e.g., HOSS) to align on schema and API
   version ranges before publishing.
+
+## Troubleshooting
+
+- Script not found under `/workspace/capsules/...`:
+  - Ensure the App Pack was installed with `demonctl app install <path> [--overwrite]`.
+  - Run via the alias form `demonctl run <app>:<ritual>` so the installed pack
+    is mounted at `/workspace`.
+  - Set `DEMON_DEBUG=1` and check diagnostics for the runtime command line
+    (should include `--entrypoint ""`) and mounts showing `/workspace` and
+    `/workspace/.artifacts`.
