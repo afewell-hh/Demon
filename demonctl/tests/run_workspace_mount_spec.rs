@@ -7,6 +7,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::Command;
 use tempfile::TempDir;
+use std::time::Duration;
 
 fn workspace_root() -> std::path::PathBuf {
     Path::new(&std::env::var("CARGO_MANIFEST_DIR").unwrap())
@@ -28,10 +29,19 @@ fn demonctl_run_uses_installed_workspace_mount_for_scripts() -> Result<()> {
         return Ok(());
     }
 
-    // Ensure alpine image is present and get digest used across tests
-    let _ = Command::new("docker")
-        .args(["pull", "alpine:3.20"])
-        .status();
+    // Ensure alpine image is present and get digest used across tests.
+    // Add a short retry to deflake runners with transient network hiccups.
+    let image = "alpine:3.20";
+    let mut pulled = false;
+    for _ in 0..3 {
+        if let Ok(status) = Command::new("docker").args(["pull", image]).status() {
+            if status.success() { pulled = true; break; }
+        }
+        std::thread::sleep(Duration::from_millis(800));
+    }
+    if !pulled {
+        eprintln!("warning: docker pull {} failed; continuing (digest resolution may still succeed)", image);
+    }
     // Resolve a repo digest dynamically to avoid flakiness when hardcoded digests change.
     let inspect = Command::new("docker")
         .args([
@@ -42,7 +52,7 @@ fn demonctl_run_uses_installed_workspace_mount_for_scripts() -> Result<()> {
         ])
         .output()
         .expect("docker inspect must be runnable");
-    let mut alpine_digest = String::from_utf8_lossy(&inspect.stdout)
+    let alpine_digest = String::from_utf8_lossy(&inspect.stdout)
         .lines()
         .find(|l| l.contains("alpine@sha256:"))
         .unwrap_or("")
