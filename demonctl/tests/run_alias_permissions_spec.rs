@@ -141,14 +141,36 @@ fn run_alias_emits_envelope_with_real_runtime() -> Result<()> {
     fs::create_dir_all(pack_dir.join("contracts/test"))?;
     fs::write(pack_dir.join("contracts/test/result.json"), b"{}")?;
 
-    let status = Command::new("docker")
-        .args(["pull", "alpine:3.20"])
-        .status()?;
-    if !status.success() {
-        anyhow::bail!("docker pull alpine:3.20 failed");
+    // Ensure alpine image is present with a short retry to deflake CI
+    let image = "alpine:3.20";
+    let mut pulled = false;
+    for _ in 0..3 {
+        if let Ok(s) = Command::new("docker").args(["pull", image]).status() {
+            if s.success() { pulled = true; break; }
+        }
+        std::thread::sleep(std::time::Duration::from_millis(800));
+    }
+    if !pulled {
+        anyhow::bail!("docker pull {} failed", image);
     }
 
-    let alpine_digest = "docker.io/library/alpine@sha256:b3119ef930faabb6b7b976780c0c7a9c1aa24d0c75e9179ac10e6bc9ac080d0d";
+    // Resolve a repo digest dynamically for the pulled tag
+    let inspect = Command::new("docker")
+        .args([
+            "inspect",
+            "--format",
+            r#"{{join .RepoDigests "\n"}}"#,
+            image,
+        ])
+        .output()?;
+    let alpine_digest = String::from_utf8_lossy(&inspect.stdout)
+        .lines()
+        .find(|l| l.contains("alpine@sha256:"))
+        .unwrap_or("")
+        .to_string();
+    if alpine_digest.is_empty() {
+        anyhow::bail!("could not resolve repo digest for {}", image);
+    }
 
     let manifest = format!(
         r#"apiVersion: demon.io/v1
@@ -233,14 +255,33 @@ fn run_alias_emits_envelope_as_uid_1000() -> Result<()> {
     fs::create_dir_all(pack_dir.join("contracts/test"))?;
     fs::write(pack_dir.join("contracts/test/result.json"), b"{}")?;
 
-    let status = Command::new("docker")
-        .args(["pull", "alpine:3.20"])
-        .status()?;
-    if !status.success() {
-        anyhow::bail!("docker pull alpine:3.20 failed");
+    let image = "alpine:3.20";
+    let mut pulled = false;
+    for _ in 0..3 {
+        if let Ok(s) = Command::new("docker").args(["pull", image]).status() {
+            if s.success() { pulled = true; break; }
+        }
+        std::thread::sleep(std::time::Duration::from_millis(800));
     }
-
-    let alpine_digest = "docker.io/library/alpine@sha256:b3119ef930faabb6b7b976780c0c7a9c1aa24d0c75e9179ac10e6bc9ac080d0d";
+    if !pulled {
+        anyhow::bail!("docker pull {} failed", image);
+    }
+    let inspect = Command::new("docker")
+        .args([
+            "inspect",
+            "--format",
+            r#"{{join .RepoDigests "\n"}}"#,
+            image,
+        ])
+        .output()?;
+    let alpine_digest = String::from_utf8_lossy(&inspect.stdout)
+        .lines()
+        .find(|l| l.contains("alpine@sha256:"))
+        .unwrap_or("")
+        .to_string();
+    if alpine_digest.is_empty() {
+        anyhow::bail!("could not resolve repo digest for {}", image);
+    }
 
     let manifest = format!(
         r#"apiVersion: demon.io/v1
