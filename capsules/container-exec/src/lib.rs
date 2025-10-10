@@ -330,6 +330,7 @@ fn execute_with_runtime(
 
     let mut command = Command::new(&runtime_bin);
     configure_command(&mut command, config, &mount)?;
+    let runtime_cmdline = command_line_string(&command);
 
     let start = Instant::now();
     let output = command.output().map_err(|err| ExecError::RuntimeSpawn {
@@ -370,7 +371,16 @@ fn execute_with_runtime(
         duration_ms: duration.as_secs_f64() * 1000.0,
         exit_status: exit_code(&output.status),
     }
-    .tap(|result| annotate_logs(&mut result.envelope, &logs, &host_target, config)))
+    .tap(|result| {
+        annotate_logs(&mut result.envelope, &logs, &host_target, config);
+        if debug_enabled() {
+            annotate_host_postrun(
+                &mut result.envelope,
+                &mount.host_envelope_path,
+                &runtime_cmdline,
+            );
+        }
+    }))
 }
 
 fn annotate_logs(
@@ -520,14 +530,35 @@ fn configure_command(
         .arg("--env")
         .arg(format!("ENVELOPE_PATH={}", config.envelope_path));
 
+    // Pass through DEMON_DEBUG to the container if enabled
+    if let Ok(val) = env::var("DEMON_DEBUG") {
+        if !val.is_empty() && val != "0" {
+            command.arg("--env").arg(format!("DEMON_DEBUG={}", val));
+        }
+    }
+
     for (key, value) in &config.env {
         command.arg("--env").arg(format!("{}={}", key, value));
     }
 
+    command.arg("--entrypoint").arg("");
     command.arg(&config.image_digest);
 
-    for part in &config.command {
-        command.arg(part);
+    if debug_enabled() {
+        let original = shell_join(&config.command);
+        let script = format!(
+            "set -e; echo '=== DEMON_DEBUG pre-run ==='; echo uid: $(id -u); echo gid: $(id -g); \
+             echo \"ENVELOPE_PATH=${{ENVELOPE_PATH}}\"; p=\"$(dirname \"$ENVELOPE_PATH\")\"; \
+             ls -l \"$p\" || true; test -w \"$ENVELOPE_PATH\" || echo 'NOT WRITABLE'; \
+             (mount 2>/dev/null || cat /proc/mounts 2>/dev/null) | sed -n '1,120p'; \
+             echo '=== DEMON_DEBUG run ==='; {} ; echo '=== DEMON_DEBUG done ===';",
+            original
+        );
+        command.arg("/bin/sh").arg("-c").arg(script);
+    } else {
+        for part in &config.command {
+            command.arg(part);
+        }
     }
 
     command.stdin(Stdio::null());
@@ -547,7 +578,7 @@ fn container_user() -> String {
     {
         let uid = unsafe { libc::geteuid() };
         let gid = unsafe { libc::getegid() };
-        return format!("{}:{}", uid, gid);
+        format!("{}:{}", uid, gid)
     }
     #[cfg(not(unix))]
     {
@@ -613,6 +644,100 @@ fn truncate(text: &str, limit: usize) -> String {
         let mut truncated = text[..limit].to_string();
         truncated.push_str("… (truncated)");
         truncated
+    }
+}
+
+fn debug_enabled() -> bool {
+    matches!(env::var("DEMON_DEBUG"), Ok(val) if !val.is_empty() && val != "0")
+}
+
+fn shell_escape(arg: &str) -> String {
+    if arg.is_empty() {
+        return "''".to_string();
+    }
+    let escaped = arg.replace('\'', "'\\''");
+    format!("'{}'", escaped)
+}
+
+fn shell_join(args: &[String]) -> String {
+    let mut out = String::new();
+    let mut first = true;
+    for a in args {
+        if !first {
+            out.push(' ');
+        }
+        first = false;
+        out.push_str(&shell_escape(a));
+    }
+    out
+}
+
+fn command_line_string(cmd: &Command) -> String {
+    let mut s = String::new();
+    s.push_str(&cmd.get_program().to_string_lossy());
+    for a in cmd.get_args() {
+        s.push(' ');
+        let a = a.to_string_lossy();
+        if a.contains(' ') || a.contains('"') || a.contains('\'') {
+            s.push_str(&shell_escape(&a));
+        } else {
+            s.push_str(&a);
+        }
+    }
+    s
+}
+
+fn annotate_host_postrun(envelope: &mut Envelope, host_path: &Path, cmdline: &str) {
+    // Always include the runtime command line when debugging
+    envelope.diagnostics.push(
+        Diagnostic::info(format!("runtime command: {}", truncate(cmdline, 1024)))
+            .with_source("container-exec"),
+    );
+
+    let ls_output = Command::new("/bin/ls")
+        .arg("-l")
+        .arg(host_path)
+        .output()
+        .ok()
+        .map(|o| CommandLogs::from_output(&o));
+    let stat_output = Command::new("/usr/bin/stat")
+        .arg(host_path)
+        .output()
+        .or_else(|_| Command::new("/bin/stat").arg(host_path).output())
+        .ok()
+        .map(|o| CommandLogs::from_output(&o));
+
+    if let Some(logs) = ls_output {
+        envelope.diagnostics.push(
+            Diagnostic::info(format!(
+                "host ls -l {}:\n{}",
+                host_path.display(),
+                truncate(&logs.stdout, 1024)
+            ))
+            .with_source("container-exec"),
+        );
+    }
+    if let Some(logs) = stat_output {
+        envelope.diagnostics.push(
+            Diagnostic::info(format!(
+                "host stat {}:\n{}",
+                host_path.display(),
+                truncate(&logs.stdout, 1024)
+            ))
+            .with_source("container-exec"),
+        );
+    }
+
+    if let Ok(meta) = fs::metadata(host_path) {
+        if meta.len() == 0 {
+            envelope.diagnostics.push(
+                Diagnostic::warning(format!(
+                    "envelope size is 0 bytes; runtime command: {}",
+                    truncate(cmdline, 1024)
+                ))
+                .with_source("container-exec"),
+            );
+        }
     }
 }
 
@@ -1060,6 +1185,70 @@ mod tests {
         assert!(args.contains(&"--workdir".to_string()));
         assert!(args.contains(&"/workspace".to_string()));
         assert!(args.contains(&envelope_env));
+    }
+
+    #[test]
+    fn configure_command_clears_entrypoint_and_preserves_command_order() {
+        // Ensure debug mode is off so command parts are not wrapped
+        env::remove_var("DEMON_DEBUG");
+
+        let base = tempfile::tempdir().unwrap();
+        let app_pack_dir = base.path().join("pack");
+        let artifacts_dir = base.path().join("artifacts");
+        fs::create_dir_all(&app_pack_dir).unwrap();
+        fs::create_dir_all(&artifacts_dir).unwrap();
+
+        let config = ContainerExecConfig {
+            image_digest: "ghcr.io/example/app@sha256:abcdef".to_string(),
+            command: vec![
+                "/bin/run".to_string(),
+                "-c".to_string(),
+                "echo hi".to_string(),
+            ],
+            env: BTreeMap::new(),
+            working_dir: None,
+            envelope_path: "/workspace/.artifacts/result.json".to_string(),
+            capsule_name: None,
+            app_pack_dir: Some(app_pack_dir),
+            artifacts_dir: Some(artifacts_dir),
+        };
+
+        let tmp = tempfile::tempdir().unwrap();
+        let mount = EnvelopeMount::prepare(
+            &config.envelope_path,
+            tmp.path(),
+            config.artifacts_dir.as_deref(),
+        )
+        .unwrap();
+
+        let mut command = Command::new("docker");
+        configure_command(&mut command, &config, &mount).unwrap();
+
+        let args: Vec<String> = command
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
+
+        // Find --entrypoint "" then image, then our explicit command parts
+        let idx_entry = args
+            .iter()
+            .position(|a| a == "--entrypoint")
+            .expect("--entrypoint not present");
+        assert_eq!(args.get(idx_entry + 1).map(|s| s.as_str()), Some(""));
+
+        let idx_image = args
+            .iter()
+            .position(|a| a == &config.image_digest)
+            .expect("image digest not present");
+        assert!(idx_image > idx_entry, "image must come after --entrypoint");
+
+        // Command parts must immediately follow the image unless debug wrapper is active
+        assert_eq!(
+            args.get(idx_image + 1).map(|s| s.as_str()),
+            Some("/bin/run")
+        );
+        assert_eq!(args.get(idx_image + 2).map(|s| s.as_str()), Some("-c"));
+        assert_eq!(args.get(idx_image + 3).map(|s| s.as_str()), Some("echo hi"));
     }
 
     #[test]

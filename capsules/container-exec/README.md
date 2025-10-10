@@ -17,6 +17,10 @@ Envelopes from a shared bind mount.
   fail
 - Supports a `stub` runtime for local testing (set `DEMON_CONTAINER_RUNTIME=stub`
   and point `DEMON_CONTAINER_EXEC_STUB_ENVELOPE` to an envelope JSON file)
+ - Clears image `ENTRYPOINT` (`--entrypoint ""`) so the capsule's declared
+   command is executed exactly as provided. This avoids Docker's
+   `ENTRYPOINT + CMD` concatenation which can break read-only filesystems or
+   wrapper shells.
 
 ## Envelope Write Semantics (non-root containers)
 
@@ -69,6 +73,15 @@ let config = ContainerExecConfig {
 let envelope = execute(&config);
 // Serialize envelope back to the runtime caller
 ```
+
+### Entrypoint Behavior
+
+Some images define an `ENTRYPOINT` like `/bin/bash -lc`. By default, Docker
+concatenates `ENTRYPOINT` and the runtime `CMD`, altering how commands execute
+and sometimes preventing writes on hardened, read-only filesystems. The
+container-exec capsule explicitly passes `--entrypoint ""` before the image
+reference so that only the capsule's `command` runs. Images without an
+`ENTRYPOINT` are unaffected.
 
 ## Environment Overrides
 
