@@ -91,7 +91,14 @@ reference so that only the capsule's `command` runs. Images without an
   returned when `DEMON_CONTAINER_RUNTIME=stub`.
 - `DEMON_CONTAINER_USER` — user (`uid:gid`) to run containers as (default:
   `65534:65534`).
-- Provide `workspaceDir` / `artifactsDir` in the request (or via
+- `DEMON_DEBUG` — when set to a non-empty value other than `0`, enables
+  additional diagnostics and a lightweight debug wrapper around the declared
+  command. The wrapper prints a pre-run banner with the effective UID/GID,
+  the resolved `ENVELOPE_PATH`, a short `ls -l` of the envelope directory, and
+  a snapshot of the container mount table. The runtime also includes the full
+  container command line (showing `--entrypoint ""` and mounts), plus host-side
+  `ls`/`stat` of the bound envelope file, in the emitted envelope diagnostics.
+  - Provide `workspaceDir` / `artifactsDir` in the request (or via
   `ContainerExecConfig`) so the App Pack is mounted read-only at `/workspace`
   and result artifacts are written to `/workspace/.artifacts`.
 
