@@ -146,7 +146,10 @@ fn run_alias_emits_envelope_with_real_runtime() -> Result<()> {
     let mut pulled = false;
     for _ in 0..3 {
         if let Ok(s) = Command::new("docker").args(["pull", image]).status() {
-            if s.success() { pulled = true; break; }
+            if s.success() {
+                pulled = true;
+                break;
+            }
         }
         std::thread::sleep(std::time::Duration::from_millis(800));
     }
@@ -259,7 +262,10 @@ fn run_alias_emits_envelope_as_uid_1000() -> Result<()> {
     let mut pulled = false;
     for _ in 0..3 {
         if let Ok(s) = Command::new("docker").args(["pull", image]).status() {
-            if s.success() { pulled = true; break; }
+            if s.success() {
+                pulled = true;
+                break;
+            }
         }
         std::thread::sleep(std::time::Duration::from_millis(800));
     }
