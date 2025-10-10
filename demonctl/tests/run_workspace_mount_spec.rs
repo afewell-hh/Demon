@@ -6,8 +6,8 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::Command;
-use tempfile::TempDir;
 use std::time::Duration;
+use tempfile::TempDir;
 
 fn workspace_root() -> std::path::PathBuf {
     Path::new(&std::env::var("CARGO_MANIFEST_DIR").unwrap())
@@ -35,12 +35,18 @@ fn demonctl_run_uses_installed_workspace_mount_for_scripts() -> Result<()> {
     let mut pulled = false;
     for _ in 0..3 {
         if let Ok(status) = Command::new("docker").args(["pull", image]).status() {
-            if status.success() { pulled = true; break; }
+            if status.success() {
+                pulled = true;
+                break;
+            }
         }
         std::thread::sleep(Duration::from_millis(800));
     }
     if !pulled {
-        eprintln!("warning: docker pull {} failed; continuing (digest resolution may still succeed)", image);
+        eprintln!(
+            "warning: docker pull {} failed; continuing (digest resolution may still succeed)",
+            image
+        );
     }
     // Resolve a repo digest dynamically to avoid flakiness when hardcoded digests change.
     let inspect = Command::new("docker")
