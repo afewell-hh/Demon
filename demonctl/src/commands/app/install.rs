@@ -109,6 +109,13 @@ pub fn run(args: InstallArgs) -> Result<()> {
                         );
                     }
                 }
+            } else if entry.file_type().is_symlink() {
+                // Be explicit: do not silently skip symlinks. Refuse packs with symlinks
+                // so installations don't end up missing files unexpectedly.
+                anyhow::bail!(
+                    "App Packs may not contain symlinks (found: '{}'). Please replace symlinks with regular files.",
+                    rel.display()
+                );
             }
         }
         Ok(())
