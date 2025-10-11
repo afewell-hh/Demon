@@ -1,6 +1,6 @@
 use super::manifest::{self, CosignSettings};
 use super::registry::Registry;
-use super::{copy_to_store, ensure_relative_path, packs_dir, registry_path, MANIFEST_BASENAMES};
+use super::{ensure_relative_path, packs_dir, registry_path, MANIFEST_BASENAMES};
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
@@ -63,29 +63,86 @@ pub fn run(args: InstallArgs) -> Result<()> {
         )
     })?;
 
-    let dest_manifest = install_root.join(
-        resolved
-            .manifest_path
-            .file_name()
-            .unwrap_or_else(|| std::ffi::OsStr::new("app-pack.yaml")),
-    );
-    copy_to_store(&resolved.manifest_path, &dest_manifest)?;
+    // Copy the entire App Pack directory to the install location so capsules/
+    // scripts and other runtime assets are available under /workspace.
+    // This preserves directory structure and best-effort file permissions.
+    // We still verify referenced contracts exist to surface clear errors.
 
+    fn copy_tree(src_root: &Path, dest_root: &Path) -> Result<()> {
+        for entry in walkdir::WalkDir::new(src_root).follow_links(false) {
+            let entry = entry?;
+            let rel = entry.path().strip_prefix(src_root).unwrap();
+            if rel.as_os_str().is_empty() {
+                continue;
+            }
+            // Skip VCS metadata
+            if rel.components().any(|c| c.as_os_str() == ".git") {
+                continue;
+            }
+            let dest_path = dest_root.join(rel);
+            if entry.file_type().is_dir() {
+                std::fs::create_dir_all(&dest_path).with_context(|| {
+                    format!("Failed to create directory '{}'", dest_path.display())
+                })?;
+            } else if entry.file_type().is_file() {
+                if let Some(parent) = dest_path.parent() {
+                    std::fs::create_dir_all(parent).with_context(|| {
+                        format!("Failed to create directory '{}'", parent.display())
+                    })?;
+                }
+                std::fs::copy(entry.path(), &dest_path).with_context(|| {
+                    format!(
+                        "Failed to copy '{}' to '{}'",
+                        entry.path().display(),
+                        dest_path.display()
+                    )
+                })?;
+                // Best effort: carry over executable bit when present
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    if let Ok(meta) = std::fs::metadata(entry.path()) {
+                        let mode = meta.permissions().mode();
+                        let _ = std::fs::set_permissions(
+                            &dest_path,
+                            std::fs::Permissions::from_mode(mode),
+                        );
+                    }
+                }
+            } else if entry.file_type().is_symlink() {
+                // Be explicit: do not silently skip symlinks. Refuse packs with symlinks
+                // so installations don't end up missing files unexpectedly.
+                anyhow::bail!(
+                    "App Packs may not contain symlinks (found: '{}'). Please replace symlinks with regular files.",
+                    rel.display()
+                );
+            }
+        }
+        Ok(())
+    }
+
+    copy_tree(&resolved.root, &install_root)?;
+
+    // Verify contracts referenced by the manifest are present in the install.
     for contract in &manifest.contracts {
         let relative = Path::new(&contract.path);
         ensure_relative_path(relative)?;
-        let source = resolved.root.join(relative);
-        if !source.exists() {
-            bail!(
-                "Contract '{}' referenced by App Pack '{}' not found at '{}'",
-                contract.id,
-                manifest.name(),
-                source.display()
-            );
-        }
         let destination = install_root.join(relative);
-        copy_to_store(&source, &destination)?;
+        ensure!(
+            destination.exists(),
+            "Contract '{}' referenced by App Pack '{}' not found at '{}' after install",
+            contract.id,
+            manifest.name(),
+            destination.display()
+        );
     }
+
+    // Resolve stored manifest path (post-copy) for registry entry
+    let dest_manifest = MANIFEST_BASENAMES
+        .iter()
+        .map(|b| install_root.join(b))
+        .find(|p| p.exists())
+        .unwrap_or_else(|| install_root.join("app-pack.yaml"));
 
     let registry_path = registry_path()?;
     let mut registry = Registry::load(registry_path.clone())?;

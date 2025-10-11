@@ -6,7 +6,7 @@ pub mod alias;
 mod manifest;
 mod registry;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use clap::Subcommand;
 use std::path::{Path, PathBuf};
 
@@ -68,12 +68,4 @@ pub(crate) fn packs_dir() -> Result<PathBuf> {
     Ok(resolve_store_root()?.join("packs"))
 }
 
-pub(crate) fn copy_to_store(src: &Path, dest: &Path) -> Result<()> {
-    if let Some(parent) = dest.parent() {
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("Failed to create directory '{}'", parent.display()))?;
-    }
-    std::fs::copy(src, dest)
-        .with_context(|| format!("Failed to copy '{}' to '{}'", src.display(), dest.display()))?;
-    Ok(())
-}
+// (removed) copy_to_store: install now copies the full App Pack directory tree.
