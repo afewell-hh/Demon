@@ -52,6 +52,13 @@ Troubleshooting:
   ensure the App Pack was prepared via `demonctl app install` (the runtime will
   pre-create the container-side target automatically during execution).
   Inspect the host-side artifacts directory for the bound file if debugging.
+ - "script not found under /workspace/capsules": the container command in your
+   capsule likely references a path like `/workspace/capsules/<name>/scripts/*.sh`.
+   This path exists only when the App Pack tree is installed and mounted at
+   `/workspace` (read-only). Fix by installing the pack with `demonctl app install`
+   and invoking the ritual via `demonctl run <app>:<ritual>`. Do not reference the
+   source tree paths directly — the runtime resolves capsule scripts relative to
+   the installed App Pack mounted at `/workspace`.
 
 ## Usage
 
