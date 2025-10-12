@@ -26,7 +26,7 @@ async fn dispatch_container_exec_stub_returns_envelope() {
     let args = json!({
         "imageDigest": "ghcr.io/demo/app@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
         "command": ["/bin/true"],
-        "outputs": {"envelopePath": "/workspace/result.json"},
+        "outputs": {"envelopePath": "/workspace/.artifacts/result.json"},
         "env": {},
         "capsuleName": "test-capsule"
     });

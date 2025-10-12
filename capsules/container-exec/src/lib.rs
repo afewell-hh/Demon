@@ -57,6 +57,16 @@ impl ContainerExecConfig {
             anyhow::bail!("Envelope path '{}' must be absolute", self.envelope_path);
         }
 
+        // Enforce workspace boundary: result envelope must live under /workspace/.artifacts
+        if !self.envelope_path.starts_with("/workspace/.artifacts/")
+            && self.envelope_path != "/workspace/.artifacts"
+        {
+            anyhow::bail!(
+                "Envelope path '{}' must live under /workspace/.artifacts",
+                self.envelope_path
+            );
+        }
+
         if let Some(dir) = &self.app_pack_dir {
             if !dir.is_absolute() {
                 anyhow::bail!(
@@ -1101,7 +1111,7 @@ mod tests {
             command: vec!["/bin/true".to_string()],
             env: BTreeMap::new(),
             working_dir: None,
-            envelope_path: "/workspace/result.json".to_string(),
+            envelope_path: "/workspace/.artifacts/result.json".to_string(),
             capsule_name: Some("test".to_string()),
             app_pack_dir: None,
             artifacts_dir: None,
