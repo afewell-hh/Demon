@@ -23,6 +23,21 @@ cargo run -p demonctl -- run examples/rituals/echo.yaml
 cargo run -p demonctl -- --help
 ```
 
+## Installed App Pack Mounts
+
+When you run a ritual from an installed App Pack (e.g., `demonctl run hoss:hoss-validate`),
+the runtime mounts the pack into the container with hardened settings:
+
+- App Pack root is mounted read-only at `/workspace`.
+- The pack’s artifacts directory is mounted read-write at `/workspace/.artifacts`.
+- A direct file bind is added from the host placeholder to the container target
+  envelope path (e.g., `/workspace/.artifacts/result.json`) to guarantee writes
+  with non-root users.
+
+Capsule commands should reference scripts relative to `/workspace`, for example:
+`/workspace/capsules/<capsule>/scripts/run.sh`. If you see "script not found",
+ensure you installed the pack via `demonctl app install <pack_dir>` before running.
+
 ## See Also
 
 - [Main README](../README.md) — Project overview and quickstart
