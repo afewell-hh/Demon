@@ -551,6 +551,29 @@ fn configure_command(
         command.arg("--env").arg(format!("{}={}", key, value));
     }
 
+    // Optional resource limits (Issue #270): cpus, memory, pids-limit
+    // These must appear BEFORE the image per `docker run` semantics; any
+    // options after the image are treated as container args and ignored by
+    // the Docker CLI. Place them here before setting entrypoint/image.
+    if let Ok(cpus) = env::var("DEMON_CONTAINER_CPUS") {
+        let cpus = cpus.trim();
+        if !cpus.is_empty() {
+            command.arg("--cpus").arg(cpus);
+        }
+    }
+    if let Ok(mem) = env::var("DEMON_CONTAINER_MEMORY") {
+        let mem = mem.trim();
+        if !mem.is_empty() {
+            command.arg("--memory").arg(mem);
+        }
+    }
+    if let Ok(pids) = env::var("DEMON_CONTAINER_PIDS_LIMIT") {
+        let pids = pids.trim();
+        if !pids.is_empty() {
+            command.arg("--pids-limit").arg(pids);
+        }
+    }
+
     command.arg("--entrypoint").arg("");
     command.arg(&config.image_digest);
 
@@ -571,25 +594,7 @@ fn configure_command(
         }
     }
 
-    // Optional resource limits (Issue #270): cpus, memory, pids-limit
-    if let Ok(cpus) = env::var("DEMON_CONTAINER_CPUS") {
-        let cpus = cpus.trim();
-        if !cpus.is_empty() {
-            command.arg("--cpus").arg(cpus);
-        }
-    }
-    if let Ok(mem) = env::var("DEMON_CONTAINER_MEMORY") {
-        let mem = mem.trim();
-        if !mem.is_empty() {
-            command.arg("--memory").arg(mem);
-        }
-    }
-    if let Ok(pids) = env::var("DEMON_CONTAINER_PIDS_LIMIT") {
-        let pids = pids.trim();
-        if !pids.is_empty() {
-            command.arg("--pids-limit").arg(pids);
-        }
-    }
+    // (resource limits handled above before the image)
 
     command.stdin(Stdio::null());
     command.stdout(Stdio::piped());

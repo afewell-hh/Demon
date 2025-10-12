@@ -35,4 +35,7 @@ k8s-bootstrapper-smoke-*/
 health-check-*.md
 .markdown-link-check.json
 
+# Local Rust toolchains (never commit)
+.rustup/
+
 # trigger CI
