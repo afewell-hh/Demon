@@ -571,6 +571,26 @@ fn configure_command(
         }
     }
 
+    // Optional resource limits (Issue #270): cpus, memory, pids-limit
+    if let Ok(cpus) = env::var("DEMON_CONTAINER_CPUS") {
+        let cpus = cpus.trim();
+        if !cpus.is_empty() {
+            command.arg("--cpus").arg(cpus);
+        }
+    }
+    if let Ok(mem) = env::var("DEMON_CONTAINER_MEMORY") {
+        let mem = mem.trim();
+        if !mem.is_empty() {
+            command.arg("--memory").arg(mem);
+        }
+    }
+    if let Ok(pids) = env::var("DEMON_CONTAINER_PIDS_LIMIT") {
+        let pids = pids.trim();
+        if !pids.is_empty() {
+            command.arg("--pids-limit").arg(pids);
+        }
+    }
+
     command.stdin(Stdio::null());
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
@@ -1259,6 +1279,58 @@ mod tests {
         );
         assert_eq!(args.get(idx_image + 2).map(|s| s.as_str()), Some("-c"));
         assert_eq!(args.get(idx_image + 3).map(|s| s.as_str()), Some("echo hi"));
+    }
+
+    #[test]
+    fn resource_limits_flags_are_included_when_envs_set() {
+        // Set resource limit envs
+        env::set_var("DEMON_CONTAINER_CPUS", "0.5");
+        env::set_var("DEMON_CONTAINER_MEMORY", "256m");
+        env::set_var("DEMON_CONTAINER_PIDS_LIMIT", "128");
+
+        let base = tempfile::tempdir().unwrap();
+        let app_pack_dir = base.path().join("pack");
+        let artifacts_dir = base.path().join("artifacts");
+        fs::create_dir_all(&app_pack_dir).unwrap();
+        fs::create_dir_all(&artifacts_dir).unwrap();
+
+        let config = ContainerExecConfig {
+            image_digest: "ghcr.io/example/app@sha256:abcdef".to_string(),
+            command: vec!["/bin/true".to_string()],
+            env: BTreeMap::new(),
+            working_dir: None,
+            envelope_path: "/workspace/.artifacts/result.json".to_string(),
+            capsule_name: None,
+            app_pack_dir: Some(app_pack_dir),
+            artifacts_dir: Some(artifacts_dir),
+        };
+
+        let tmp = tempfile::tempdir().unwrap();
+        let mount = EnvelopeMount::prepare(
+            &config.envelope_path,
+            tmp.path(),
+            config.artifacts_dir.as_deref(),
+        )
+        .unwrap();
+
+        let mut command = Command::new("docker");
+        configure_command(&mut command, &config, &mount).unwrap();
+        let args: Vec<String> = command
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
+
+        assert!(args.contains(&"--cpus".to_string()));
+        assert!(args.contains(&"0.5".to_string()));
+        assert!(args.contains(&"--memory".to_string()));
+        assert!(args.contains(&"256m".to_string()));
+        assert!(args.contains(&"--pids-limit".to_string()));
+        assert!(args.contains(&"128".to_string()));
+
+        // Cleanup env vars
+        env::remove_var("DEMON_CONTAINER_CPUS");
+        env::remove_var("DEMON_CONTAINER_MEMORY");
+        env::remove_var("DEMON_CONTAINER_PIDS_LIMIT");
     }
 
     #[test]
