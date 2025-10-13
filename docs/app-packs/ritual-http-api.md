@@ -233,6 +233,38 @@ Client reconnection is recommended with exponential backoff; the stream is short
 
 ---
 
+#### Quick SSE Client (JavaScript)
+
+```html
+<script>
+  const app = 'hoss';
+  const ritual = 'noop';
+  const runId = '<RUN_ID>';
+  const url = `/api/v1/rituals/${ritual}/runs/${runId}/events/stream?app=${encodeURIComponent(app)}&heartbeat_secs=5`;
+
+  const es = new EventSource(url);
+  es.onopen = () => console.log('[SSE] open');
+  es.onerror = (e) => console.warn('[SSE] error', e);
+  es.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'status') {
+        console.log('status:', msg.status);
+        if (msg.status === 'Completed' || msg.status === 'Failed' || msg.status === 'Canceled') {
+          es.close();
+        }
+      } else if (msg.type === 'envelope') {
+        console.log('envelope:', msg.envelope);
+      } else if (msg.type === 'warning') {
+        console.warn('warning:', msg.message);
+      }
+    } catch (err) {
+      console.error('parse error', err);
+    }
+  };
+```
+
+
 ### POST `/api/v1/rituals/{ritual}/runs/{runId}/cancel`
 
 Attempt to cancel a running ritual. If successful, the run transitions to `Canceled` and the server stops the underlying task. If the run has already finished or does not exist, cancellation fails gracefully.
