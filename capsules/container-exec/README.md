@@ -109,6 +109,14 @@ reference so that only the capsule's `command` runs. Images without an
   `ContainerExecConfig`) so the App Pack is mounted read-only at `/workspace`
   and result artifacts are written to `/workspace/.artifacts`.
 
+Resource limits:
+
+- `DEMON_CONTAINER_CPUS` — passed to `docker run --cpus` (e.g., `0.5`).
+- `DEMON_CONTAINER_MEMORY` — passed to `docker run --memory` (e.g., `256m`).
+- `DEMON_CONTAINER_PIDS_LIMIT` — passed to `docker run --pids-limit` (e.g., `128`).
+
+All configured limits are reflected in the emitted DEMON_DEBUG runtime command line.
+
 ## Future Work
 
 - Optional support for additional capsule outputs (artifacts, logs)
