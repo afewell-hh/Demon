@@ -1332,11 +1332,27 @@ mod tests {
         assert!(args.contains(&"--pids-limit".to_string()));
         assert!(args.contains(&"128".to_string()));
 
+        // Order: each flag must precede the image
+        let idx_image = args
+            .iter()
+            .position(|a| a == &config.image_digest)
+            .expect("image digest not present");
+        for flag in &["--cpus", "--memory", "--pids-limit"] {
+            let idx = args
+                .iter()
+                .position(|a| a == *flag)
+                .unwrap_or_else(|| panic!("flag {} not present", flag));
+            assert!(idx < idx_image, "{} must precede image", flag);
+        }
+
         // Cleanup env vars
         env::remove_var("DEMON_CONTAINER_CPUS");
         env::remove_var("DEMON_CONTAINER_MEMORY");
         env::remove_var("DEMON_CONTAINER_PIDS_LIMIT");
     }
+
+    // NOTE: We intentionally assert flag ORDER in the same test to avoid
+    // env-var race conditions across parallel tests.
 
     #[test]
     fn envelope_path_rejects_parent_dir_when_artifacts_dir_set() {
