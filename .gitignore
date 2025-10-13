@@ -38,4 +38,7 @@ health-check-*.md
 # Local Rust toolchains (never commit)
 .rustup/
 
+# Cargo local cache (never commit)
+.cargo/
+
 # trigger CI

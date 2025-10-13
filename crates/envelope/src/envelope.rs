@@ -15,6 +15,10 @@ pub struct ResultEnvelope<T> {
     pub metrics: Option<Metrics>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provenance: Option<Provenance>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool: Option<ToolInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub matrix: Option<MatrixInfo>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -139,6 +143,18 @@ pub struct ResourceMetrics {
     pub io_operations: Option<i64>,
     #[serde(flatten)]
     pub additional: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolInfo {
+    #[serde(rename = "gitSha")]
+    pub git_sha: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MatrixInfo {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

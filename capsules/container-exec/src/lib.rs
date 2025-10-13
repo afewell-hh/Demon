@@ -1,7 +1,8 @@
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use envelope::{
-    Diagnostic, DiagnosticLevel, DurationMetrics, Metrics, Provenance, ResultEnvelope, SourceInfo,
+    Diagnostic, DiagnosticLevel, DurationMetrics, MatrixInfo, Metrics, Provenance, ResultEnvelope,
+    SourceInfo, ToolInfo,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -464,6 +465,22 @@ fn annotate_success(result: &mut ContainerExecResult, config: &ContainerExecConf
             parent_span_id: None,
             chain: vec![],
         });
+
+    // Enrich with tool.gitSha if available
+    if let Ok(sha) = env::var("DEMON_TOOL_GIT_SHA") {
+        if !sha.trim().is_empty() {
+            result.envelope.tool = Some(ToolInfo { git_sha: sha });
+        }
+    }
+
+    // Enrich with matrix.details if provided as JSON
+    if let Ok(details) = env::var("DEMON_MATRIX_DETAILS") {
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&details) {
+            let mut matrix = result.envelope.matrix.take().unwrap_or(MatrixInfo { details: None });
+            matrix.details = Some(val);
+            result.envelope.matrix = Some(matrix);
+        }
+    }
 }
 
 fn configure_command(
@@ -820,6 +837,8 @@ fn build_error_envelope(error: ExecError, config: &ContainerExecConfig) -> Envel
             suggestions: vec![],
             metrics: None,
             provenance: None,
+            tool: None,
+            matrix: None,
         })
 }
 
@@ -1091,6 +1110,8 @@ mod tests {
             suggestions: vec![],
             metrics: None,
             provenance: None,
+            tool: None,
+            matrix: None,
         }
     }
 
@@ -1332,11 +1353,27 @@ mod tests {
         assert!(args.contains(&"--pids-limit".to_string()));
         assert!(args.contains(&"128".to_string()));
 
+        // Order: each flag must precede the image
+        let idx_image = args
+            .iter()
+            .position(|a| a == &config.image_digest)
+            .expect("image digest not present");
+        for flag in &["--cpus", "--memory", "--pids-limit"] {
+            let idx = args
+                .iter()
+                .position(|a| a == *flag)
+                .unwrap_or_else(|| panic!("flag {} not present", flag));
+            assert!(idx < idx_image, "{} must precede image", flag);
+        }
+
         // Cleanup env vars
         env::remove_var("DEMON_CONTAINER_CPUS");
         env::remove_var("DEMON_CONTAINER_MEMORY");
         env::remove_var("DEMON_CONTAINER_PIDS_LIMIT");
     }
+
+    // NOTE: We intentionally assert flag ORDER in the same test to avoid
+    // env-var race conditions across parallel tests.
 
     #[test]
     fn envelope_path_rejects_parent_dir_when_artifacts_dir_set() {

@@ -102,6 +102,8 @@ mod tests {
             suggestions: vec![],
             metrics: None,
             provenance: None,
+            tool: None,
+            matrix: None,
         };
 
         assert!(envelope.validate().is_ok());
@@ -115,6 +117,8 @@ mod tests {
             suggestions: vec![],
             metrics: None,
             provenance: None,
+            tool: None,
+            matrix: None,
         };
 
         assert!(envelope.validate().is_ok());
@@ -128,6 +132,8 @@ mod tests {
             suggestions: vec![],
             metrics: None,
             provenance: None,
+            tool: None,
+            matrix: None,
         };
 
         assert!(envelope.validate().is_ok());
