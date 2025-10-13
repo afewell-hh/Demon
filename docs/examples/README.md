@@ -5,6 +5,7 @@ Example ritual definitions and usage demonstrations for Demon.
 ## Contents
 
 - **[rituals/](../../examples/rituals/README.md)** — Sample ritual YAML files demonstrating various features
+- **[batch.yaml](./batch.yaml)** — Example input for `demonctl batch` (see ../demonctl/batch.md)
 
 ## See Also
 

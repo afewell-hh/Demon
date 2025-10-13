@@ -476,7 +476,11 @@ fn annotate_success(result: &mut ContainerExecResult, config: &ContainerExecConf
     // Enrich with matrix.details if provided as JSON
     if let Ok(details) = env::var("DEMON_MATRIX_DETAILS") {
         if let Ok(val) = serde_json::from_str::<serde_json::Value>(&details) {
-            let mut matrix = result.envelope.matrix.take().unwrap_or(MatrixInfo { details: None });
+            let mut matrix = result
+                .envelope
+                .matrix
+                .take()
+                .unwrap_or(MatrixInfo { details: None });
             matrix.details = Some(val);
             result.envelope.matrix = Some(matrix);
         }

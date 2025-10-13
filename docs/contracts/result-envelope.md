@@ -98,6 +98,10 @@ Test fixtures are available in `contracts/fixtures/envelopes/`:
 - `result_error.json`: Error result with diagnostics
 - `result_with_suggestions.json`: Result with JSON Patch suggestions
 
+Event fixtures (for run lifecycle) are in `contracts/fixtures/events/`:
+- `ritual.completed.v1.json`: Example run completion event
+- `ritual.canceled.v1.json`: Example cancellation event (no result envelope)
+
 ## Versioning
 
 The Result Envelope follows semantic versioning. Breaking changes will increment the schema version and require migration paths for existing consumers.

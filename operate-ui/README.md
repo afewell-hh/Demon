@@ -183,6 +183,20 @@ open tarpaulin-report.html
 
 4. **UI Layer**: Askama templates provide responsive, accessible HTML with auto-refresh for running rituals.
 
+### Mapping Note (Operate UI ↔ Runtime)
+
+- Status mapping: the UI derives run badges from ritual event types
+  - `ritual.started:v1` → Running
+  - `ritual.completed:v1` → Completed
+  - `ritual.failed:v1` → Failed
+  - `ritual.canceled:v1` (when present) → Canceled
+- SSE: the UI consumes `GET /api/runs/:runId/events/stream` (Operate UI) which mirrors runtime semantics; runtime’s SSE at
+  `GET /api/v1/rituals/{ritual}/runs/{runId}/events/stream?app=…` emits `status` and (on completion) an `envelope` JSON event.
+- Result envelope rendering: cards may refer to fields in the result envelope (produced by capsules) using manifest metadata;
+  when an envelope isn’t available (e.g., canceled), the UI renders timeline/events only.
+
+![Status Mapping](../docs/operate-ui/status-mapping.svg)
+
 ### Error Handling
 
 - **Service Unavailable**: When NATS/JetStream is down, the UI shows helpful error messages

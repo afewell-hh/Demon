@@ -34,14 +34,8 @@ pub fn routes() -> Router {
             "/:ritual/runs/:run_id/envelope",
             get(get_ritual_run_envelope),
         )
-        .route(
-            "/:ritual/runs/:run_id/events/stream",
-            get(stream_run_sse),
-        )
-        .route(
-            "/:ritual/runs/:run_id/cancel",
-            post(cancel_run),
-        )
+        .route("/:ritual/runs/:run_id/events/stream", get(stream_run_sse))
+        .route("/:ritual/runs/:run_id/cancel", post(cancel_run))
 }
 
 #[derive(Debug, Deserialize)]
@@ -293,8 +287,11 @@ async fn stream_run_sse(
         }
     };
 
-    let sse = axum::response::Sse::new(stream).keep_alive(axum::response::sse::KeepAlive::new().interval(Duration::from_secs(heartbeat)).text(":\
-\n"));
+    let sse = axum::response::Sse::new(stream).keep_alive(
+        axum::response::sse::KeepAlive::new()
+            .interval(Duration::from_secs(heartbeat))
+            .text(": keep-alive"),
+    );
     sse.into_response()
 }
 
@@ -315,7 +312,11 @@ async fn cancel_run(
     match service.cancel_run(&query.app, &ritual, &run_id).await {
         Ok(true) => {
             info!(run = %run_id, "canceled run");
-            (StatusCode::OK, Json(json!({"canceled": true, "runId": run_id})) ).into_response()
+            (
+                StatusCode::OK,
+                Json(json!({"canceled": true, "runId": run_id})),
+            )
+                .into_response()
         }
         Ok(false) => (
             StatusCode::CONFLICT,

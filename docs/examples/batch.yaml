@@ -1,0 +1,2 @@
+- target: examples/rituals/echo.yaml
+- target: examples/rituals/timer.yaml

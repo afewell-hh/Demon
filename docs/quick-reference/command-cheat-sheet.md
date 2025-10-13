@@ -22,6 +22,9 @@ make fmt && make lint
 # Quick smoke test
 cargo run -p demonctl -- run examples/rituals/echo.yaml
 
+# Batch run (save envelopes to directory)
+cargo run -p demonctl -- batch docs/examples/batch.yaml --save-dir ./.artifacts
+
 # Run installed App Pack ritual via alias
 cargo run -p demonctl -- run hoss:hoss-validate
 
