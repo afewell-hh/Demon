@@ -1,9 +1,12 @@
 use std::path::PathBuf;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use serde_json::Value as JsonValue;
+use futures_util::future::{AbortHandle, Abortable};
+use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
@@ -20,6 +23,7 @@ pub struct RitualService {
     registry: AppPackRegistry,
     store: RunStore,
     runner: Arc<dyn RitualRunner>,
+    tasks: Arc<Mutex<HashMap<String, AbortHandle>>>,
 }
 
 impl RitualService {
@@ -35,6 +39,7 @@ impl RitualService {
             registry,
             store,
             runner,
+            tasks: Arc::new(Mutex::new(HashMap::new())),
         })
     }
 
@@ -47,6 +52,7 @@ impl RitualService {
             registry,
             store,
             runner,
+            tasks: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -89,7 +95,7 @@ impl RitualService {
             .await
             .context("persisting run metadata")?;
 
-        self.spawn_execution(plan, record.app.clone())?;
+        self.spawn_execution(plan, record.app.clone()).await?;
 
         let response = RunCreatedResponse {
             run_id: run_id.clone(),
@@ -162,29 +168,38 @@ impl RitualService {
         Ok(None)
     }
 
-    fn spawn_execution(&self, plan: ExecutionPlan, app: String) -> Result<()> {
+    async fn spawn_execution(&self, plan: ExecutionPlan, app: String) -> Result<()> {
         let store = self.store.clone();
         let runner = Arc::clone(&self.runner);
         let run_id = plan.run_id.clone();
         let ritual_id = plan.ritual_id.clone();
+
+        let (abort_handle, abort_reg) = AbortHandle::new_pair();
+        {
+            let mut map = self.tasks.lock().await;
+            map.insert(run_id.clone(), abort_handle);
+        }
+
+        let tasks_map = Arc::clone(&self.tasks);
         tokio::spawn(async move {
             info!(run = %run_id, ritual = %ritual_id, "starting ritual execution task");
-            match runner.run(plan).await {
-                Ok(envelope) => {
+            let fut = runner.run(plan);
+            match Abortable::new(fut, abort_reg).await {
+                Ok(Ok(envelope_json)) => {
                     let now = Utc::now();
                     if let Err(err) = store
                         .update(&run_id, |record| {
                             record.status = RunStatus::Completed;
                             record.updated_at = now;
                             record.completed_at = Some(now);
-                            record.result_envelope = Some(envelope.clone());
+                            record.result_envelope = Some(envelope_json);
                         })
                         .await
                     {
                         error!(run = %run_id, %app, error = %err, "failed to persist completion metadata");
                     }
                 }
-                Err(err) => {
+                Ok(Err(err)) => {
                     warn!(run = %run_id, %app, error = %err, "ritual execution failed");
                     let message = err.to_string();
                     if let Err(err) = store
@@ -200,10 +215,54 @@ impl RitualService {
                         error!(run = %run_id, %app, error = %err, "failed to persist failure metadata");
                     }
                 }
+                Err(_aborted) => {
+                    let now = Utc::now();
+                    let _ = store
+                        .update(&run_id, |record| {
+                            record.status = RunStatus::Canceled;
+                            record.updated_at = now;
+                            record.completed_at = Some(now);
+                            record.error = Some("Canceled by user".to_string());
+                        })
+                        .await;
+                }
             }
+            // Remove handle after completion
+            let mut map = tasks_map.lock().await;
+            map.remove(&run_id);
         });
 
         Ok(())
+    }
+
+    pub async fn cancel_run(&self, app: &str, ritual: &str, run_id: &str) -> Result<bool> {
+        // Validate the run exists and belongs to the requested app/ritual
+        if let Some(record) = self.store.get(run_id).await {
+            if record.app != app || record.ritual != ritual {
+                return Ok(false);
+            }
+        } else {
+            return Ok(false);
+        }
+
+        let handle = { self.tasks.lock().await.remove(run_id) };
+        if let Some(h) = handle {
+            h.abort();
+            let now = Utc::now();
+            self.store
+                .update(run_id, |record| {
+                    record.status = RunStatus::Canceled;
+                    record.updated_at = now;
+                    record.completed_at = Some(now);
+                    record.error = Some("Canceled by user".to_string());
+                })
+                .await
+                .ok();
+            Ok(true)
+        } else {
+            // Nothing to abort — return false if not running
+            Ok(false)
+        }
     }
 }
 

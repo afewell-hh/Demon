@@ -18,6 +18,7 @@ pub enum RunStatus {
     Running,
     Completed,
     Failed,
+    Canceled,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -80,6 +81,7 @@ impl RunStatus {
             "running" => Some(RunStatus::Running),
             "completed" => Some(RunStatus::Completed),
             "failed" => Some(RunStatus::Failed),
+            "canceled" => Some(RunStatus::Canceled),
             _ => None,
         }
     }

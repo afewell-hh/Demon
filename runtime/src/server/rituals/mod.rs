@@ -17,7 +17,8 @@ use axum::routing::{get, post};
 use axum::{Extension, Json, Router};
 use serde::Deserialize;
 use serde_json::json;
-use tracing::warn;
+use std::time::Duration;
+use tracing::{info, warn};
 
 use std::sync::Arc;
 
@@ -32,6 +33,14 @@ pub fn routes() -> Router {
         .route(
             "/:ritual/runs/:run_id/envelope",
             get(get_ritual_run_envelope),
+        )
+        .route(
+            "/:ritual/runs/:run_id/events/stream",
+            get(stream_run_sse),
+        )
+        .route(
+            "/:ritual/runs/:run_id/cancel",
+            post(cancel_run),
         )
 }
 
@@ -199,5 +208,124 @@ fn classify_error(message: &str) -> StatusCode {
         StatusCode::BAD_REQUEST
     } else {
         StatusCode::INTERNAL_SERVER_ERROR
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct StreamQuery {
+    pub app: String,
+    #[serde(default)]
+    pub heartbeat_secs: Option<u64>,
+}
+
+#[axum::debug_handler]
+async fn stream_run_sse(
+    Extension(service): Extension<Arc<RitualService>>,
+    Path((ritual, run_id)): Path<(String, String)>,
+    Query(query): Query<StreamQuery>,
+) -> Response {
+    if query.app.trim().is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "Query parameter 'app' is required"})),
+        )
+            .into_response();
+    }
+
+    let heartbeat = query.heartbeat_secs.unwrap_or_else(|| {
+        std::env::var("RITUAL_SSE_HEARTBEAT_SECONDS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(5)
+    });
+
+    let tenant = query.app.clone();
+    let ritual_id = ritual.clone();
+    let run = run_id.clone();
+
+    let stream = async_stream::stream! {
+        // Emit initial state
+        if let Ok(Some(detail)) = service.get_run(&tenant, &ritual_id, &run).await {
+            let ev = serde_json::json!({
+                "type": "status",
+                "runId": run,
+                "status": detail.status,
+            });
+            yield Ok::<_, std::convert::Infallible>(axum::response::sse::Event::default().json_data(ev).unwrap());
+        }
+
+        loop {
+            // Periodic heartbeat
+            tokio::time::sleep(Duration::from_secs(heartbeat)).await;
+            let maybe_detail = service.get_run(&tenant, &ritual_id, &run).await.ok().flatten();
+            if let Some(detail) = maybe_detail.clone() {
+                let ev = serde_json::json!({
+                    "type": "status",
+                    "runId": run,
+                    "status": detail.status,
+                });
+                yield Ok::<_, std::convert::Infallible>(axum::response::sse::Event::default().json_data(ev).unwrap());
+
+                match detail.status {
+                    RunStatus::Completed | RunStatus::Failed | RunStatus::Canceled => {
+                        // If envelope exists, emit it and break
+                        if let Some(env) = detail.result_envelope {
+                            let ev = serde_json::json!({
+                                "type": "envelope",
+                                "runId": run,
+                                "envelope": env,
+                            });
+                            yield Ok::<_, std::convert::Infallible>(axum::response::sse::Event::default().json_data(ev).unwrap());
+                        }
+                        break;
+                    }
+                    _ => {}
+                }
+            } else {
+                let ev = serde_json::json!({
+                    "type": "warning",
+                    "message": "Run not found (may have expired)",
+                    "runId": run,
+                });
+                yield Ok::<_, std::convert::Infallible>(axum::response::sse::Event::default().json_data(ev).unwrap());
+                break;
+            }
+        }
+    };
+
+    let sse = axum::response::Sse::new(stream).keep_alive(axum::response::sse::KeepAlive::new().interval(Duration::from_secs(heartbeat)).text(":\
+\n"));
+    sse.into_response()
+}
+
+#[axum::debug_handler]
+async fn cancel_run(
+    Extension(service): Extension<Arc<RitualService>>,
+    Path((ritual, run_id)): Path<(String, String)>,
+    Query(query): Query<RunLookupQuery>,
+) -> Response {
+    if query.app.trim().is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "Query parameter 'app' is required"})),
+        )
+            .into_response();
+    }
+
+    match service.cancel_run(&query.app, &ritual, &run_id).await {
+        Ok(true) => {
+            info!(run = %run_id, "canceled run");
+            (StatusCode::OK, Json(json!({"canceled": true, "runId": run_id})) ).into_response()
+        }
+        Ok(false) => (
+            StatusCode::CONFLICT,
+            Json(json!({"canceled": false, "reason": "Run not running or not found"})),
+        )
+            .into_response(),
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": err.to_string()})),
+        )
+            .into_response(),
     }
 }

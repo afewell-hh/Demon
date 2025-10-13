@@ -165,6 +165,8 @@ impl<T> ResultEnvelopeBuilder<T> {
             suggestions: self.suggestions,
             metrics: self.metrics,
             provenance: self.provenance,
+            tool: None,
+            matrix: None,
         })
     }
 }
