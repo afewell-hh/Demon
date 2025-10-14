@@ -168,6 +168,9 @@ enum Commands {
         /// Save result envelopes alongside the batch file
         #[arg(long, action = ArgAction::SetTrue)]
         save: bool,
+        /// Optional directory to write saved result envelopes (implies --save)
+        #[arg(long, value_name = "DIR")]
+        save_dir: Option<PathBuf>,
     },
 }
 
@@ -596,33 +599,52 @@ async fn main() -> Result<()> {
         Commands::Version => {
             println!("{}", env!("CARGO_PKG_VERSION"));
         }
-        Commands::Batch { file, save } => {
+        Commands::Batch {
+            file,
+            save,
+            save_dir,
+        } => {
             // Minimal schema: list of targets (ritual YAML paths or app:ritual aliases)
             #[derive(serde::Deserialize)]
-            struct Item { target: String }
+            struct Item {
+                target: String,
+            }
             let raw = std::fs::read_to_string(&file)
                 .with_context(|| format!("reading batch file {}", file.display()))?;
             let items: Vec<Item> = serde_yaml::from_str(&raw)
                 .with_context(|| "parsing batch YAML (expected list of {target})")?;
             let mut engine = engine::rituals::Engine::new();
+            let out_dir = save_dir.or_else(|| file.parent().map(|p| p.to_path_buf()));
+            if let Some(dir) = &out_dir {
+                std::fs::create_dir_all(dir)
+                    .with_context(|| format!("creating save dir {}", dir.display()))?;
+            }
             for (idx, item) in items.iter().enumerate() {
                 let target = &item.target;
-                let run_path = if let Some(alias_target) = commands::app::alias::parse_alias(target) {
+                let run_path = if let Some(alias_target) = commands::app::alias::parse_alias(target)
+                {
                     let spec = commands::app::alias::build_alias_spec(&alias_target)?;
                     spec.spec_path().to_path_buf()
-                } else { PathBuf::from(target) };
+                } else {
+                    PathBuf::from(target)
+                };
                 let run_path_str = run_path
                     .to_str()
                     .ok_or_else(|| anyhow::anyhow!("Ritual path contains invalid UTF-8"))?;
 
                 eprintln!("[batch {}/{}] running {}", idx + 1, items.len(), target);
-                if save {
+                if save || out_dir.is_some() {
                     match engine.run_from_file_with_result(run_path_str).await {
                         Ok(result_event) => {
                             println!("{}", serde_json::to_string_pretty(&result_event).unwrap());
-                            let base = file.parent().unwrap_or_else(|| std::path::Path::new("."));
-                            let out = base.join(format!("batch-{}.result.json", idx + 1));
-                            if let Err(e) = std::fs::write(&out, serde_json::to_vec_pretty(&result_event).unwrap()) {
+                            let base = out_dir.as_deref().unwrap_or_else(|| {
+                                file.parent().unwrap_or_else(|| std::path::Path::new("."))
+                            });
+                            let out = base.join(format!("batch-{:03}.result.json", idx + 1));
+                            if let Err(e) = std::fs::write(
+                                &out,
+                                serde_json::to_vec_pretty(&result_event).unwrap(),
+                            ) {
                                 eprintln!("failed to write {}: {}", out.display(), e);
                             }
                         }

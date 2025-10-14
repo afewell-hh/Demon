@@ -185,6 +185,118 @@ curl "http://localhost:8080/api/v1/rituals/noop/runs/550e8400-e29b-41d4-a716-446
 
 ---
 
+### GET `/api/v1/rituals/{ritual}/runs/{runId}/events/stream` (SSE)
+
+Stream live status updates for a run via Server‑Sent Events. Each SSE message contains a JSON object in the `data:` field (no custom `event:` name). The stream closes once the run reaches a terminal state (`Completed`, `Failed`, or `Canceled`).
+
+**Path Parameters:**
+- `ritual` (string, required)
+- `runId` (string, required)
+
+**Query Parameters:**
+- `app` (string, required)
+- `heartbeat_secs` (integer, optional, default from `RITUAL_SSE_HEARTBEAT_SECONDS` or `5`): Interval between status polls/heartbeats
+
+**Event Types:**
+- `status` — periodic status heartbeat and on-change notifications
+- `envelope` — full result envelope (emitted only on `Completed`/`Failed` and only if available)
+- `warning` — run not found or expired during polling
+
+**Examples (wire format):**
+```
+data: {"type":"status","runId":"550e...","status":"Running"}
+
+data: {"type":"status","runId":"550e...","status":"Completed"}
+
+data: {"type":"envelope","runId":"550e...","envelope":{"event":"ritual.completed:v1","ritualId":"hoss::noop","runId":"550e...","ts":"2025-10-06T12:00:05Z","outputs":{"result":"ok"}}}
+```
+
+**Subscribed then cancel:**
+```
+data: {"type":"status","runId":"550e...","status":"Running"}
+
+data: {"type":"status","runId":"550e...","status":"Canceled"}
+```
+Note: no `envelope` event is emitted for canceled runs.
+
+**Headers:**
+- `Content-Type: text/event-stream`
+- `Cache-Control: no-cache`
+- `Connection: keep-alive`
+
+**Example:**
+```bash
+curl -N "http://localhost:8080/api/v1/rituals/noop/runs/<runId>/events/stream?app=hoss&heartbeat_secs=2"
+```
+
+Client reconnection is recommended with exponential backoff; the stream is short‑lived and will close after a terminal status.
+
+---
+
+#### Quick SSE Client (JavaScript)
+
+```html
+<script>
+  const app = 'hoss';
+  const ritual = 'noop';
+  const runId = '<RUN_ID>';
+  const url = `/api/v1/rituals/${ritual}/runs/${runId}/events/stream?app=${encodeURIComponent(app)}&heartbeat_secs=5`;
+
+  const es = new EventSource(url);
+  es.onopen = () => console.log('[SSE] open');
+  es.onerror = (e) => console.warn('[SSE] error', e);
+  es.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'status') {
+        console.log('status:', msg.status);
+        if (msg.status === 'Completed' || msg.status === 'Failed' || msg.status === 'Canceled') {
+          es.close();
+        }
+      } else if (msg.type === 'envelope') {
+        console.log('envelope:', msg.envelope);
+      } else if (msg.type === 'warning') {
+        console.warn('warning:', msg.message);
+      }
+    } catch (err) {
+      console.error('parse error', err);
+    }
+  };
+```
+
+
+### POST `/api/v1/rituals/{ritual}/runs/{runId}/cancel`
+
+Attempt to cancel a running ritual. If successful, the run transitions to `Canceled` and the server stops the underlying task. If the run has already finished or does not exist, cancellation fails gracefully.
+
+**Path Parameters:**
+- `ritual` (string, required)
+- `runId` (string, required)
+
+**Query Parameters:**
+- `app` (string, required)
+
+**Success Response (200 OK):**
+```json
+{ "canceled": true, "runId": "<runId>" }
+```
+
+**Conflict (409):** Run not running or not found
+```json
+{ "canceled": false, "reason": "Run not running or not found" }
+```
+
+**Example:**
+```bash
+curl -X POST "http://localhost:8080/api/v1/rituals/noop/runs/<runId>/cancel?app=hoss"
+```
+
+Notes:
+- Cancellation is best‑effort. If the operation already completed, the endpoint returns a conflict response.
+- SSE streams for canceled runs emit status updates and close without an `envelope` event.
+
+---
+
 ## Error Model
 
 All error responses follow a consistent JSON format:
@@ -319,9 +431,9 @@ cargo test --package runtime ritual_http_api
 
 ### Additional Features
 - Webhook notifications on run completion
-- SSE streaming for real-time status updates
+- SSE streaming for real-time status updates (documented above)
 - Bulk run creation
-- Run cancellation endpoint
+- Run cancellation endpoint (documented above)
 
 ---
 
