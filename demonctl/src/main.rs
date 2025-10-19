@@ -640,7 +640,6 @@ async fn main() -> Result<()> {
                 let run_path_str = run_path
                     .to_str()
                     .ok_or_else(|| anyhow::anyhow!("Ritual path contains invalid UTF-8"))?;
-
                 eprintln!("[batch {}/{}] running {}", idx + 1, items.len(), target);
                 if out_dir.is_some() {
                     match engine.run_from_file_with_result(run_path_str).await {
