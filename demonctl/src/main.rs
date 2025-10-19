@@ -614,7 +614,16 @@ async fn main() -> Result<()> {
             let items: Vec<Item> = serde_yaml::from_str(&raw)
                 .with_context(|| "parsing batch YAML (expected list of {target})")?;
             let mut engine = engine::rituals::Engine::new();
-            let out_dir = save_dir.or_else(|| file.parent().map(|p| p.to_path_buf()));
+            // Only compute output directory when saving is requested or an explicit
+            // save_dir is provided; otherwise do not write artifacts.
+            let out_dir = if save {
+                save_dir
+                    .clone()
+                    .or_else(|| file.parent().map(|p| p.to_path_buf()))
+            } else {
+                // --save-dir alone implies saving even without --save
+                save_dir.clone()
+            };
             if let Some(dir) = &out_dir {
                 std::fs::create_dir_all(dir)
                     .with_context(|| format!("creating save dir {}", dir.display()))?;
@@ -631,9 +640,8 @@ async fn main() -> Result<()> {
                 let run_path_str = run_path
                     .to_str()
                     .ok_or_else(|| anyhow::anyhow!("Ritual path contains invalid UTF-8"))?;
-
                 eprintln!("[batch {}/{}] running {}", idx + 1, items.len(), target);
-                if save || out_dir.is_some() {
+                if out_dir.is_some() {
                     match engine.run_from_file_with_result(run_path_str).await {
                         Ok(result_event) => {
                             println!("{}", serde_json::to_string_pretty(&result_event).unwrap());

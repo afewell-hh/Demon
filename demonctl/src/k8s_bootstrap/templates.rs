@@ -828,8 +828,13 @@ mod tests {
         std::env::remove_var("ENGINE_IMAGE_TAG");
     }
 
+    #[serial]
     #[test]
     fn test_build_image_reference_with_digest() {
+        let var = "OPERATE_UI_IMAGE_TAG";
+        let original = std::env::var(var).ok();
+        std::env::remove_var(var);
+
         let reference = build_image_reference(
             "OPERATE_UI_IMAGE_TAG",
             "sha256:abc",
@@ -837,6 +842,12 @@ mod tests {
         );
 
         assert_eq!(reference, "ghcr.io/afewell-hh/demon-operate-ui@sha256:abc");
+
+        if let Some(value) = original {
+            std::env::set_var(var, value);
+        } else {
+            std::env::remove_var(var);
+        }
     }
 
     #[serial]
