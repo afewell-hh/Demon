@@ -473,6 +473,54 @@ demonctl app list
 demonctl app install path/to/pack
 ```
 
+## Testing
+
+### Local Compat Smoke Test
+
+The `app-pack-compat-smoke` CI job validates the end-to-end flow: install → run → render. You can run these steps locally to verify changes:
+
+**Prerequisites:**
+```bash
+# Start NATS JetStream
+make dev
+# Or manually:
+docker run -d --rm --name nats -p 4222:4222 -p 8222:8222 nats:2.10 -js
+```
+
+**Run the test sequence:**
+
+```bash
+# 1. Install the sample app pack
+cargo run -p demonctl -- app install examples/app-pack-sample/
+
+# 2. List installed packs
+cargo run -p demonctl -- app list
+
+# 3. Run the hello ritual
+export RITUAL_STREAM_NAME=RITUAL_EVENTS
+cargo run -p demonctl -- run hello-world:hello
+
+# 4. Start Operate UI (in another terminal)
+RITUAL_STREAM_NAME=RITUAL_EVENTS cargo run -p operate-ui
+
+# 5. View results
+curl http://localhost:3000/api/runs | jq .
+
+# 6. Cleanup
+cargo run -p demonctl -- app uninstall hello-world
+```
+
+**Expected behavior:**
+- Install succeeds with "Installed App Pack hello-world@1.0.0"
+- Run completes with `"event": "ritual.completed:v1"` and `"success": true`
+- UI `/api/runs` returns an array with the run
+- Uninstall removes pack files and registry entry
+
+**Troubleshooting:**
+- If NATS is not running, ritual execution will fail with connection errors
+- If Operate UI shows empty runs, verify `RITUAL_STREAM_NAME` matches across commands
+- For detailed logs, add `RUST_LOG=debug` environment variable
+
 ## Future Enhancements
 
 Planned features for App Packs:

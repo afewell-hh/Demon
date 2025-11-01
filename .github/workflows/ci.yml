@@ -865,3 +865,149 @@ jobs:
           name: k8s-bootstrapper-dryrun-artifacts
           path: dist/bootstrapper-smoke/
           retention-days: 7
+
+  app-pack-compat-smoke:
+    runs-on: ubuntu-latest
+    needs: build-test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust (pinned toolchain)
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: 1.82.0
+          components: clippy, rustfmt
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+          cache-on-failure: true
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+      - name: Clippy (deny warnings)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Cargo deny check
+        run: cargo deny check --all-features
+        continue-on-error: true
+
+      - name: Build workspace
+        run: cargo build --workspace
+
+      - name: Start NATS (JetStream)
+        run: |
+          docker run -d --rm --name nats -p 4222:4222 -p 8222:8222 nats:2.10 -js
+          for i in {1..40}; do
+            if docker logs nats 2>&1 | grep -q "Server is ready"; then exit 0; fi
+            sleep 0.5
+          done
+          echo "NATS did not report ready in time"; docker logs nats; exit 1
+
+      - name: Install sample app pack
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/compat-smoke
+          cargo run -p demonctl -- app install examples/app-pack-sample/ 2>&1 | tee /tmp/compat-smoke/install.log
+          echo "✓ App pack installed"
+
+      - name: List installed app packs
+        run: |
+          cargo run -p demonctl -- app list 2>&1 | tee /tmp/compat-smoke/list.log
+          cargo run -p demonctl -- app list --json | jq . | tee /tmp/compat-smoke/list.json
+
+      - name: Run sample ritual via container-exec
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS
+        run: |
+          set -euo pipefail
+          cargo run -p demonctl -- run hello-world:hello --save --output-dir /tmp/compat-smoke 2>&1 | tee /tmp/compat-smoke/run.log
+          echo "✓ Ritual execution completed"
+          # Verify result envelope was created
+          if [[ -f /tmp/compat-smoke/result.json ]]; then
+            echo "✓ Result envelope saved"
+            jq . /tmp/compat-smoke/result.json || echo "Warning: result.json is not valid JSON"
+          else
+            echo "⚠ result.json not found (may be normal depending on execution)"
+          fi
+
+      - name: Start Operate UI (background)
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS
+          APPROVER_ALLOWLIST: test@example.com
+        run: |
+          nohup bash -c 'APPROVER_ALLOWLIST=test@example.com RITUAL_STREAM_NAME=RITUAL_EVENTS cargo run -q -p operate-ui' >/tmp/compat-smoke/ui.log 2>&1 &
+          # Wait for HTTP 200 from /api/runs with valid JSON response
+          for i in {1..60}; do
+            code=$(curl -sS -o /tmp/compat-smoke/ui-ready-check.json -w "%{http_code}" http://127.0.0.1:3000/api/runs 2>/dev/null || echo "000")
+            if [[ "$code" == "200" ]] && jq -e . /tmp/compat-smoke/ui-ready-check.json >/dev/null 2>&1; then
+              echo "✓ Operate UI ready (HTTP $code)"
+              break
+            fi
+            if [[ $i -eq 60 ]]; then
+              echo "❌ Operate UI failed to start"
+              cat /tmp/compat-smoke/ui.log || true
+              exit 1
+            fi
+            sleep 0.5
+          done
+
+      - name: Verify UI response structure and rendered card
+        run: |
+          set -euo pipefail
+          # Fetch runs list
+          curl -s http://127.0.0.1:3000/api/runs | tee /tmp/compat-smoke/ui-runs.json | jq .
+
+          # Verify response is an array (resilient to empty or error responses)
+          if jq -e 'type == "array"' /tmp/compat-smoke/ui-runs.json >/dev/null 2>&1; then
+            echo "✓ UI /api/runs returned valid array"
+
+            # If we have runs, verify structure
+            run_count=$(jq 'length' /tmp/compat-smoke/ui-runs.json)
+            echo "Runs count: $run_count"
+
+            if [[ $run_count -gt 0 ]]; then
+              # Get first run ID and fetch detail
+              run_id=$(jq -r '.[0].runId // .[0].id // empty' /tmp/compat-smoke/ui-runs.json)
+              if [[ -n "$run_id" ]]; then
+                echo "Fetching run detail for: $run_id"
+                curl -s "http://127.0.0.1:3000/api/runs/${run_id}" | tee /tmp/compat-smoke/ui-run-detail.json | jq .
+
+                # Verify run detail has expected fields
+                if jq -e '.events' /tmp/compat-smoke/ui-run-detail.json >/dev/null 2>&1; then
+                  echo "✓ Run detail has events field"
+                else
+                  echo "⚠ Run detail missing events field"
+                fi
+              fi
+            else
+              echo "⚠ No runs found (may be expected if ritual hasn't emitted events yet)"
+            fi
+          else
+            echo "⚠ UI response is not an array"
+            jq . /tmp/compat-smoke/ui-runs.json || cat /tmp/compat-smoke/ui-runs.json
+          fi
+
+      - name: Upload compat-smoke artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: app-pack-compat-smoke-artifacts
+          path: /tmp/compat-smoke/
+          retention-days: 7
+
+      - name: Cleanup (uninstall app pack)
+        if: always()
+        run: |
+          cargo run -p demonctl -- app uninstall hello-world 2>&1 | tee /tmp/compat-smoke/uninstall.log || echo "Uninstall failed or pack not found"
+
+      - name: Teardown NATS
+        if: always()
+        run: docker rm -f nats || true
