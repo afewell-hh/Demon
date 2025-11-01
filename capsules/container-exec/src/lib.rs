@@ -371,7 +371,7 @@ fn execute_with_runtime(
     let envelope_bytes =
         fs::read(&mount.host_envelope_path).map_err(|err| ExecError::EnvelopeMissing {
             path: mount.host_envelope_path.clone(),
-            status: status.clone(),
+            status,
             logs: logs.clone(),
             source: err,
         })?;
@@ -379,7 +379,7 @@ fn execute_with_runtime(
     let envelope: Envelope =
         serde_json::from_slice(&envelope_bytes).map_err(|err| ExecError::EnvelopeInvalid {
             path: mount.host_envelope_path.clone(),
-            status: status.clone(),
+            status,
             logs: logs.clone(),
             source: anyhow!(err),
         })?;
