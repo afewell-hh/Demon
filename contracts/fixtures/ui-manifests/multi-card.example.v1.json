@@ -1,0 +1,46 @@
+{
+  "apiVersion": "demon.io/v1",
+  "kind": "UIManifest",
+  "metadata": {
+    "name": "multi-card-example",
+    "version": "1.0.0",
+    "displayName": "Multi-Card Example",
+    "description": "Example with multiple cards of different types"
+  },
+  "cards": [
+    {
+      "id": "echo-status",
+      "kind": "result-envelope",
+      "title": "Echo Result",
+      "match": {
+        "rituals": ["hello"]
+      },
+      "config": {
+        "statusPath": "result.success",
+        "showTimestamp": true
+      }
+    },
+    {
+      "id": "echo-details",
+      "kind": "fields-table",
+      "title": "Echo Details",
+      "match": {
+        "rituals": ["hello"]
+      },
+      "config": {
+        "fields": [
+          {
+            "label": "Message",
+            "path": "result.data.message",
+            "format": "text"
+          },
+          {
+            "label": "Timestamp",
+            "path": "result.data.timestamp",
+            "format": "timestamp"
+          }
+        ]
+      }
+    }
+  ]
+}

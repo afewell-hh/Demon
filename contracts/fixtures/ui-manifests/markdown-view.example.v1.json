@@ -1,0 +1,25 @@
+{
+  "apiVersion": "demon.io/v1",
+  "kind": "UIManifest",
+  "metadata": {
+    "name": "markdown-view-example",
+    "version": "1.0.0",
+    "displayName": "Markdown View Card Example"
+  },
+  "cards": [
+    {
+      "id": "release-notes",
+      "kind": "markdown-view",
+      "title": "Release Notes",
+      "description": "Renders markdown release notes from ritual output",
+      "match": {
+        "rituals": ["create-release"]
+      },
+      "config": {
+        "contentPath": "outputs.result.data.releaseNotes",
+        "sanitize": true,
+        "maxHeight": "400px"
+      }
+    }
+  ]
+}
