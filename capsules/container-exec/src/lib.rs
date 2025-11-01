@@ -1895,7 +1895,7 @@ esac
 
     #[test]
     fn shell_join_inserts_spaces() {
-        let joined = shell_join(&vec!["echo".into(), "hello world".into()]);
+        let joined = shell_join(&["echo".into(), "hello world".into()]);
         assert!(joined.contains("'hello world'"));
         assert!(joined.contains("'echo'"));
     }
