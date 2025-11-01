@@ -106,24 +106,21 @@ async fn container_exec_echo_capsule_round_trips_envelope() {
     let envelope_json = serde_json::to_value(&envelope).expect("serialize envelope");
     let fixture = RuntimeFixture::new(&envelope_json);
 
-    // Set up environment with guard, then drop it before await
-    {
-        let _guard = env_guard();
-        env::set_var(
-            "DEMON_CONTAINER_RUNTIME",
-            fixture.script().to_string_lossy().to_string(),
-        );
-        env::set_var(
-            "TEST_ENVELOPE_HOST_PATH",
-            fixture.host_envelope().to_string_lossy().to_string(),
-        );
-        env::set_var(
-            "TEST_ENVELOPE_SOURCE",
-            fixture.stub_source().to_string_lossy().to_string(),
-        );
-        env::set_var("TEST_RUNTIME_MODE", "success");
-        env::set_var("TEST_EXIT_CODE", "0");
-    } // Guard dropped here
+    let _guard = env_guard();
+    env::set_var(
+        "DEMON_CONTAINER_RUNTIME",
+        fixture.script().to_string_lossy().to_string(),
+    );
+    env::set_var(
+        "TEST_ENVELOPE_HOST_PATH",
+        fixture.host_envelope().to_string_lossy().to_string(),
+    );
+    env::set_var(
+        "TEST_ENVELOPE_SOURCE",
+        fixture.stub_source().to_string_lossy().to_string(),
+    );
+    env::set_var("TEST_RUNTIME_MODE", "success");
+    env::set_var("TEST_EXIT_CODE", "0");
 
     let router = Router::new();
     let args = json!({
@@ -153,4 +150,5 @@ async fn container_exec_echo_capsule_round_trips_envelope() {
     ] {
         env::remove_var(key);
     }
+    drop(_guard);
 }
