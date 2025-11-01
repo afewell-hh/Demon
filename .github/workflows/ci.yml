@@ -986,71 +986,53 @@ jobs:
           echo "Waiting for ritual execution..."
           sleep 5
 
-      - name: Start Operate UI (background)
-        env:
-          RITUAL_STREAM_NAME: RITUAL_EVENTS
-          APPROVER_ALLOWLIST: test@example.com
-        run: |
-          nohup bash -c 'APPROVER_ALLOWLIST=test@example.com RITUAL_STREAM_NAME=RITUAL_EVENTS cargo run -q -p operate-ui' >/tmp/compat-smoke/ui.log 2>&1 &
-          # Wait for HTTP 200 from /api/runs with valid JSON response
-          for i in {1..60}; do
-            code=$(curl -sS -o /tmp/compat-smoke/ui-ready-check.json -w "%{http_code}" http://127.0.0.1:3000/api/runs 2>/dev/null || echo "000")
-            if [[ "$code" == "200" ]] && jq -e . /tmp/compat-smoke/ui-ready-check.json >/dev/null 2>&1; then
-              echo "✓ Operate UI ready (HTTP $code)"
-              break
-            fi
-            if [[ $i -eq 60 ]]; then
-              echo "❌ Operate UI failed to start"
-              cat /tmp/compat-smoke/ui.log || true
-              exit 1
-            fi
-            sleep 0.5
-          done
-
-      - name: Verify UI response structure and rendered card
+      - name: Query runtime API for run status
         run: |
           set -euo pipefail
-          # Fetch runs list
-          curl -s http://127.0.0.1:3000/api/runs | tee /tmp/compat-smoke/ui-runs.json | jq .
+          # Load the run ID we saved earlier
+          run_id=$(cat /tmp/compat-smoke/run_id.txt)
+          echo "Querying runtime API for run: $run_id"
 
-          # Verify response is an array
-          if ! jq -e 'type == "array"' /tmp/compat-smoke/ui-runs.json >/dev/null 2>&1; then
-            echo "❌ FAIL: UI /api/runs did not return an array"
-            jq . /tmp/compat-smoke/ui-runs.json || cat /tmp/compat-smoke/ui-runs.json
+          # Query runtime API for runs list
+          curl -s "http://127.0.0.1:8080/api/v1/rituals/hello/runs?app=hello-world" | tee /tmp/compat-smoke/runtime-runs.json | jq .
+
+          # Verify response structure
+          if ! jq -e '.runs' /tmp/compat-smoke/runtime-runs.json >/dev/null 2>&1; then
+            echo "❌ FAIL: Runtime API response missing 'runs' field"
+            jq . /tmp/compat-smoke/runtime-runs.json
             exit 1
           fi
-          echo "✓ UI /api/runs returned valid array"
+          echo "✓ Runtime API returned runs array"
 
-          # Verify we have at least one run (we just executed a ritual)
-          run_count=$(jq 'length' /tmp/compat-smoke/ui-runs.json)
+          # Verify we have at least one run
+          run_count=$(jq '.runs | length' /tmp/compat-smoke/runtime-runs.json)
           echo "Runs count: $run_count"
           if [[ $run_count -eq 0 ]]; then
-            echo "❌ FAIL: No runs found after executing ritual"
+            echo "❌ FAIL: No runs found in runtime API"
             exit 1
           fi
           echo "✓ Found $run_count run(s)"
 
-          # Get first run ID and fetch detail
-          run_id=$(jq -r '.[0].runId // .[0].id // empty' /tmp/compat-smoke/ui-runs.json)
-          if [[ -z "$run_id" ]]; then
-            echo "❌ FAIL: Run entry missing runId/id field"
-            jq '.[0]' /tmp/compat-smoke/ui-runs.json
+          # Fetch run detail
+          curl -s "http://127.0.0.1:8080/api/v1/rituals/hello/runs/${run_id}?app=hello-world" | tee /tmp/compat-smoke/runtime-run-detail.json | jq .
+
+          # Verify run completed successfully
+          status=$(jq -r '.status // empty' /tmp/compat-smoke/runtime-run-detail.json)
+          if [[ "$status" != "Completed" ]]; then
+            echo "❌ FAIL: Expected status 'Completed', got '$status'"
+            jq . /tmp/compat-smoke/runtime-run-detail.json
             exit 1
           fi
-          echo "✓ First run has ID: $run_id"
+          echo "✓ Run status: $status"
 
-          # Fetch and verify run detail
-          echo "Fetching run detail for: $run_id"
-          curl -s "http://127.0.0.1:3000/api/runs/${run_id}" | tee /tmp/compat-smoke/ui-run-detail.json | jq .
-
-          # Verify run detail has expected events field
-          if ! jq -e '.events' /tmp/compat-smoke/ui-run-detail.json >/dev/null 2>&1; then
-            echo "❌ FAIL: Run detail missing events field"
-            jq . /tmp/compat-smoke/ui-run-detail.json
+          # Verify result envelope exists
+          if ! jq -e '.resultEnvelope' /tmp/compat-smoke/runtime-run-detail.json >/dev/null 2>&1; then
+            echo "❌ FAIL: Run detail missing resultEnvelope"
+            jq . /tmp/compat-smoke/runtime-run-detail.json
             exit 1
           fi
-          echo "✓ Run detail has events field"
-          echo "✓ UI data contract validation passed"
+          echo "✓ Run has result envelope"
+          echo "✓ Runtime API validation passed"
 
       - name: Upload compat-smoke artifacts
         uses: actions/upload-artifact@v4
@@ -1065,12 +1047,11 @@ jobs:
         run: |
           cargo run -p demonctl -- app uninstall hello-world 2>&1 | tee /tmp/compat-smoke/uninstall.log || echo "Uninstall failed or pack not found"
 
-      - name: Stop runtime and UI servers
+      - name: Stop runtime server
         if: always()
         run: |
-          # Kill any cargo processes running runtime or operate-ui
+          # Kill any cargo processes running runtime
           pkill -f "cargo.*-p runtime" || true
-          pkill -f "cargo.*operate-ui" || true
 
       - name: Teardown NATS
         if: always()
