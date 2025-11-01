@@ -9,13 +9,16 @@ use serde_json::Value as JsonValue;
 use std::collections::BTreeMap;
 use std::env;
 use std::fs::{self, OpenOptions};
+use std::io::{self, Read};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
-use std::process::{Command, ExitStatus, Output, Stdio};
-use std::time::Instant;
+use std::process::{Command, ExitStatus, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 use tempfile::TempDir;
 use thiserror::Error;
+use wait_timeout::ChildExt;
 
 type Envelope = ResultEnvelope<JsonValue>;
 
@@ -30,6 +33,8 @@ pub struct ContainerExecConfig {
     #[serde(default)]
     pub working_dir: Option<String>,
     pub envelope_path: String,
+    #[serde(default)]
+    pub timeout_seconds: Option<u64>,
     #[serde(default)]
     pub capsule_name: Option<String>,
     #[serde(default)]
@@ -101,6 +106,12 @@ impl ContainerExecConfig {
                     dir.display()
                 )
             })?;
+        }
+
+        if let Some(timeout) = self.timeout_seconds {
+            if timeout == 0 {
+                anyhow::bail!("Execution timeout must be greater than 0 seconds");
+            }
         }
 
         Ok(())
@@ -339,23 +350,28 @@ fn execute_with_runtime(
 
     ensure_envelope_placeholder(&mount.host_envelope_path)?;
 
+    let cidfile_path = temp_dir.path().join("container.cid");
+
     let mut command = Command::new(&runtime_bin);
-    configure_command(&mut command, config, &mount)?;
+    configure_command(&mut command, config, &mount, Some(&cidfile_path))?;
     let runtime_cmdline = command_line_string(&command);
+    let timeout = resolve_timeout(config)?;
 
     let start = Instant::now();
-    let output = command.output().map_err(|err| ExecError::RuntimeSpawn {
-        runtime: runtime_bin.clone(),
-        source: err,
-    })?;
+    let run_result = run_container_command(
+        runtime_bin.clone(),
+        command,
+        timeout,
+        Some(cidfile_path.clone()),
+    )?;
     let duration = start.elapsed();
 
-    let logs = CommandLogs::from_output(&output);
+    let CommandRun { status, logs } = run_result;
 
     let envelope_bytes =
         fs::read(&mount.host_envelope_path).map_err(|err| ExecError::EnvelopeMissing {
             path: mount.host_envelope_path.clone(),
-            status: output.status,
+            status: status.clone(),
             logs: logs.clone(),
             source: err,
         })?;
@@ -363,7 +379,7 @@ fn execute_with_runtime(
     let envelope: Envelope =
         serde_json::from_slice(&envelope_bytes).map_err(|err| ExecError::EnvelopeInvalid {
             path: mount.host_envelope_path.clone(),
-            status: output.status,
+            status: status.clone(),
             logs: logs.clone(),
             source: anyhow!(err),
         })?;
@@ -371,7 +387,7 @@ fn execute_with_runtime(
     if let Err(err) = envelope.validate() {
         return Err(ExecError::EnvelopeInvalid {
             path: mount.host_envelope_path.clone(),
-            status: output.status,
+            status,
             logs,
             source: err,
         });
@@ -380,7 +396,7 @@ fn execute_with_runtime(
     Ok(ContainerExecResult {
         envelope,
         duration_ms: duration.as_secs_f64() * 1000.0,
-        exit_status: exit_code(&output.status),
+        exit_status: exit_code(&status),
     }
     .tap(|result| {
         annotate_logs(&mut result.envelope, &logs, &host_target, config);
@@ -491,6 +507,7 @@ fn configure_command(
     command: &mut Command,
     config: &ContainerExecConfig,
     mount: &EnvelopeMount,
+    cidfile: Option<&Path>,
 ) -> Result<(), ExecError> {
     command.arg("run");
     command.arg("--rm");
@@ -528,6 +545,19 @@ fn configure_command(
             "type=bind,source={},target=/workspace/.artifacts,readonly=false",
             artifacts_dir.display()
         ));
+    }
+
+    if let Some(cidfile) = cidfile {
+        if let Some(parent) = cidfile.parent() {
+            fs::create_dir_all(parent).map_err(|err| ExecError::Io {
+                message: format!(
+                    "Failed to prepare cidfile directory {}: {}",
+                    parent.display(),
+                    err
+                ),
+            })?;
+        }
+        command.arg("--cidfile").arg(cidfile.display().to_string());
     }
 
     if let Some(host_root) = mount.host_root() {
@@ -868,12 +898,189 @@ struct CommandLogs {
 }
 
 impl CommandLogs {
-    fn from_output(output: &Output) -> Self {
+    fn new(stdout: String, stderr: String, exit_status: Option<i32>) -> Self {
         Self {
-            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-            exit_status: exit_code(&output.status),
+            stdout,
+            stderr,
+            exit_status,
         }
+    }
+
+    fn from_output(output: &std::process::Output) -> Self {
+        Self::new(
+            String::from_utf8_lossy(&output.stdout).to_string(),
+            String::from_utf8_lossy(&output.stderr).to_string(),
+            exit_code(&output.status),
+        )
+    }
+}
+
+#[derive(Debug)]
+struct CommandRun {
+    status: ExitStatus,
+    logs: CommandLogs,
+}
+
+fn resolve_timeout(config: &ContainerExecConfig) -> Result<Option<Duration>, ExecError> {
+    if let Some(secs) = config.timeout_seconds {
+        return Ok(Some(Duration::from_secs(secs)));
+    }
+
+    match env::var("DEMON_CONTAINER_EXEC_TIMEOUT_SECONDS") {
+        Ok(val) if !val.trim().is_empty() => {
+            let parsed = val
+                .trim()
+                .parse::<u64>()
+                .map_err(|err| ExecError::InvalidConfig {
+                    message: format!(
+                        "Invalid DEMON_CONTAINER_EXEC_TIMEOUT_SECONDS '{}': {}",
+                        val, err
+                    ),
+                })?;
+            if parsed == 0 {
+                return Err(ExecError::InvalidConfig {
+                    message: "DEMON_CONTAINER_EXEC_TIMEOUT_SECONDS must be greater than 0 seconds"
+                        .to_string(),
+                });
+            }
+            Ok(Some(Duration::from_secs(parsed)))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn run_container_command(
+    runtime_bin: String,
+    mut command: Command,
+    timeout: Option<Duration>,
+    cidfile: Option<PathBuf>,
+) -> Result<CommandRun, ExecError> {
+    let mut child = command.spawn().map_err(|err| ExecError::RuntimeSpawn {
+        runtime: runtime_bin.clone(),
+        source: err,
+    })?;
+
+    let stdout_handle = spawn_pipe_reader(child.stdout.take());
+    let stderr_handle = spawn_pipe_reader(child.stderr.take());
+
+    let (status, timed_out) = match timeout {
+        Some(duration) => match child.wait_timeout(duration) {
+            Ok(Some(status)) => (status, None),
+            Ok(None) => {
+                child.kill().map_err(|err| ExecError::Io {
+                    message: format!(
+                        "Failed to terminate container runtime '{}' after {:?} timeout: {}",
+                        runtime_bin, duration, err
+                    ),
+                })?;
+                let status = child.wait().map_err(|err| ExecError::Io {
+                    message: format!(
+                        "Failed to reap container runtime '{}' after kill: {}",
+                        runtime_bin, err
+                    ),
+                })?;
+                (status, Some(duration))
+            }
+            Err(err) => {
+                return Err(ExecError::Io {
+                    message: format!(
+                        "Failed to wait on container runtime '{}': {}",
+                        runtime_bin, err
+                    ),
+                });
+            }
+        },
+        None => (
+            child.wait().map_err(|err| ExecError::Io {
+                message: format!(
+                    "Failed to wait on container runtime '{}': {}",
+                    runtime_bin, err
+                ),
+            })?,
+            None,
+        ),
+    };
+
+    let stdout = collect_pipe(stdout_handle, "stdout", &runtime_bin)?;
+    let stderr = collect_pipe(stderr_handle, "stderr", &runtime_bin)?;
+    let logs = CommandLogs::new(stdout, stderr, exit_code(&status));
+
+    if let Some(duration) = timed_out {
+        if let Some(ref cidfile) = cidfile {
+            cleanup_container(&runtime_bin, cidfile);
+        }
+        return Err(ExecError::Timeout {
+            runtime: runtime_bin,
+            duration,
+            logs,
+        });
+    }
+
+    if let Some(cidfile) = cidfile {
+        let _ = fs::remove_file(cidfile);
+    }
+
+    Ok(CommandRun { status, logs })
+}
+
+fn cleanup_container(runtime_bin: &str, cidfile: &Path) {
+    let contents = match fs::read_to_string(cidfile) {
+        Ok(data) => data,
+        Err(_) => return,
+    };
+
+    let id = contents.split_whitespace().next().unwrap_or("");
+    if id.is_empty() {
+        let _ = fs::remove_file(cidfile);
+        return;
+    }
+
+    let mut command = Command::new(runtime_bin);
+    command.arg("rm").arg("--force").arg(id);
+    command.stdin(Stdio::null());
+    command.stdout(Stdio::null());
+    command.stderr(Stdio::null());
+    let _ = command.status();
+    let _ = fs::remove_file(cidfile);
+}
+
+fn spawn_pipe_reader<R>(pipe: Option<R>) -> Option<thread::JoinHandle<io::Result<Vec<u8>>>>
+where
+    R: Read + Send + 'static,
+{
+    pipe.map(|mut stream| {
+        thread::spawn(move || {
+            let mut buf = Vec::new();
+            stream.read_to_end(&mut buf)?;
+            Ok(buf)
+        })
+    })
+}
+
+fn collect_pipe(
+    handle: Option<thread::JoinHandle<io::Result<Vec<u8>>>>,
+    stream: &str,
+    runtime: &str,
+) -> Result<String, ExecError> {
+    match handle {
+        Some(handle) => {
+            let bytes = handle
+                .join()
+                .map_err(|_| ExecError::Io {
+                    message: format!(
+                        "Failed to join {} reader thread for container runtime '{}'",
+                        stream, runtime
+                    ),
+                })?
+                .map_err(|err| ExecError::Io {
+                    message: format!(
+                        "Failed to read {} from container runtime '{}': {}",
+                        stream, runtime, err
+                    ),
+                })?;
+            Ok(String::from_utf8_lossy(&bytes).to_string())
+        }
+        None => Ok(String::new()),
     }
 }
 
@@ -1039,6 +1246,12 @@ enum ExecError {
         logs: CommandLogs,
         source: anyhow::Error,
     },
+    #[error("Container runtime {runtime} timed out after {duration:?}")]
+    Timeout {
+        runtime: String,
+        duration: Duration,
+        logs: CommandLogs,
+    },
     #[error("Stub mode error: {message}")]
     Stub { message: String },
 }
@@ -1064,6 +1277,12 @@ impl ExecError {
                     source
                 )
             }
+            ExecError::Timeout {
+                runtime, duration, ..
+            } => format!(
+                "Container runtime '{}' timed out after {:?}",
+                runtime, duration
+            ),
             ExecError::Stub { message } => message.clone(),
         }
     }
@@ -1075,6 +1294,7 @@ impl ExecError {
             ExecError::Io { .. } => "CONTAINER_EXEC_IO_ERROR",
             ExecError::EnvelopeMissing { .. } => "CONTAINER_EXEC_ENVELOPE_MISSING",
             ExecError::EnvelopeInvalid { .. } => "CONTAINER_EXEC_ENVELOPE_INVALID",
+            ExecError::Timeout { .. } => "CONTAINER_EXEC_TIMEOUT",
             ExecError::Stub { .. } => "CONTAINER_EXEC_STUB_ERROR",
         }
     }
@@ -1084,6 +1304,7 @@ impl ExecError {
             ExecError::EnvelopeMissing { logs, .. } | ExecError::EnvelopeInvalid { logs, .. } => {
                 Some(logs)
             }
+            ExecError::Timeout { logs, .. } => Some(logs),
             _ => None,
         }
     }
@@ -1104,8 +1325,146 @@ impl<T> Tap<T> for T {
 mod tests {
     use super::*;
     use envelope::OperationResult;
-    use std::fs::File;
+    use std::fs::{self, File};
     use std::io::Write;
+    #[cfg(unix)]
+    use std::os::unix::process::ExitStatusExt;
+    use std::sync::{Mutex, MutexGuard, OnceLock};
+
+    static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+    fn env_guard() -> MutexGuard<'static, ()> {
+        ENV_LOCK
+            .get_or_init(|| Mutex::new(()))
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+    }
+
+    #[cfg(unix)]
+    const RUNTIME_SCRIPT: &str = r#"#!/bin/sh
+set -eu
+
+if [ "${1-}" = "rm" ]; then
+  shift || true
+  if [ "${1-}" = "--force" ] || [ "${1-}" = "-f" ]; then
+    shift || true
+  fi
+  cid="${1-}"
+  if [ -n "${TEST_RUNTIME_LOG:-}" ] && [ -n "$cid" ]; then
+    printf 'cleanup %s\n' "$cid" >> "${TEST_RUNTIME_LOG}"
+  fi
+  exit 0
+fi
+
+cidfile=""
+prev=""
+for arg in "$@"; do
+  if [ "$prev" = "--cidfile" ]; then
+    cidfile="$arg"
+    prev=""
+    continue
+  fi
+  case "$arg" in
+    --cidfile)
+      prev="--cidfile"
+      ;;
+    --cidfile=*)
+      cidfile="${arg#--cidfile=}"
+      ;;
+  esac
+done
+
+if [ -n "$cidfile" ]; then
+  printf 'stub-container-id\n' > "$cidfile"
+fi
+
+mode="${TEST_RUNTIME_MODE:-success}"
+host="${TEST_ENVELOPE_HOST_PATH:?missing}"
+
+if [ -n "${TEST_RUNTIME_LOG:-}" ]; then
+  printf 'run %s\n' "$mode" >> "${TEST_RUNTIME_LOG}"
+fi
+
+case "$mode" in
+  success)
+    cat "${TEST_ENVELOPE_SOURCE:?missing}" > "$host"
+    echo "capsule stdout"
+    echo "capsule stderr" >&2
+    exit "${TEST_EXIT_CODE:-0}"
+    ;;
+  fail)
+    echo "capsule failed" >&2
+    exit "${TEST_EXIT_CODE:-1}"
+    ;;
+  sleep)
+    sleep "${TEST_SLEEP_SECS:-5}"
+    cat "${TEST_ENVELOPE_SOURCE:?missing}" > "$host"
+    exit 0
+    ;;
+  missing)
+    rm -f "$host"
+    echo "capsule missing envelope" >&2
+    exit "${TEST_EXIT_CODE:-0}"
+    ;;
+  *)
+    echo "unknown mode $mode" >&2
+    exit 2
+    ;;
+esac
+"#;
+
+    #[cfg(unix)]
+    struct RuntimeFixture {
+        _temp: tempfile::TempDir,
+        script: PathBuf,
+        artifacts_dir: PathBuf,
+        host_envelope: PathBuf,
+        stub_source: PathBuf,
+    }
+
+    #[cfg(unix)]
+    impl RuntimeFixture {
+        fn new(envelope: &Envelope) -> Self {
+            use std::fs;
+            use std::os::unix::fs::PermissionsExt;
+
+            let temp = tempfile::tempdir().unwrap();
+            let script = temp.path().join("runtime.sh");
+            fs::write(&script, RUNTIME_SCRIPT).unwrap();
+            fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+
+            let artifacts_dir = temp.path().join("artifacts");
+            fs::create_dir_all(&artifacts_dir).unwrap();
+            let host_envelope = artifacts_dir.join("result.json");
+
+            let stub_source = temp.path().join("stub.json");
+            fs::write(&stub_source, serde_json::to_vec(envelope).unwrap()).unwrap();
+
+            Self {
+                _temp: temp,
+                script,
+                artifacts_dir,
+                host_envelope,
+                stub_source,
+            }
+        }
+
+        fn script(&self) -> &Path {
+            &self.script
+        }
+
+        fn artifacts_dir(&self) -> &Path {
+            &self.artifacts_dir
+        }
+
+        fn host_envelope(&self) -> &Path {
+            &self.host_envelope
+        }
+
+        fn stub_source(&self) -> &Path {
+            &self.stub_source
+        }
+    }
 
     fn sample_envelope() -> Envelope {
         ResultEnvelope {
@@ -1116,6 +1475,20 @@ mod tests {
             provenance: None,
             tool: None,
             matrix: None,
+        }
+    }
+
+    fn base_config() -> ContainerExecConfig {
+        ContainerExecConfig {
+            image_digest: "ghcr.io/example/app@sha256:abcdef".to_string(),
+            command: vec!["/bin/true".to_string()],
+            env: BTreeMap::new(),
+            working_dir: None,
+            envelope_path: "/workspace/.artifacts/result.json".to_string(),
+            timeout_seconds: None,
+            capsule_name: None,
+            app_pack_dir: None,
+            artifacts_dir: None,
         }
     }
 
@@ -1143,6 +1516,7 @@ mod tests {
 
     #[test]
     fn stub_mode_loads_envelope() {
+        let _guard = env_guard();
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("stub.json");
         let envelope = sample_envelope();
@@ -1156,16 +1530,8 @@ mod tests {
             path.to_string_lossy().to_string(),
         );
 
-        let config = ContainerExecConfig {
-            image_digest: "ghcr.io/example/app@sha256:abcdef".to_string(),
-            command: vec!["/bin/true".to_string()],
-            env: BTreeMap::new(),
-            working_dir: None,
-            envelope_path: "/workspace/.artifacts/result.json".to_string(),
-            capsule_name: Some("test".to_string()),
-            app_pack_dir: None,
-            artifacts_dir: None,
-        };
+        let mut config = base_config();
+        config.capsule_name = Some("test".to_string());
 
         let result = execute(&config);
         assert!(matches!(result.result, OperationResult::Success { .. }));
@@ -1175,18 +1541,107 @@ mod tests {
     }
 
     #[test]
+    fn stub_mode_without_stub_env_errors() {
+        let _guard = env_guard();
+        env::set_var("DEMON_CONTAINER_RUNTIME", "stub");
+        env::remove_var("DEMON_CONTAINER_EXEC_STUB_ENVELOPE");
+
+        let envelope = execute(&base_config());
+        assert!(envelope.result.is_error());
+        if let OperationResult::Error { error, .. } = envelope.result {
+            assert_eq!(error.code.as_deref(), Some("CONTAINER_EXEC_STUB_ERROR"));
+        } else {
+            panic!("expected stub error");
+        }
+
+        env::remove_var("DEMON_CONTAINER_RUNTIME");
+    }
+
+    #[test]
+    fn stub_mode_missing_stub_file_errors() {
+        let _guard = env_guard();
+        env::set_var("DEMON_CONTAINER_RUNTIME", "stub");
+        let temp = tempfile::tempdir().unwrap();
+        let missing = temp.path().join("missing.json");
+        env::set_var(
+            "DEMON_CONTAINER_EXEC_STUB_ENVELOPE",
+            missing.to_string_lossy().to_string(),
+        );
+
+        let envelope = execute(&base_config());
+        assert!(envelope.result.is_error());
+        if let OperationResult::Error { error, .. } = envelope.result {
+            assert_eq!(error.code.as_deref(), Some("CONTAINER_EXEC_STUB_ERROR"));
+            assert!(error.message.contains("Failed to read stub envelope"));
+        } else {
+            panic!("expected stub error");
+        }
+
+        for key in [
+            "DEMON_CONTAINER_RUNTIME",
+            "DEMON_CONTAINER_EXEC_STUB_ENVELOPE",
+        ] {
+            env::remove_var(key);
+        }
+    }
+
+    #[test]
+    fn stub_mode_invalid_json_errors() {
+        let _guard = env_guard();
+        env::set_var("DEMON_CONTAINER_RUNTIME", "stub");
+        let temp = tempfile::tempdir().unwrap();
+        let stub = temp.path().join("stub.json");
+        fs::write(&stub, b"not-json").unwrap();
+        env::set_var(
+            "DEMON_CONTAINER_EXEC_STUB_ENVELOPE",
+            stub.to_string_lossy().to_string(),
+        );
+
+        let envelope = execute(&base_config());
+        assert!(envelope.result.is_error());
+        if let OperationResult::Error { error, .. } = envelope.result {
+            assert_eq!(error.code.as_deref(), Some("CONTAINER_EXEC_STUB_ERROR"));
+            assert!(error.message.contains("Failed to parse stub envelope"));
+        } else {
+            panic!("expected stub error");
+        }
+
+        for key in [
+            "DEMON_CONTAINER_RUNTIME",
+            "DEMON_CONTAINER_EXEC_STUB_ENVELOPE",
+        ] {
+            env::remove_var(key);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn build_error_envelope_includes_logs() {
+        let logs = CommandLogs::new("stdout".into(), "stderr".into(), Some(17));
+        let error = ExecError::EnvelopeInvalid {
+            path: PathBuf::from("/tmp/result.json"),
+            status: std::process::ExitStatus::from_raw(17),
+            logs,
+            source: anyhow::anyhow!("invalid"),
+        };
+
+        let envelope = build_error_envelope(error, &base_config());
+        assert!(envelope.result.is_error());
+        let messages: Vec<_> = envelope
+            .diagnostics
+            .iter()
+            .map(|d| d.message.clone())
+            .collect();
+        assert!(messages.iter().any(|m| m.contains("stdout:")));
+        assert!(messages.iter().any(|m| m.contains("stderr:")));
+    }
+
+    #[test]
     fn invalid_config_builds_error_envelope() {
         env::remove_var("DEMON_CONTAINER_RUNTIME");
-        let config = ContainerExecConfig {
-            image_digest: "not-digest".to_string(),
-            command: vec!["run".to_string()],
-            env: BTreeMap::new(),
-            working_dir: None,
-            envelope_path: "/workspace/result.json".to_string(),
-            capsule_name: None,
-            app_pack_dir: None,
-            artifacts_dir: None,
-        };
+        let mut config = base_config();
+        config.image_digest = "not-digest".to_string();
+        config.envelope_path = "/workspace/result.json".to_string();
 
         let result = execute(&config);
         assert!(matches!(result.result, OperationResult::Error { .. }));
@@ -1206,6 +1661,7 @@ mod tests {
             env: BTreeMap::new(),
             working_dir: None,
             envelope_path: "/workspace/.artifacts/result.json".to_string(),
+            timeout_seconds: None,
             capsule_name: None,
             app_pack_dir: Some(app_pack_dir.clone()),
             artifacts_dir: Some(artifacts_dir.clone()),
@@ -1222,7 +1678,7 @@ mod tests {
         .unwrap();
 
         let mut command = Command::new("docker");
-        configure_command(&mut command, &config, &mount).unwrap();
+        configure_command(&mut command, &config, &mount, None).unwrap();
 
         let args: Vec<String> = command
             .get_args()
@@ -1268,6 +1724,7 @@ mod tests {
             env: BTreeMap::new(),
             working_dir: None,
             envelope_path: "/workspace/.artifacts/result.json".to_string(),
+            timeout_seconds: None,
             capsule_name: None,
             app_pack_dir: Some(app_pack_dir),
             artifacts_dir: Some(artifacts_dir),
@@ -1282,7 +1739,7 @@ mod tests {
         .unwrap();
 
         let mut command = Command::new("docker");
-        configure_command(&mut command, &config, &mount).unwrap();
+        configure_command(&mut command, &config, &mount, None).unwrap();
 
         let args: Vec<String> = command
             .get_args()
@@ -1330,6 +1787,7 @@ mod tests {
             env: BTreeMap::new(),
             working_dir: None,
             envelope_path: "/workspace/.artifacts/result.json".to_string(),
+            timeout_seconds: None,
             capsule_name: None,
             app_pack_dir: Some(app_pack_dir),
             artifacts_dir: Some(artifacts_dir),
@@ -1344,7 +1802,7 @@ mod tests {
         .unwrap();
 
         let mut command = Command::new("docker");
-        configure_command(&mut command, &config, &mount).unwrap();
+        configure_command(&mut command, &config, &mount, None).unwrap();
         let args: Vec<String> = command
             .get_args()
             .map(|a| a.to_string_lossy().to_string())
@@ -1378,6 +1836,639 @@ mod tests {
 
     // NOTE: We intentionally assert flag ORDER in the same test to avoid
     // env-var race conditions across parallel tests.
+
+    #[cfg(unix)]
+    #[test]
+    fn configure_command_respects_container_user_env() {
+        let _guard = env_guard();
+        env::set_var("DEMON_CONTAINER_USER", "1234:4321");
+
+        let base = tempfile::tempdir().unwrap();
+        let app_pack_dir = base.path().join("pack");
+        let artifacts_dir = base.path().join("artifacts");
+        fs::create_dir_all(&app_pack_dir).unwrap();
+        fs::create_dir_all(&artifacts_dir).unwrap();
+
+        let config = ContainerExecConfig {
+            image_digest: "ghcr.io/example/app@sha256:abcdef".to_string(),
+            command: vec!["/bin/true".to_string()],
+            env: BTreeMap::new(),
+            working_dir: None,
+            envelope_path: "/workspace/.artifacts/result.json".to_string(),
+            timeout_seconds: None,
+            capsule_name: None,
+            app_pack_dir: Some(app_pack_dir),
+            artifacts_dir: Some(artifacts_dir),
+        };
+
+        let tmp = tempfile::tempdir().unwrap();
+        let mount = EnvelopeMount::prepare(
+            &config.envelope_path,
+            tmp.path(),
+            config.artifacts_dir.as_deref(),
+        )
+        .unwrap();
+
+        let mut command = Command::new("docker");
+        configure_command(&mut command, &config, &mount, None).unwrap();
+        let args: Vec<String> = command
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
+        let user_index = args
+            .iter()
+            .position(|a| a == "--user")
+            .expect("--user flag present");
+        assert_eq!(
+            args.get(user_index + 1).map(|s| s.as_str()),
+            Some("1234:4321")
+        );
+
+        env::remove_var("DEMON_CONTAINER_USER");
+    }
+
+    #[test]
+    fn shell_escape_handles_quotes() {
+        let escaped = shell_escape("it's complicated");
+        assert_eq!(escaped, "'it'\\''s complicated'");
+    }
+
+    #[test]
+    fn shell_join_inserts_spaces() {
+        let joined = shell_join(&vec!["echo".into(), "hello world".into()]);
+        assert!(joined.contains("'hello world'"));
+        assert!(joined.contains("'echo'"));
+    }
+
+    #[test]
+    fn command_line_string_quotes_arguments() {
+        let mut command = Command::new("docker");
+        command.arg("run");
+        command.arg("--label");
+        command.arg("key=value with space");
+        let repr = command_line_string(&command);
+        assert!(repr.contains("'key=value with space'"));
+    }
+
+    #[test]
+    fn detect_runtime_kind_defaults_to_docker() {
+        let _guard = env_guard();
+        env::remove_var("DEMON_CONTAINER_RUNTIME");
+        match detect_runtime_kind() {
+            RuntimeKind::Binary(bin) => assert_eq!(bin, "docker"),
+            _ => panic!("expected binary runtime"),
+        }
+    }
+
+    #[test]
+    fn detect_runtime_kind_parses_stub() {
+        let _guard = env_guard();
+        env::set_var("DEMON_CONTAINER_RUNTIME", "stub");
+        match detect_runtime_kind() {
+            RuntimeKind::Stub => {}
+            other => panic!("expected stub, got {:?}", other),
+        }
+        env::remove_var("DEMON_CONTAINER_RUNTIME");
+    }
+
+    #[test]
+    fn detect_runtime_kind_accepts_custom_binary() {
+        let _guard = env_guard();
+        env::set_var("DEMON_CONTAINER_RUNTIME", "nerdctl");
+        match detect_runtime_kind() {
+            RuntimeKind::Binary(bin) => assert_eq!(bin, "nerdctl"),
+            _ => panic!("expected binary runtime"),
+        }
+        env::remove_var("DEMON_CONTAINER_RUNTIME");
+    }
+
+    #[test]
+    fn resolve_timeout_prefers_config_override() {
+        let mut config = base_config();
+        config.timeout_seconds = Some(42);
+        let timeout = resolve_timeout(&config).unwrap();
+        assert_eq!(timeout, Some(Duration::from_secs(42)));
+    }
+
+    #[test]
+    fn resolve_timeout_reads_env_when_config_absent() {
+        let _guard = env_guard();
+        env::remove_var("DEMON_CONTAINER_EXEC_TIMEOUT_SECONDS");
+        env::set_var("DEMON_CONTAINER_EXEC_TIMEOUT_SECONDS", "3");
+        let timeout = resolve_timeout(&base_config()).unwrap();
+        assert_eq!(timeout, Some(Duration::from_secs(3)));
+        env::remove_var("DEMON_CONTAINER_EXEC_TIMEOUT_SECONDS");
+    }
+
+    #[test]
+    fn config_validate_rejects_zero_timeout() {
+        let mut config = base_config();
+        config.timeout_seconds = Some(0);
+        let result = config.validate();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn config_validate_rejects_empty_command() {
+        let mut config = base_config();
+        config.command.clear();
+        let err = config.validate().unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("Container command cannot be empty"));
+    }
+
+    #[test]
+    fn config_validate_rejects_blank_envelope_path() {
+        let mut config = base_config();
+        config.envelope_path = " ".into();
+        let err = config.validate().unwrap_err();
+        assert!(err.to_string().contains("Envelope path cannot be empty"));
+    }
+
+    #[test]
+    fn config_validate_rejects_relative_envelope_path() {
+        let mut config = base_config();
+        config.envelope_path = "workspace/result.json".into();
+        let err = config.validate().unwrap_err();
+        assert!(err.to_string().contains("must be absolute"));
+    }
+
+    #[test]
+    fn config_validate_rejects_outside_artifacts() {
+        let mut config = base_config();
+        config.envelope_path = "/tmp/result.json".into();
+        let err = config.validate().unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("must live under /workspace/.artifacts"));
+    }
+
+    #[test]
+    fn config_validate_rejects_relative_app_pack_dir() {
+        let mut config = base_config();
+        config.app_pack_dir = Some(PathBuf::from("relative/pack"));
+        let err = config.validate().unwrap_err();
+        assert!(err.to_string().contains("App Pack directory"));
+    }
+
+    #[test]
+    fn config_validate_rejects_missing_app_pack_dir() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut config = base_config();
+        config.app_pack_dir = Some(temp.path().join("missing"));
+        let err = config.validate().unwrap_err();
+        assert!(err.to_string().contains("does not exist"));
+    }
+
+    #[test]
+    fn config_validate_rejects_relative_artifacts_dir() {
+        let mut config = base_config();
+        config.artifacts_dir = Some(PathBuf::from("relative/artifacts"));
+        let err = config.validate().unwrap_err();
+        assert!(err.to_string().contains("Artifacts directory"));
+    }
+
+    #[test]
+    fn config_validate_creates_artifacts_dir_with_permissions() {
+        let temp = tempfile::tempdir().unwrap();
+        let artifacts_dir = temp.path().join("artifacts-new");
+        let mut config = base_config();
+        config.artifacts_dir = Some(artifacts_dir.clone());
+        config.validate().unwrap();
+        assert!(artifacts_dir.exists());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = fs::metadata(&artifacts_dir).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o777);
+        }
+    }
+
+    #[test]
+    fn invalid_timeout_env_returns_error_envelope() {
+        let _guard = env_guard();
+        env::set_var("DEMON_CONTAINER_EXEC_TIMEOUT_SECONDS", "not-a-number");
+
+        let envelope = execute(&base_config());
+        assert!(envelope.result.is_error());
+        if let OperationResult::Error { error, .. } = envelope.result {
+            assert_eq!(error.code.as_deref(), Some("CONTAINER_EXEC_INVALID_CONFIG"));
+        } else {
+            panic!("expected error envelope");
+        }
+
+        env::remove_var("DEMON_CONTAINER_EXEC_TIMEOUT_SECONDS");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn invalid_zero_timeout_env_returns_error_envelope() {
+        let _guard = env_guard();
+        env::set_var("DEMON_CONTAINER_EXEC_TIMEOUT_SECONDS", "0");
+
+        let envelope = execute(&base_config());
+        assert!(envelope.result.is_error());
+        if let OperationResult::Error { error, .. } = envelope.result {
+            assert_eq!(error.code.as_deref(), Some("CONTAINER_EXEC_INVALID_CONFIG"));
+        } else {
+            panic!("expected error envelope");
+        }
+
+        env::remove_var("DEMON_CONTAINER_EXEC_TIMEOUT_SECONDS");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn runtime_script_success_records_exit_code_and_logs() {
+        let _guard = env_guard();
+        let envelope = sample_envelope();
+        let fixture = RuntimeFixture::new(&envelope);
+
+        env::set_var(
+            "DEMON_CONTAINER_RUNTIME",
+            fixture.script().to_string_lossy().to_string(),
+        );
+        env::set_var(
+            "TEST_ENVELOPE_HOST_PATH",
+            fixture.host_envelope().to_string_lossy().to_string(),
+        );
+        env::set_var(
+            "TEST_ENVELOPE_SOURCE",
+            fixture.stub_source().to_string_lossy().to_string(),
+        );
+        env::set_var("TEST_RUNTIME_MODE", "success");
+        env::set_var("TEST_EXIT_CODE", "7");
+
+        let pack = tempfile::tempdir().unwrap();
+        let mut config = base_config();
+        config.capsule_name = Some("test-capsule".to_string());
+        config.timeout_seconds = Some(5);
+        config.artifacts_dir = Some(fixture.artifacts_dir().to_path_buf());
+        config.app_pack_dir = Some(pack.path().to_path_buf());
+
+        let result = execute(&config);
+        assert!(result.result.is_success());
+
+        let exit_diag = result
+            .diagnostics
+            .iter()
+            .find(|d| d.message.contains("exited with code 7"))
+            .expect("exit code diagnostic");
+        assert_eq!(exit_diag.level, DiagnosticLevel::Warning);
+
+        let stdout_diag = result
+            .diagnostics
+            .iter()
+            .find(|d| d.message.contains("stdout:"))
+            .expect("stdout diagnostic");
+        assert!(stdout_diag.message.contains("capsule stdout"));
+
+        let stderr_diag = result
+            .diagnostics
+            .iter()
+            .find(|d| d.message.contains("stderr:"))
+            .expect("stderr diagnostic");
+        assert_eq!(stderr_diag.level, DiagnosticLevel::Warning);
+        assert!(stderr_diag.message.contains("capsule stderr"));
+
+        for key in [
+            "DEMON_CONTAINER_RUNTIME",
+            "TEST_ENVELOPE_HOST_PATH",
+            "TEST_ENVELOPE_SOURCE",
+            "TEST_RUNTIME_MODE",
+            "TEST_EXIT_CODE",
+        ] {
+            env::remove_var(key);
+        }
+    }
+
+    #[test]
+    fn runtime_missing_binary_returns_error_envelope() {
+        let _guard = env_guard();
+        env::set_var("DEMON_CONTAINER_RUNTIME", "/demon/runtime/not-found");
+
+        let config = ContainerExecConfig {
+            image_digest: "ghcr.io/example/app@sha256:abcdef".to_string(),
+            command: vec!["/bin/true".to_string()],
+            env: BTreeMap::new(),
+            working_dir: None,
+            envelope_path: "/workspace/.artifacts/result.json".to_string(),
+            timeout_seconds: None,
+            capsule_name: None,
+            app_pack_dir: None,
+            artifacts_dir: None,
+        };
+
+        let result = execute(&config);
+        assert!(result.result.is_error());
+        if let OperationResult::Error { error, .. } = &result.result {
+            assert_eq!(error.code.as_deref(), Some("CONTAINER_EXEC_RUNTIME_ERROR"));
+            assert!(
+                error.message.contains("Failed to spawn container runtime"),
+                "unexpected error message: {}",
+                error.message
+            );
+        } else {
+            panic!("expected error result");
+        }
+
+        env::remove_var("DEMON_CONTAINER_RUNTIME");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn runtime_script_timeout_errors() {
+        let _guard = env_guard();
+        let envelope = sample_envelope();
+        let fixture = RuntimeFixture::new(&envelope);
+
+        env::set_var(
+            "DEMON_CONTAINER_RUNTIME",
+            fixture.script().to_string_lossy().to_string(),
+        );
+        env::set_var(
+            "TEST_ENVELOPE_HOST_PATH",
+            fixture.host_envelope().to_string_lossy().to_string(),
+        );
+        env::set_var(
+            "TEST_ENVELOPE_SOURCE",
+            fixture.stub_source().to_string_lossy().to_string(),
+        );
+        env::set_var("TEST_RUNTIME_MODE", "sleep");
+        env::set_var("TEST_SLEEP_SECS", "3");
+
+        let pack = tempfile::tempdir().unwrap();
+        let mut config = base_config();
+        config.timeout_seconds = Some(1);
+        config.artifacts_dir = Some(fixture.artifacts_dir().to_path_buf());
+        config.app_pack_dir = Some(pack.path().to_path_buf());
+
+        let result = execute(&config);
+        assert!(result.result.is_error());
+        if let OperationResult::Error { error, .. } = &result.result {
+            assert_eq!(error.code.as_deref(), Some("CONTAINER_EXEC_TIMEOUT"));
+            assert!(
+                error.message.contains("timed out"),
+                "expected timeout message, got {}",
+                error.message
+            );
+        } else {
+            panic!("expected error result");
+        }
+
+        for key in [
+            "DEMON_CONTAINER_RUNTIME",
+            "TEST_ENVELOPE_HOST_PATH",
+            "TEST_ENVELOPE_SOURCE",
+            "TEST_RUNTIME_MODE",
+            "TEST_SLEEP_SECS",
+        ] {
+            env::remove_var(key);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn runtime_timeout_triggers_cleanup() {
+        let _guard = env_guard();
+        let envelope = sample_envelope();
+        let fixture = RuntimeFixture::new(&envelope);
+        let log_dir = tempfile::tempdir().unwrap();
+        let log_path = log_dir.path().join("runtime.log");
+
+        env::set_var(
+            "DEMON_CONTAINER_RUNTIME",
+            fixture.script().to_string_lossy().to_string(),
+        );
+        env::set_var(
+            "TEST_ENVELOPE_HOST_PATH",
+            fixture.host_envelope().to_string_lossy().to_string(),
+        );
+        env::set_var(
+            "TEST_ENVELOPE_SOURCE",
+            fixture.stub_source().to_string_lossy().to_string(),
+        );
+        env::set_var("TEST_RUNTIME_MODE", "sleep");
+        env::set_var("TEST_SLEEP_SECS", "3");
+        env::set_var("TEST_RUNTIME_LOG", log_path.to_string_lossy().to_string());
+
+        let pack = tempfile::tempdir().unwrap();
+        let mut config = base_config();
+        config.timeout_seconds = Some(1);
+        config.artifacts_dir = Some(fixture.artifacts_dir().to_path_buf());
+        config.app_pack_dir = Some(pack.path().to_path_buf());
+
+        let envelope = execute(&config);
+        assert!(envelope.result.is_error());
+
+        let log_contents = fs::read_to_string(&log_path).unwrap();
+        assert!(log_contents.contains("cleanup stub-container-id"));
+
+        for key in [
+            "DEMON_CONTAINER_RUNTIME",
+            "TEST_ENVELOPE_HOST_PATH",
+            "TEST_ENVELOPE_SOURCE",
+            "TEST_RUNTIME_MODE",
+            "TEST_SLEEP_SECS",
+            "TEST_RUNTIME_LOG",
+        ] {
+            env::remove_var(key);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn debug_mode_emits_host_diagnostics() {
+        let _guard = env_guard();
+        let envelope = sample_envelope();
+        let fixture = RuntimeFixture::new(&envelope);
+
+        env::set_var(
+            "DEMON_CONTAINER_RUNTIME",
+            fixture.script().to_string_lossy().to_string(),
+        );
+        env::set_var(
+            "TEST_ENVELOPE_HOST_PATH",
+            fixture.host_envelope().to_string_lossy().to_string(),
+        );
+        env::set_var(
+            "TEST_ENVELOPE_SOURCE",
+            fixture.stub_source().to_string_lossy().to_string(),
+        );
+        env::set_var("TEST_RUNTIME_MODE", "success");
+        env::set_var("DEMON_DEBUG", "1");
+
+        let pack = tempfile::tempdir().unwrap();
+        let mut config = base_config();
+        config.timeout_seconds = Some(5);
+        config.artifacts_dir = Some(fixture.artifacts_dir().to_path_buf());
+        config.app_pack_dir = Some(pack.path().to_path_buf());
+
+        let envelope = execute(&config);
+        assert!(envelope.result.is_success());
+        let debug_diag = envelope
+            .diagnostics
+            .iter()
+            .find(|d| d.message.contains("runtime command"))
+            .expect("debug diagnostics present");
+        assert_eq!(debug_diag.level, DiagnosticLevel::Info);
+
+        for key in [
+            "DEMON_CONTAINER_RUNTIME",
+            "TEST_ENVELOPE_HOST_PATH",
+            "TEST_ENVELOPE_SOURCE",
+            "TEST_RUNTIME_MODE",
+            "DEMON_DEBUG",
+        ] {
+            env::remove_var(key);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn runtime_script_failure_without_envelope() {
+        let _guard = env_guard();
+        let envelope = sample_envelope();
+        let fixture = RuntimeFixture::new(&envelope);
+
+        env::set_var(
+            "DEMON_CONTAINER_RUNTIME",
+            fixture.script().to_string_lossy().to_string(),
+        );
+        env::set_var(
+            "TEST_ENVELOPE_HOST_PATH",
+            fixture.host_envelope().to_string_lossy().to_string(),
+        );
+        env::set_var("TEST_RUNTIME_MODE", "fail");
+        env::set_var("TEST_EXIT_CODE", "125");
+
+        let pack = tempfile::tempdir().unwrap();
+        let mut config = base_config();
+        config.timeout_seconds = Some(5);
+        config.artifacts_dir = Some(fixture.artifacts_dir().to_path_buf());
+        config.app_pack_dir = Some(pack.path().to_path_buf());
+
+        let result = execute(&config);
+        assert!(result.result.is_error());
+        if let OperationResult::Error { error, .. } = &result.result {
+            assert_eq!(
+                error.code.as_deref(),
+                Some("CONTAINER_EXEC_ENVELOPE_INVALID")
+            );
+        } else {
+            panic!("expected error result");
+        }
+
+        let stderr_diag = result
+            .diagnostics
+            .iter()
+            .find(|d| d.message.contains("stderr:"))
+            .expect("stderr diagnostic");
+        assert!(stderr_diag.message.contains("capsule failed"));
+
+        for key in [
+            "DEMON_CONTAINER_RUNTIME",
+            "TEST_ENVELOPE_HOST_PATH",
+            "TEST_RUNTIME_MODE",
+            "TEST_EXIT_CODE",
+        ] {
+            env::remove_var(key);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn runtime_script_missing_envelope_returns_error() {
+        let _guard = env_guard();
+        let envelope = sample_envelope();
+        let fixture = RuntimeFixture::new(&envelope);
+
+        env::set_var(
+            "DEMON_CONTAINER_RUNTIME",
+            fixture.script().to_string_lossy().to_string(),
+        );
+        env::set_var(
+            "TEST_ENVELOPE_HOST_PATH",
+            fixture.host_envelope().to_string_lossy().to_string(),
+        );
+        env::set_var("TEST_RUNTIME_MODE", "missing");
+        env::set_var("TEST_EXIT_CODE", "0");
+
+        let pack = tempfile::tempdir().unwrap();
+        let mut config = base_config();
+        config.timeout_seconds = Some(5);
+        config.artifacts_dir = Some(fixture.artifacts_dir().to_path_buf());
+        config.app_pack_dir = Some(pack.path().to_path_buf());
+
+        let envelope = execute(&config);
+        assert!(envelope.result.is_error());
+        if let OperationResult::Error { error, .. } = envelope.result {
+            assert_eq!(
+                error.code.as_deref(),
+                Some("CONTAINER_EXEC_ENVELOPE_MISSING")
+            );
+        } else {
+            panic!("expected missing envelope error");
+        }
+
+        for key in [
+            "DEMON_CONTAINER_RUNTIME",
+            "TEST_ENVELOPE_HOST_PATH",
+            "TEST_RUNTIME_MODE",
+            "TEST_EXIT_CODE",
+        ] {
+            env::remove_var(key);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn runtime_timeout_uses_environment_when_not_configured() {
+        let _guard = env_guard();
+        let envelope = sample_envelope();
+        let fixture = RuntimeFixture::new(&envelope);
+
+        env::set_var(
+            "DEMON_CONTAINER_RUNTIME",
+            fixture.script().to_string_lossy().to_string(),
+        );
+        env::set_var(
+            "TEST_ENVELOPE_HOST_PATH",
+            fixture.host_envelope().to_string_lossy().to_string(),
+        );
+        env::set_var(
+            "TEST_ENVELOPE_SOURCE",
+            fixture.stub_source().to_string_lossy().to_string(),
+        );
+        env::set_var("TEST_RUNTIME_MODE", "sleep");
+        env::set_var("TEST_SLEEP_SECS", "3");
+        env::set_var("DEMON_CONTAINER_EXEC_TIMEOUT_SECONDS", "1");
+
+        let pack = tempfile::tempdir().unwrap();
+        let mut config = base_config();
+        config.artifacts_dir = Some(fixture.artifacts_dir().to_path_buf());
+        config.app_pack_dir = Some(pack.path().to_path_buf());
+
+        let result = execute(&config);
+        assert!(result.result.is_error());
+        if let OperationResult::Error { error, .. } = &result.result {
+            assert_eq!(error.code.as_deref(), Some("CONTAINER_EXEC_TIMEOUT"));
+        } else {
+            panic!("expected error result");
+        }
+
+        for key in [
+            "DEMON_CONTAINER_RUNTIME",
+            "TEST_ENVELOPE_HOST_PATH",
+            "TEST_ENVELOPE_SOURCE",
+            "TEST_RUNTIME_MODE",
+            "TEST_SLEEP_SECS",
+            "DEMON_CONTAINER_EXEC_TIMEOUT_SECONDS",
+        ] {
+            env::remove_var(key);
+        }
+    }
 
     #[test]
     fn envelope_path_rejects_parent_dir_when_artifacts_dir_set() {

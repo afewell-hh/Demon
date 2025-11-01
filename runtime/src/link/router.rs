@@ -432,6 +432,8 @@ struct ContainerExecRequest {
     workspace_dir: Option<String>,
     #[serde(default, rename = "artifactsDir")]
     artifacts_dir: Option<String>,
+    #[serde(default, rename = "timeoutSeconds")]
+    timeout_seconds: Option<u64>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -449,6 +451,7 @@ impl From<ContainerExecRequest> for capsules_container_exec::ContainerExecConfig
             env: request.env,
             working_dir: request.working_dir,
             envelope_path: request.outputs.envelope_path,
+            timeout_seconds: request.timeout_seconds,
             capsule_name: request.capsule_name,
             app_pack_dir: request.workspace_dir.map(PathBuf::from),
             artifacts_dir: request.artifacts_dir.map(PathBuf::from),

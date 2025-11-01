@@ -34,6 +34,7 @@ Each capsule entry describes a reusable execution primitive. For v1 the platform
 - `command` — Array representing the container entrypoint.
 - `env` — Optional map of string→string environment variables.
 - `workingDir` — Optional working directory inside the container.
+- `timeoutSeconds` — Optional maximum runtime for the capsule before the platform aborts the execution.
 - `outputs.envelopePath` — Absolute path where the capsule writes the Explainable Result Envelope consumed by the runtime.
 
 Capsules are sandboxed by the platform: non-root user, network disabled, read-only filesystem with a writable `tmpfs` at `/tmp`, and `no-new-privileges` enforced. Future schema revisions may add more capsule types.
