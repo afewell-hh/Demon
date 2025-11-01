@@ -977,35 +977,44 @@ jobs:
           # Fetch runs list
           curl -s http://127.0.0.1:3000/api/runs | tee /tmp/compat-smoke/ui-runs.json | jq .
 
-          # Verify response is an array (resilient to empty or error responses)
-          if jq -e 'type == "array"' /tmp/compat-smoke/ui-runs.json >/dev/null 2>&1; then
-            echo "✓ UI /api/runs returned valid array"
-
-            # If we have runs, verify structure
-            run_count=$(jq 'length' /tmp/compat-smoke/ui-runs.json)
-            echo "Runs count: $run_count"
-
-            if [[ $run_count -gt 0 ]]; then
-              # Get first run ID and fetch detail
-              run_id=$(jq -r '.[0].runId // .[0].id // empty' /tmp/compat-smoke/ui-runs.json)
-              if [[ -n "$run_id" ]]; then
-                echo "Fetching run detail for: $run_id"
-                curl -s "http://127.0.0.1:3000/api/runs/${run_id}" | tee /tmp/compat-smoke/ui-run-detail.json | jq .
-
-                # Verify run detail has expected fields
-                if jq -e '.events' /tmp/compat-smoke/ui-run-detail.json >/dev/null 2>&1; then
-                  echo "✓ Run detail has events field"
-                else
-                  echo "⚠ Run detail missing events field"
-                fi
-              fi
-            else
-              echo "⚠ No runs found (may be expected if ritual hasn't emitted events yet)"
-            fi
-          else
-            echo "⚠ UI response is not an array"
+          # Verify response is an array
+          if ! jq -e 'type == "array"' /tmp/compat-smoke/ui-runs.json >/dev/null 2>&1; then
+            echo "❌ FAIL: UI /api/runs did not return an array"
             jq . /tmp/compat-smoke/ui-runs.json || cat /tmp/compat-smoke/ui-runs.json
+            exit 1
           fi
+          echo "✓ UI /api/runs returned valid array"
+
+          # Verify we have at least one run (we just executed a ritual)
+          run_count=$(jq 'length' /tmp/compat-smoke/ui-runs.json)
+          echo "Runs count: $run_count"
+          if [[ $run_count -eq 0 ]]; then
+            echo "❌ FAIL: No runs found after executing ritual"
+            exit 1
+          fi
+          echo "✓ Found $run_count run(s)"
+
+          # Get first run ID and fetch detail
+          run_id=$(jq -r '.[0].runId // .[0].id // empty' /tmp/compat-smoke/ui-runs.json)
+          if [[ -z "$run_id" ]]; then
+            echo "❌ FAIL: Run entry missing runId/id field"
+            jq '.[0]' /tmp/compat-smoke/ui-runs.json
+            exit 1
+          fi
+          echo "✓ First run has ID: $run_id"
+
+          # Fetch and verify run detail
+          echo "Fetching run detail for: $run_id"
+          curl -s "http://127.0.0.1:3000/api/runs/${run_id}" | tee /tmp/compat-smoke/ui-run-detail.json | jq .
+
+          # Verify run detail has expected events field
+          if ! jq -e '.events' /tmp/compat-smoke/ui-run-detail.json >/dev/null 2>&1; then
+            echo "❌ FAIL: Run detail missing events field"
+            jq . /tmp/compat-smoke/ui-run-detail.json
+            exit 1
+          fi
+          echo "✓ Run detail has events field"
+          echo "✓ UI data contract validation passed"
 
       - name: Upload compat-smoke artifacts
         uses: actions/upload-artifact@v4
