@@ -32,8 +32,24 @@ contracts:
 capsules:
   - type: container-exec
     name: hello
-    imageDigest: ghcr.io/afewell-hh/demon/capsules/echo@sha256:0000000000000000000000000000000000000000000000000000000000000000
-    command: ["/app/echo"]
+    imageDigest: busybox@sha256:355b3a1bf5609da364166913878a8508d4ba30572d02020a97028c75477e24ff
+    command:
+      - /bin/sh
+      - -c
+      - |
+        mkdir -p /workspace/.artifacts
+        cat <<'EOF' > /workspace/.artifacts/result.json
+        {
+          "result": {
+            "success": true,
+            "data": {
+              "message": "Hello from Demon App Pack!",
+              "timestamp": "2025-11-01T00:00:00Z"
+            }
+          }
+        }
+        EOF
+        cat /workspace/.artifacts/result.json
     env:
       CAPSULE_NAME: hello-world
     workingDir: /workspace
