@@ -895,6 +895,11 @@ jobs:
       - name: Clippy (deny warnings)
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+      - name: Install cargo-deny
+        run: |
+          set -euo pipefail
+          cargo install cargo-deny --locked --force
+
       - name: Cargo deny check
         run: cargo deny check --all-features
         continue-on-error: true
@@ -922,6 +927,13 @@ jobs:
         run: |
           cargo run -p demonctl -- app list 2>&1 | tee /tmp/compat-smoke/list.log
           cargo run -p demonctl -- app list --json | jq . | tee /tmp/compat-smoke/list.json
+
+      - name: Pre-pull container image
+        run: |
+          # Pull the busybox image used by the sample app pack
+          # container-exec uses --pull never, so image must be available locally
+          docker pull busybox@sha256:355b3a1bf5609da364166913878a8508d4ba30572d02020a97028c75477e24ff
+          echo "✓ Container image pulled"
 
       - name: Run sample ritual via container-exec
         env:
