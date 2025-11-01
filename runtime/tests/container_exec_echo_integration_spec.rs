@@ -101,27 +101,29 @@ impl RuntimeFixture {
 
 #[tokio::test]
 async fn container_exec_echo_capsule_round_trips_envelope() {
-    let _guard = env_guard();
-
     let message = "Hello from container exec integration!";
     let envelope = echo(message.to_string());
     let envelope_json = serde_json::to_value(&envelope).expect("serialize envelope");
     let fixture = RuntimeFixture::new(&envelope_json);
 
-    env::set_var(
-        "DEMON_CONTAINER_RUNTIME",
-        fixture.script().to_string_lossy().to_string(),
-    );
-    env::set_var(
-        "TEST_ENVELOPE_HOST_PATH",
-        fixture.host_envelope().to_string_lossy().to_string(),
-    );
-    env::set_var(
-        "TEST_ENVELOPE_SOURCE",
-        fixture.stub_source().to_string_lossy().to_string(),
-    );
-    env::set_var("TEST_RUNTIME_MODE", "success");
-    env::set_var("TEST_EXIT_CODE", "0");
+    // Set up environment with guard, then drop it before await
+    {
+        let _guard = env_guard();
+        env::set_var(
+            "DEMON_CONTAINER_RUNTIME",
+            fixture.script().to_string_lossy().to_string(),
+        );
+        env::set_var(
+            "TEST_ENVELOPE_HOST_PATH",
+            fixture.host_envelope().to_string_lossy().to_string(),
+        );
+        env::set_var(
+            "TEST_ENVELOPE_SOURCE",
+            fixture.stub_source().to_string_lossy().to_string(),
+        );
+        env::set_var("TEST_RUNTIME_MODE", "success");
+        env::set_var("TEST_EXIT_CODE", "0");
+    } // Guard dropped here
 
     let router = Router::new();
     let args = json!({
