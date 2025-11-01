@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demon.dev/schemas/hello-world/hello-request.v1.json",
+  "title": "Hello World Request",
+  "description": "Input parameters for the hello world capsule",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "message": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "description": "The greeting message to echo"
+    },
+    "includeTimestamp": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to include a timestamp in the response"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional metadata to pass through to the response"
+    }
+  },
+  "required": ["message"]
+}
