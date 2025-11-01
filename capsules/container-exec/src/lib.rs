@@ -350,13 +350,20 @@ fn execute_with_runtime(
 
     ensure_envelope_placeholder(&mount.host_envelope_path)?;
 
+    let cidfile_path = temp_dir.path().join("container.cid");
+
     let mut command = Command::new(&runtime_bin);
-    configure_command(&mut command, config, &mount)?;
+    configure_command(&mut command, config, &mount, Some(&cidfile_path))?;
     let runtime_cmdline = command_line_string(&command);
     let timeout = resolve_timeout(config)?;
 
     let start = Instant::now();
-    let run_result = run_container_command(runtime_bin.clone(), command, timeout)?;
+    let run_result = run_container_command(
+        runtime_bin.clone(),
+        command,
+        timeout,
+        Some(cidfile_path.clone()),
+    )?;
     let duration = start.elapsed();
 
     let CommandRun { status, logs } = run_result;
@@ -500,6 +507,7 @@ fn configure_command(
     command: &mut Command,
     config: &ContainerExecConfig,
     mount: &EnvelopeMount,
+    cidfile: Option<&Path>,
 ) -> Result<(), ExecError> {
     command.arg("run");
     command.arg("--rm");
@@ -537,6 +545,19 @@ fn configure_command(
             "type=bind,source={},target=/workspace/.artifacts,readonly=false",
             artifacts_dir.display()
         ));
+    }
+
+    if let Some(cidfile) = cidfile {
+        if let Some(parent) = cidfile.parent() {
+            fs::create_dir_all(parent).map_err(|err| ExecError::Io {
+                message: format!(
+                    "Failed to prepare cidfile directory {}: {}",
+                    parent.display(),
+                    err
+                ),
+            })?;
+        }
+        command.arg("--cidfile").arg(cidfile.display().to_string());
     }
 
     if let Some(host_root) = mount.host_root() {
@@ -932,6 +953,7 @@ fn run_container_command(
     runtime_bin: String,
     mut command: Command,
     timeout: Option<Duration>,
+    cidfile: Option<PathBuf>,
 ) -> Result<CommandRun, ExecError> {
     let mut child = command.spawn().map_err(|err| ExecError::RuntimeSpawn {
         runtime: runtime_bin.clone(),
@@ -984,6 +1006,9 @@ fn run_container_command(
     let logs = CommandLogs::new(stdout, stderr, exit_code(&status));
 
     if let Some(duration) = timed_out {
+        if let Some(ref cidfile) = cidfile {
+            cleanup_container(&runtime_bin, cidfile);
+        }
         return Err(ExecError::Timeout {
             runtime: runtime_bin,
             duration,
@@ -991,7 +1016,32 @@ fn run_container_command(
         });
     }
 
+    if let Some(cidfile) = cidfile {
+        let _ = fs::remove_file(cidfile);
+    }
+
     Ok(CommandRun { status, logs })
+}
+
+fn cleanup_container(runtime_bin: &str, cidfile: &Path) {
+    let contents = match fs::read_to_string(cidfile) {
+        Ok(data) => data,
+        Err(_) => return,
+    };
+
+    let id = contents.split_whitespace().next().unwrap_or("");
+    if id.is_empty() {
+        let _ = fs::remove_file(cidfile);
+        return;
+    }
+
+    let mut command = Command::new(runtime_bin);
+    command.arg("rm").arg("--force").arg(id);
+    command.stdin(Stdio::null());
+    command.stdout(Stdio::null());
+    command.stderr(Stdio::null());
+    let _ = command.status();
+    let _ = fs::remove_file(cidfile);
 }
 
 fn spawn_pipe_reader<R>(pipe: Option<R>) -> Option<thread::JoinHandle<io::Result<Vec<u8>>>>
@@ -1293,8 +1343,48 @@ mod tests {
     #[cfg(unix)]
     const RUNTIME_SCRIPT: &str = r#"#!/bin/sh
 set -eu
+
+if [ "${1-}" = "rm" ]; then
+  shift || true
+  if [ "${1-}" = "--force" ] || [ "${1-}" = "-f" ]; then
+    shift || true
+  fi
+  cid="${1-}"
+  if [ -n "${TEST_RUNTIME_LOG:-}" ] && [ -n "$cid" ]; then
+    printf 'cleanup %s\n' "$cid" >> "${TEST_RUNTIME_LOG}"
+  fi
+  exit 0
+fi
+
+cidfile=""
+prev=""
+for arg in "$@"; do
+  if [ "$prev" = "--cidfile" ]; then
+    cidfile="$arg"
+    prev=""
+    continue
+  fi
+  case "$arg" in
+    --cidfile)
+      prev="--cidfile"
+      ;;
+    --cidfile=*)
+      cidfile="${arg#--cidfile=}"
+      ;;
+  esac
+done
+
+if [ -n "$cidfile" ]; then
+  printf 'stub-container-id\n' > "$cidfile"
+fi
+
 mode="${TEST_RUNTIME_MODE:-success}"
 host="${TEST_ENVELOPE_HOST_PATH:?missing}"
+
+if [ -n "${TEST_RUNTIME_LOG:-}" ]; then
+  printf 'run %s\n' "$mode" >> "${TEST_RUNTIME_LOG}"
+fi
+
 case "$mode" in
   success)
     cat "${TEST_ENVELOPE_SOURCE:?missing}" > "$host"
@@ -1588,7 +1678,7 @@ esac
         .unwrap();
 
         let mut command = Command::new("docker");
-        configure_command(&mut command, &config, &mount).unwrap();
+        configure_command(&mut command, &config, &mount, None).unwrap();
 
         let args: Vec<String> = command
             .get_args()
@@ -1649,7 +1739,7 @@ esac
         .unwrap();
 
         let mut command = Command::new("docker");
-        configure_command(&mut command, &config, &mount).unwrap();
+        configure_command(&mut command, &config, &mount, None).unwrap();
 
         let args: Vec<String> = command
             .get_args()
@@ -1712,7 +1802,7 @@ esac
         .unwrap();
 
         let mut command = Command::new("docker");
-        configure_command(&mut command, &config, &mount).unwrap();
+        configure_command(&mut command, &config, &mount, None).unwrap();
         let args: Vec<String> = command
             .get_args()
             .map(|a| a.to_string_lossy().to_string())
@@ -1780,7 +1870,7 @@ esac
         .unwrap();
 
         let mut command = Command::new("docker");
-        configure_command(&mut command, &config, &mount).unwrap();
+        configure_command(&mut command, &config, &mount, None).unwrap();
         let args: Vec<String> = command
             .get_args()
             .map(|a| a.to_string_lossy().to_string())
@@ -2133,6 +2223,55 @@ esac
             "TEST_ENVELOPE_SOURCE",
             "TEST_RUNTIME_MODE",
             "TEST_SLEEP_SECS",
+        ] {
+            env::remove_var(key);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn runtime_timeout_triggers_cleanup() {
+        let _guard = env_guard();
+        let envelope = sample_envelope();
+        let fixture = RuntimeFixture::new(&envelope);
+        let log_dir = tempfile::tempdir().unwrap();
+        let log_path = log_dir.path().join("runtime.log");
+
+        env::set_var(
+            "DEMON_CONTAINER_RUNTIME",
+            fixture.script().to_string_lossy().to_string(),
+        );
+        env::set_var(
+            "TEST_ENVELOPE_HOST_PATH",
+            fixture.host_envelope().to_string_lossy().to_string(),
+        );
+        env::set_var(
+            "TEST_ENVELOPE_SOURCE",
+            fixture.stub_source().to_string_lossy().to_string(),
+        );
+        env::set_var("TEST_RUNTIME_MODE", "sleep");
+        env::set_var("TEST_SLEEP_SECS", "3");
+        env::set_var("TEST_RUNTIME_LOG", log_path.to_string_lossy().to_string());
+
+        let pack = tempfile::tempdir().unwrap();
+        let mut config = base_config();
+        config.timeout_seconds = Some(1);
+        config.artifacts_dir = Some(fixture.artifacts_dir().to_path_buf());
+        config.app_pack_dir = Some(pack.path().to_path_buf());
+
+        let envelope = execute(&config);
+        assert!(envelope.result.is_error());
+
+        let log_contents = fs::read_to_string(&log_path).unwrap();
+        assert!(log_contents.contains("cleanup stub-container-id"));
+
+        for key in [
+            "DEMON_CONTAINER_RUNTIME",
+            "TEST_ENVELOPE_HOST_PATH",
+            "TEST_ENVELOPE_SOURCE",
+            "TEST_RUNTIME_MODE",
+            "TEST_SLEEP_SECS",
+            "TEST_RUNTIME_LOG",
         ] {
             env::remove_var(key);
         }
