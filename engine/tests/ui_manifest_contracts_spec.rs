@@ -154,3 +154,68 @@ fn ui_manifest_validates_fields_table_config() {
         "should validate fields-table with proper config"
     );
 }
+
+#[test]
+fn ui_manifest_rejects_mismatched_kind_and_config() {
+    let schema_path = "../contracts/schemas/ui-manifest.v1.schema.json";
+    let schema_text = fs::read_to_string(schema_path).expect(schema_path);
+    let schema = JSONSchema::compile(&serde_json::from_str(&schema_text).expect("parse schema"))
+        .expect("schema compiles");
+
+    // json-viewer kind with fields-table config (mismatch)
+    let mismatched = serde_json::json!({
+        "apiVersion": "demon.io/v1",
+        "kind": "UIManifest",
+        "metadata": {
+            "name": "test",
+            "version": "1.0.0"
+        },
+        "cards": [{
+            "id": "test-card",
+            "kind": "json-viewer",
+            "match": {
+                "rituals": ["test"]
+            },
+            "config": {
+                "fields": [{
+                    "label": "Status",
+                    "path": "result.success"
+                }]
+            }
+        }]
+    });
+
+    let validation = schema.validate(&mismatched);
+    assert!(
+        validation.is_err(),
+        "should reject json-viewer kind with fields-table config: {:?}",
+        validation.ok()
+    );
+
+    // result-envelope kind with markdown-view config (mismatch)
+    let mismatched2 = serde_json::json!({
+        "apiVersion": "demon.io/v1",
+        "kind": "UIManifest",
+        "metadata": {
+            "name": "test",
+            "version": "1.0.0"
+        },
+        "cards": [{
+            "id": "test-card",
+            "kind": "result-envelope",
+            "match": {
+                "rituals": ["test"]
+            },
+            "config": {
+                "contentPath": "outputs.report"
+            }
+        }]
+    });
+
+    let validation2 = schema.validate(&mismatched2);
+    assert!(
+        validation2.is_err(),
+        "should reject result-envelope kind with markdown-view config: {:?}",
+        validation2.ok()
+    );
+}

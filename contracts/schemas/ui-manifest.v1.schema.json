@@ -107,60 +107,76 @@
         },
         "config": {
           "type": "object",
-          "description": "Card-specific configuration. Shape depends on the card kind.",
-          "oneOf": [
-            {
-              "if": {
-                "properties": {
-                  "kind": {
-                    "const": "result-envelope"
-                  }
-                }
-              },
-              "then": {
+          "description": "Card-specific configuration. Shape depends on the card kind."
+        }
+      },
+      "required": ["id", "kind", "match"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "result-envelope"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "config": {
                 "$ref": "#/$defs/resultEnvelopeConfig"
               }
-            },
-            {
-              "if": {
-                "properties": {
-                  "kind": {
-                    "const": "fields-table"
-                  }
-                }
-              },
-              "then": {
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "fields-table"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "config": {
                 "$ref": "#/$defs/fieldsTableConfig"
               }
-            },
-            {
-              "if": {
-                "properties": {
-                  "kind": {
-                    "const": "markdown-view"
-                  }
-                }
-              },
-              "then": {
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "markdown-view"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "config": {
                 "$ref": "#/$defs/markdownViewConfig"
               }
-            },
-            {
-              "if": {
-                "properties": {
-                  "kind": {
-                    "const": "json-viewer"
-                  }
-                }
-              },
-              "then": {
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "json-viewer"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "config": {
                 "$ref": "#/$defs/jsonViewerConfig"
               }
             }
-          ]
+          }
         }
-      },
-      "required": ["id", "kind", "match"]
+      ]
     },
     "resultEnvelopeConfig": {
       "type": "object",
