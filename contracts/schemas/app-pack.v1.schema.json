@@ -236,6 +236,11 @@
             "minLength": 1,
             "description": "Optional working directory inside the container."
           },
+          "timeoutSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum duration (in seconds) the runtime waits before aborting the capsule."
+          },
           "outputs": {
             "type": "object",
             "additionalProperties": false,

@@ -52,13 +52,24 @@ Troubleshooting:
   ensure the App Pack was prepared via `demonctl app install` (the runtime will
   pre-create the container-side target automatically during execution).
   Inspect the host-side artifacts directory for the bound file if debugging.
- - "script not found under /workspace/capsules": the container command in your
-   capsule likely references a path like `/workspace/capsules/<name>/scripts/*.sh`.
-   This path exists only when the App Pack tree is installed and mounted at
-   `/workspace` (read-only). Fix by installing the pack with `demonctl app install`
-   and invoking the ritual via `demonctl run <app>:<ritual>`. Do not reference the
-   source tree paths directly — the runtime resolves capsule scripts relative to
-   the installed App Pack mounted at `/workspace`.
+- "script not found under /workspace/capsules": the container command in your
+  capsule likely references a path like `/workspace/capsules/<name>/scripts/*.sh`.
+  This path exists only when the App Pack tree is installed and mounted at
+  `/workspace` (read-only). Fix by installing the pack with `demonctl app install`
+  and invoking the ritual via `demonctl run <app>:<ritual>`. Do not reference the
+  source tree paths directly — the runtime resolves capsule scripts relative to
+  the installed App Pack mounted at `/workspace`.
+- Rootless Docker: run `dockerd-rootless-setuptool.sh install` (install
+  `uidmap` as needed), switch the CLI context to `rootless`, and invoke rituals
+  with `DOCKER_HOST=unix:///run/user/<uid>/docker.sock`. Expect the pre-run
+  mount table to reference `~/.local/share/docker/overlay2` and the placeholder
+  envelope to appear as `root:root` before your command overwrites it.
+- containerd / nerdctl: set `DEMON_CONTAINER_RUNTIME` to a wrapper that calls
+  `nerdctl --address /run/containerd/containerd.sock --namespace moby`. Pull
+  digested images into that namespace ahead of time (`nerdctl pull
+  docker.io/library/bash:TAG`) because the runtime passes `--pull never`.
+  Warnings about `failed to remove hosts file` are benign when running with
+  `--network none`; add CNI plugins if you need other network modes.
 
 ## Usage
 
@@ -72,6 +83,7 @@ let config = ContainerExecConfig {
     env: BTreeMap::new(),
     working_dir: None,
     envelope_path: "/workspace/.artifacts/result.json".into(),
+    timeout_seconds: Some(120),
     capsule_name: Some("sample".into()),
     app_pack_dir: Some(std::path::PathBuf::from("/path/to/app-pack")),
     artifacts_dir: Some(std::path::PathBuf::from("/tmp/demon-run/artifacts")),
@@ -98,6 +110,8 @@ reference so that only the capsule's `command` runs. Images without an
   returned when `DEMON_CONTAINER_RUNTIME=stub`.
 - `DEMON_CONTAINER_USER` — user (`uid:gid`) to run containers as (default:
   `65534:65534`).
+- `DEMON_CONTAINER_EXEC_TIMEOUT_SECONDS` — overrides the container execution
+  timeout when the request does not specify `timeoutSeconds`.
 - `DEMON_DEBUG` — when set to a non-empty value other than `0`, enables
   additional diagnostics and a lightweight debug wrapper around the declared
   command. The wrapper prints a pre-run banner with the effective UID/GID,
