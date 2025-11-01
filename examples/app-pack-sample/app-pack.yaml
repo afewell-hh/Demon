@@ -1,0 +1,80 @@
+apiVersion: demon.io/v1
+kind: AppPack
+metadata:
+  name: hello-world
+  version: 1.0.0
+  displayName: Hello World App Pack
+  description: |
+    A minimal example App Pack demonstrating the Demon platform capabilities.
+    This pack includes a simple hello-world ritual that can be executed via demonctl.
+  repository: https://github.com/afewell-hh/demon
+  license: Apache-2.0
+  homepage: https://github.com/afewell-hh/demon/tree/main/examples/app-pack-sample
+
+compatibility:
+  appPackSchema: ">=1.0.0 <2.0.0"
+  platformAPI: ">=0.1.0"
+
+requires:
+  appPackSchema: ">=1.0.0"
+  platformApis:
+    engine: ">=0.1.0"
+    runtime: ">=0.1.0"
+
+contracts:
+  - id: hello-world/hello-request
+    version: 1.0.0
+    path: contracts/hello/hello-request.v1.json
+  - id: hello-world/hello-response
+    version: 1.0.0
+    path: contracts/hello/hello-response.v1.json
+
+capsules:
+  - type: container-exec
+    name: hello
+    imageDigest: ghcr.io/afewell-hh/demon/capsules/echo@sha256:0000000000000000000000000000000000000000000000000000000000000000
+    command: ["/app/echo"]
+    env:
+      CAPSULE_NAME: hello-world
+    workingDir: /workspace
+    timeoutSeconds: 30
+    outputs:
+      envelopePath: /workspace/.artifacts/result.json
+    sandbox:
+      network: none
+      readOnly: false
+      tmpfs:
+        - /tmp
+      securityOpt:
+        - no-new-privileges:true
+
+rituals:
+  - name: hello
+    displayName: Hello World Ritual
+    description: |
+      Executes a simple hello world capsule that echoes a greeting message.
+      This ritual demonstrates the basic execution flow in the Demon platform.
+    steps:
+      - capsule: hello
+        with:
+          message: "Hello from Demon App Pack!"
+          includeTimestamp: true
+
+ui:
+  cards:
+    - id: hello-world-output
+      kind: json-viewer
+      title: Hello World Output
+      description: Displays the output from the hello world ritual execution
+      match:
+        rituals:
+          - hello
+      fields:
+        show:
+          - payload.message
+          - payload.timestamp
+          - metadata.capsule
+        map:
+          Message: payload.message
+          Timestamp: payload.timestamp
+          Capsule: metadata.capsule
