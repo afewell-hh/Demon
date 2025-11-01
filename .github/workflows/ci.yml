@@ -935,20 +935,56 @@ jobs:
           docker pull busybox@sha256:355b3a1bf5609da364166913878a8508d4ba30572d02020a97028c75477e24ff
           echo "✓ Container image pulled"
 
-      - name: Run sample ritual via container-exec
+      - name: Start Runtime HTTP server (background)
         env:
           RITUAL_STREAM_NAME: RITUAL_EVENTS
         run: |
+          # Start runtime server which publishes events to NATS
+          nohup cargo run -q -p runtime >/tmp/compat-smoke/runtime.log 2>&1 &
+          # Wait for runtime to be ready
+          for i in {1..30}; do
+            if curl -f http://127.0.0.1:8080/health 2>/dev/null; then
+              echo "✓ Runtime server ready"
+              break
+            fi
+            if [[ $i -eq 30 ]]; then
+              echo "❌ Runtime server failed to start"
+              cat /tmp/compat-smoke/runtime.log || true
+              exit 1
+            fi
+            sleep 0.5
+          done
+
+      - name: Submit ritual via runtime API
+        run: |
           set -euo pipefail
-          cargo run -p demonctl -- run hello-world:hello --save --output-dir /tmp/compat-smoke 2>&1 | tee /tmp/compat-smoke/run.log
-          echo "✓ Ritual execution completed"
-          # Verify result envelope was created
-          if [[ -f /tmp/compat-smoke/result.json ]]; then
-            echo "✓ Result envelope saved"
-            jq . /tmp/compat-smoke/result.json || echo "Warning: result.json is not valid JSON"
-          else
-            echo "⚠ result.json not found (may be normal depending on execution)"
+          # Submit ritual execution through runtime API (publishes events to NATS)
+          response=$(curl -s -w "\n%{http_code}" -X POST http://127.0.0.1:8080/api/v1/rituals/hello/runs \
+            -H "Content-Type: application/json" \
+            -d '{"app":"hello-world","parameters":{}}')
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+
+          echo "$body" | tee /tmp/compat-smoke/runtime-submit.json | jq .
+
+          if [[ "$http_code" != "202" ]]; then
+            echo "❌ FAIL: Expected HTTP 202, got $http_code"
+            exit 1
           fi
+          echo "✓ Ritual submitted successfully"
+
+          # Extract run ID for later verification
+          run_id=$(echo "$body" | jq -r '.runId // empty')
+          if [[ -z "$run_id" ]]; then
+            echo "❌ FAIL: Response missing runId"
+            exit 1
+          fi
+          echo "Run ID: $run_id"
+          echo "$run_id" > /tmp/compat-smoke/run_id.txt
+
+          # Wait a few seconds for ritual execution to complete
+          echo "Waiting for ritual execution..."
+          sleep 5
 
       - name: Start Operate UI (background)
         env:
@@ -1028,6 +1064,13 @@ jobs:
         if: always()
         run: |
           cargo run -p demonctl -- app uninstall hello-world 2>&1 | tee /tmp/compat-smoke/uninstall.log || echo "Uninstall failed or pack not found"
+
+      - name: Stop runtime and UI servers
+        if: always()
+        run: |
+          # Kill any cargo processes running runtime or operate-ui
+          pkill -f "cargo.*-p runtime" || true
+          pkill -f "cargo.*operate-ui" || true
 
       - name: Teardown NATS
         if: always()
