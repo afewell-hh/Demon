@@ -1,0 +1,27 @@
+{
+  "apiVersion": "demon.io/v1",
+  "kind": "UIManifest",
+  "metadata": {
+    "name": "result-envelope-example",
+    "version": "1.0.0",
+    "displayName": "Result Envelope Card Example",
+    "description": "Example UI manifest with result-envelope card type"
+  },
+  "cards": [
+    {
+      "id": "deployment-status",
+      "kind": "result-envelope",
+      "title": "Deployment Status",
+      "description": "Shows deployment result with status badge and duration",
+      "match": {
+        "rituals": ["deploy-production", "deploy-staging"]
+      },
+      "config": {
+        "statusPath": "result.success",
+        "durationPath": "metrics.duration.total_ms",
+        "markdownPath": "diagnostics[0].message",
+        "showTimestamp": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "apiVersion": "demon.io/v1",
+  "kind": "UIManifest",
+  "metadata": {
+    "name": "json-viewer-example",
+    "version": "1.0.0",
+    "displayName": "JSON Viewer Card Example"
+  },
+  "cards": [
+    {
+      "id": "full-output",
+      "kind": "json-viewer",
+      "title": "Full Output",
+      "description": "Interactive JSON tree view of complete ritual output",
+      "match": {
+        "rituals": ["debug-ritual", "inspect-state"]
+      },
+      "config": {
+        "rootPath": "outputs",
+        "expandDepth": 2,
+        "highlightPaths": ["result.success", "diagnostics"]
+      }
+    }
+  ]
+}

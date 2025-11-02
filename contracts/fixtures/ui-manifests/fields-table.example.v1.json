@@ -1,0 +1,40 @@
+{
+  "apiVersion": "demon.io/v1",
+  "kind": "UIManifest",
+  "metadata": {
+    "name": "fields-table-example",
+    "version": "1.0.0",
+    "displayName": "Fields Table Card Example"
+  },
+  "cards": [
+    {
+      "id": "build-artifacts",
+      "kind": "fields-table",
+      "title": "Build Artifacts",
+      "description": "Displays structured build output information",
+      "match": {
+        "rituals": ["build-container"]
+      },
+      "config": {
+        "fields": [
+          {
+            "label": "Image Digest",
+            "path": "outputs.result.data.imageDigest",
+            "format": "code"
+          },
+          {
+            "label": "Build Time",
+            "path": "outputs.result.data.buildTime",
+            "format": "timestamp"
+          },
+          {
+            "label": "Status",
+            "path": "outputs.result.success",
+            "format": "badge"
+          }
+        ],
+        "sortable": false
+      }
+    }
+  ]
+}
