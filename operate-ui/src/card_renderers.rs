@@ -64,6 +64,8 @@ fn render_result_envelope(card: &CardDefinition, run: &RunDetail) -> Result<Stri
     // Extract status
     let status_value = extract_json_path(outputs, status_path);
     let status = format_status(&status_value);
+    let status_class = escape_html(&status.to_lowercase());
+    let status_text = escape_html(&status);
 
     // Extract duration
     let duration = duration_path
@@ -84,8 +86,8 @@ fn render_result_envelope(card: &CardDefinition, run: &RunDetail) -> Result<Stri
     // Status badge
     html.push_str(&format!(
         "<div class=\"card-status\"><span class=\"status-badge status-{}\">{}</span></div>",
-        status.to_lowercase(),
-        status
+        status_class,
+        status_text
     ));
 
     // Duration if available
@@ -306,10 +308,12 @@ fn format_field_value(value: &Option<&Value>, format: &str) -> String {
             "code" => format!("<code>{}</code>", escape_html(&v.to_string())),
             "badge" => {
                 let status = format_status(&Some(v));
+                let status_class = escape_html(&status.to_lowercase());
+                let status_text = escape_html(&status);
                 format!(
                     "<span class=\"status-badge status-{}\">{}</span>",
-                    status.to_lowercase(),
-                    status
+                    status_class,
+                    status_text
                 )
             }
             "timestamp" => v

@@ -205,8 +205,8 @@ ui:
       title: Test Card
       match:
         rituals: ["test-ritual"]
-      fields:
-        show: ["status"]
+      config:
+        statusPath: result.success
 "#;
         fs::write(&manifest_path, manifest_content).unwrap();
 
