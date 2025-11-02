@@ -319,11 +319,11 @@ fn format_field_value(value: &Option<&Value>, format: &str) -> String {
             "timestamp" => v
                 .as_str()
                 .map(|s| format!("<time>{}</time>", escape_html(s)))
-                .unwrap_or_else(|| v.to_string()),
+                .unwrap_or_else(|| escape_html(&v.to_string())),
             "duration" => v
                 .as_f64()
                 .map(format_duration)
-                .unwrap_or_else(|| v.to_string()),
+                .unwrap_or_else(|| escape_html(&v.to_string())),
             _ => escape_html(&v.to_string()),
         },
     }
