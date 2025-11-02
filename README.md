@@ -134,10 +134,35 @@ Schemas, fixtures, and WIT interfaces live under [`contracts/`](contracts/); upd
 ```bash
 curl -X POST http://localhost:3000/api/approvals/{run_id}/{gate_id}/grant \
   -H "Content-Type: application/json" \
+  -H "X-Demon-API-Version: v1" \
   -d '{"approver": "ops@example.com", "note": "approved for production"}'
 ```
 
 First-writer-wins semantics and TTL auto-deny keep approvals deterministic. See [docs/operate-ui/README.md](docs/operate-ui/README.md) for UI workflows and REST responses.
+
+## API Versioning
+
+All API endpoints under `/api/` support version negotiation via the `X-Demon-API-Version` header:
+
+```bash
+# Explicitly request v1 API
+curl -H "X-Demon-API-Version: v1" http://localhost:3000/api/runs
+
+# Without version header (defaults to v1 for backwards compatibility)
+curl http://localhost:3000/api/runs
+```
+
+**Server behavior:**
+- All API responses include `X-Demon-API-Version: v1` header
+- Unsupported versions return `406 Not Acceptable` with error details
+- Current stable version: **v1**
+
+**Versioned APIs:**
+- Ritual Runs API (`/api/runs`, `/api/runs/:run_id`)
+- Approval Management API (`/api/approvals/*`)
+- Contract Registry API (`/api/contracts/*`)
+
+For complete versioning policy, contract specifications, and client integration guidance, see [docs/api-versioning.md](docs/api-versioning.md).
 
 ## Layout
 
