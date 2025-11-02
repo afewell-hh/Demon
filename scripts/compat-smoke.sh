@@ -84,7 +84,7 @@ test_endpoint() {
 
     # Check version header (for API endpoints only)
     if [[ "$endpoint" == /api/* ]]; then
-        local version_header_value=$(echo "$headers" | jq -r '.["x-demon-api-version"] // empty' 2>/dev/null || echo "")
+        local version_header_value=$(echo "$headers" | jq -r '.["x-demon-api-version"][0] // empty' 2>/dev/null || echo "")
 
         if [[ -z "$version_header_value" ]]; then
             log_error "  ✗ Missing X-Demon-API-Version header"

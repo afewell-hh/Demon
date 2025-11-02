@@ -229,8 +229,13 @@ components:
 
     ContractValidationRequest:
       type: object
-      description: Envelope payload to validate against contract schemas
+      description: Envelope payload to validate against contract schemas (raw envelope JSON)
       additionalProperties: true
+      example:
+        event: "ritual.started:v1"
+        ritualId: "deploy-prod"
+        runId: "run-123"
+        ts: "2025-01-01T00:00:00Z"
 
     ContractValidationResponse:
       type: object
