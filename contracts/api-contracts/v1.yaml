@@ -1,0 +1,674 @@
+# Demon API Contract Specification v1
+#
+# This document defines the stable v1 API contract for Demon's public APIs.
+# All API endpoints under /api/ must conform to this specification.
+#
+# Version negotiation:
+# - Clients MAY send X-Demon-API-Version header with desired version
+# - Server MUST respond with X-Demon-API-Version: v1 header on all /api/* responses
+# - If client requests unsupported version, server returns 406 Not Acceptable
+# - If no version header is sent, server assumes v1 for backwards compatibility
+
+openapi: 3.0.3
+info:
+  title: Demon Platform API
+  version: "1.0.0"
+  description: |
+    Stable public API for Demon ritual execution platform.
+    Provides access to ritual runs, contract validation, and approval management.
+  contact:
+    name: Demon Platform
+    url: https://github.com/afewell-hh/demon
+
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+
+# API version header is required on all responses
+components:
+  headers:
+    X-Demon-API-Version:
+      description: API version being used
+      required: true
+      schema:
+        type: string
+        enum: [v1]
+      example: v1
+
+  parameters:
+    TenantParam:
+      name: tenant
+      in: path
+      required: true
+      description: Tenant identifier for multi-tenant isolation
+      schema:
+        type: string
+        example: "acme-corp"
+
+    RunIdParam:
+      name: run_id
+      in: path
+      required: true
+      description: Unique identifier for a ritual run
+      schema:
+        type: string
+        example: "e2e-run-123"
+
+    GateIdParam:
+      name: gate_id
+      in: path
+      required: true
+      description: Unique identifier for an approval gate
+      schema:
+        type: string
+        example: "prod-deploy-gate"
+
+    LimitQuery:
+      name: limit
+      in: query
+      description: Maximum number of results to return (1-1000)
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 100
+      example: 50
+
+    RitualFilterQuery:
+      name: ritual
+      in: query
+      description: Filter runs by ritual ID (substring match, case-insensitive)
+      schema:
+        type: string
+      example: "deploy-prod"
+
+    RunIdFilterQuery:
+      name: runId
+      in: query
+      description: Filter runs by run ID (substring match, case-insensitive)
+      schema:
+        type: string
+      example: "run-123"
+
+    StatusFilterQuery:
+      name: status
+      in: query
+      description: Filter runs by status
+      schema:
+        type: string
+        enum: [Running, Completed, Failed]
+      example: "Completed"
+
+  schemas:
+    RunSummary:
+      type: object
+      description: Summary information about a ritual run
+      required:
+        - run_id
+        - ritual_id
+        - status
+        - started_at
+      properties:
+        run_id:
+          type: string
+          description: Unique identifier for this run
+          example: "e2e-run-123"
+        ritual_id:
+          type: string
+          description: Identifier of the ritual being executed
+          example: "deploy-production"
+        status:
+          type: string
+          enum: [Running, Completed, Failed]
+          description: Current status of the run
+          example: "Completed"
+        started_at:
+          type: string
+          format: date-time
+          description: Timestamp when the run started
+          example: "2025-01-01T00:00:00Z"
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp when the run completed (null if still running)
+          example: "2025-01-01T00:05:00Z"
+        event_count:
+          type: integer
+          description: Number of events emitted during this run
+          example: 42
+
+    RunDetail:
+      type: object
+      description: Detailed information about a ritual run including all events
+      required:
+        - run_id
+        - ritual_id
+        - status
+        - events
+      properties:
+        run_id:
+          type: string
+          description: Unique identifier for this run
+          example: "e2e-run-123"
+        ritual_id:
+          type: string
+          description: Identifier of the ritual being executed
+          example: "deploy-production"
+        status:
+          type: string
+          enum: [Running, Completed, Failed]
+          description: Current status of the run
+          example: "Completed"
+        events:
+          type: array
+          description: Ordered list of events emitted during this run
+          items:
+            type: object
+            description: Event envelope with metadata and payload
+            additionalProperties: true
+
+    ApprovalRequest:
+      type: object
+      description: Request to grant or deny an approval gate
+      required:
+        - approver
+      properties:
+        approver:
+          type: string
+          format: email
+          description: Email address of the approver
+          example: "ops@example.com"
+        note:
+          type: string
+          description: Optional note or justification
+          example: "Approved for production deployment after security review"
+        reason:
+          type: string
+          description: Reason for denial (required for deny operations)
+          example: "Failed security review - critical vulnerabilities found"
+
+    ApprovalResponse:
+      type: object
+      description: Response from an approval action
+      properties:
+        status:
+          type: string
+          enum: [granted, denied, noop]
+          description: Result of the approval action
+          example: "granted"
+        event:
+          type: object
+          description: The approval event that was published
+          additionalProperties: true
+
+    ErrorResponse:
+      type: object
+      description: Error response from API
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "invalid 'limit': must be 1..=1000"
+        requested_version:
+          type: string
+          description: API version that was requested (for version errors)
+          example: "v2"
+        supported_versions:
+          type: array
+          description: List of supported API versions (for version errors)
+          items:
+            type: string
+          example: ["v1"]
+        message:
+          type: string
+          description: Detailed error message
+          example: "API version 'v2' is not supported. Please use one of: v1"
+
+    ContractValidationRequest:
+      type: object
+      description: Request to validate an envelope against contract schemas
+      required:
+        - envelope
+      properties:
+        envelope:
+          type: object
+          description: The envelope to validate
+          additionalProperties: true
+
+    ContractValidationResponse:
+      type: object
+      description: Result of contract validation
+      required:
+        - valid
+      properties:
+        valid:
+          type: boolean
+          description: Whether the envelope is valid
+          example: true
+        errors:
+          type: array
+          description: List of validation errors (empty if valid)
+          items:
+            type: string
+          example: []
+
+    ContractBundleStatus:
+      type: object
+      description: Status of the loaded contract bundle
+      required:
+        - loaded
+        - bundle_name
+      properties:
+        loaded:
+          type: boolean
+          description: Whether a bundle is currently loaded
+          example: true
+        bundle_name:
+          type: string
+          description: Name of the loaded bundle
+          example: "preview-local-dev@0.0.1"
+        schemas_count:
+          type: integer
+          description: Number of schemas in the bundle
+          example: 15
+
+paths:
+  # Ritual Runs API
+  /api/runs:
+    get:
+      summary: List ritual runs
+      description: |
+        Returns a list of recent ritual runs. Results can be filtered by ritual ID,
+        run ID, and status. Results are ordered by most recent first.
+      operationId: listRuns
+      parameters:
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/RitualFilterQuery'
+        - $ref: '#/components/parameters/RunIdFilterQuery'
+        - $ref: '#/components/parameters/StatusFilterQuery'
+      responses:
+        '200':
+          description: Successful response with list of runs
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - runs
+                properties:
+                  runs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RunSummary'
+        '400':
+          description: Invalid query parameters
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '406':
+          description: Unsupported API version requested
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: JetStream unavailable
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/runs/{run_id}:
+    get:
+      summary: Get ritual run detail
+      description: Returns detailed information about a specific ritual run including all events
+      operationId: getRun
+      parameters:
+        - $ref: '#/components/parameters/RunIdParam'
+      responses:
+        '200':
+          description: Successful response with run details
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunDetail'
+        '404':
+          description: Run not found
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '406':
+          description: Unsupported API version requested
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: JetStream unavailable
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Tenant-aware Ritual Runs API
+  /api/tenants/{tenant}/runs:
+    get:
+      summary: List ritual runs for a specific tenant
+      description: |
+        Returns a list of recent ritual runs for the specified tenant.
+        Results can be filtered by ritual ID, run ID, and status.
+      operationId: listRunsTenant
+      parameters:
+        - $ref: '#/components/parameters/TenantParam'
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/RitualFilterQuery'
+        - $ref: '#/components/parameters/RunIdFilterQuery'
+        - $ref: '#/components/parameters/StatusFilterQuery'
+      responses:
+        '200':
+          description: Successful response with list of runs
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - runs
+                properties:
+                  runs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RunSummary'
+
+  /api/tenants/{tenant}/runs/{run_id}:
+    get:
+      summary: Get ritual run detail for a specific tenant
+      description: Returns detailed information about a specific ritual run for the given tenant
+      operationId: getRunTenant
+      parameters:
+        - $ref: '#/components/parameters/TenantParam'
+        - $ref: '#/components/parameters/RunIdParam'
+      responses:
+        '200':
+          description: Successful response with run details
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunDetail'
+
+  # Approval Management API
+  /api/approvals/{run_id}/{gate_id}/grant:
+    post:
+      summary: Grant approval for a gate
+      description: |
+        Grants approval for a specific approval gate in a ritual run.
+        First-writer-wins semantics apply - once a gate is resolved, it cannot be changed.
+      operationId: grantApproval
+      parameters:
+        - $ref: '#/components/parameters/RunIdParam'
+        - $ref: '#/components/parameters/GateIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalRequest'
+      responses:
+        '200':
+          description: Approval granted (or already granted)
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalResponse'
+        '400':
+          description: Invalid request (missing required fields, invalid email, etc.)
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Approver not in allowlist
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '406':
+          description: Unsupported API version requested
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Gate already resolved (conflicting decision)
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/approvals/{run_id}/{gate_id}/deny:
+    post:
+      summary: Deny approval for a gate
+      description: |
+        Denies approval for a specific approval gate in a ritual run.
+        First-writer-wins semantics apply - once a gate is resolved, it cannot be changed.
+      operationId: denyApproval
+      parameters:
+        - $ref: '#/components/parameters/RunIdParam'
+        - $ref: '#/components/parameters/GateIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalRequest'
+      responses:
+        '200':
+          description: Approval denied (or already denied)
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalResponse'
+        '400':
+          description: Invalid request (missing reason, invalid email, etc.)
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Approver not in allowlist
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '406':
+          description: Unsupported API version requested
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Gate already resolved (conflicting decision)
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Contract Registry API
+  /api/contracts/validate/envelope:
+    post:
+      summary: Validate an envelope against contract schemas
+      description: |
+        Validates a single envelope against the loaded contract bundle schemas.
+        Returns validation errors if the envelope does not conform to its schema.
+      operationId: validateEnvelope
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContractValidationRequest'
+      responses:
+        '200':
+          description: Validation result
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractValidationResponse'
+        '400':
+          description: Invalid request
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '406':
+          description: Unsupported API version requested
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/contracts/validate/envelope/bulk:
+    post:
+      summary: Validate multiple envelopes in batch
+      description: |
+        Validates multiple envelopes against the loaded contract bundle schemas.
+        Returns validation results for each envelope.
+      operationId: validateEnvelopeBulk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - envelopes
+              properties:
+                envelopes:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+      responses:
+        '200':
+          description: Bulk validation results
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - results
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ContractValidationResponse'
+        '406':
+          description: Unsupported API version requested
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/contracts/status:
+    get:
+      summary: Get contract bundle status
+      description: Returns information about the currently loaded contract bundle
+      operationId: getContractBundleStatus
+      responses:
+        '200':
+          description: Contract bundle status
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractBundleStatus'
+        '406':
+          description: Unsupported API version requested
+          headers:
+            X-Demon-API-Version:
+              $ref: '#/components/headers/X-Demon-API-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
