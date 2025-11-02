@@ -86,8 +86,7 @@ fn render_result_envelope(card: &CardDefinition, run: &RunDetail) -> Result<Stri
     // Status badge
     html.push_str(&format!(
         "<div class=\"card-status\"><span class=\"status-badge status-{}\">{}</span></div>",
-        status_class,
-        status_text
+        status_class, status_text
     ));
 
     // Duration if available
@@ -320,8 +319,7 @@ fn format_field_value(value: &Option<&Value>, format: &str) -> String {
                 let status_text = escape_html(&status);
                 format!(
                     "<span class=\"status-badge status-{}\">{}</span>",
-                    status_class,
-                    status_text
+                    status_class, status_text
                 )
             }
             "timestamp" => v
