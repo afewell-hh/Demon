@@ -229,14 +229,8 @@ components:
 
     ContractValidationRequest:
       type: object
-      description: Request to validate an envelope against contract schemas
-      required:
-        - envelope
-      properties:
-        envelope:
-          type: object
-          description: The envelope to validate
-          additionalProperties: true
+      description: Envelope payload to validate against contract schemas
+      additionalProperties: true
 
     ContractValidationResponse:
       type: object
@@ -252,8 +246,32 @@ components:
           type: array
           description: List of validation errors (empty if valid)
           items:
-            type: string
+            $ref: '#/components/schemas/ValidationError'
           example: []
+
+    ValidationError:
+      type: object
+      description: Detailed information about a validation error
+      required:
+        - path
+        - message
+      properties:
+        path:
+          type: string
+          description: JSON path to the field that failed validation (may be empty)
+          example: "result.data"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "missing required property"
+        schema_path:
+          type: string
+          description: Schema path associated with the validation error
+          example: "#/properties/result"
+        kind:
+          type: string
+          description: Optional error classification returned by the validator
+          example: "required"
 
     ContractBundleStatus:
       type: object
