@@ -1,5 +1,6 @@
 // Library interface for operate-ui
 
+pub mod api_version;
 pub mod app_packs;
 pub mod card_renderers;
 pub mod contracts;
@@ -10,6 +11,7 @@ use anyhow::Result;
 use axum::{
     handler::HandlerWithoutStateExt,
     http::StatusCode,
+    middleware,
     response::{Html, IntoResponse, Response},
     routing::{get, get_service, post},
     Router,
@@ -415,6 +417,9 @@ pub fn create_app(state: AppState) -> Router {
             ),
         )
         .fallback(not_found)
+        .layer(middleware::from_fn(
+            api_version::version_negotiation_middleware,
+        ))
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),
