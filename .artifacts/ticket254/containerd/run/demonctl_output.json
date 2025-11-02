@@ -1,0 +1,69 @@
+{
+  "event": "ritual.completed:v1",
+  "outputs": {
+    "diagnostics": [
+      {
+        "context": {
+          "image": "docker.io/library/bash@sha256:b63891058ebfb442f452080633a9400a2c8ebe090411b7148a2cace140e91c96",
+          "mount": "/workspace/.artifacts"
+        },
+        "level": "info",
+        "message": "container runtime exited with code 0",
+        "source": "container-exec",
+        "timestamp": "2025-10-19T18:10:12.397154887Z"
+      },
+      {
+        "level": "info",
+        "message": "stdout: === DEMON_DEBUG pre-run ===\nuid: 1000\ngid: 1000\nENVELOPE_PATH=/workspace/.artifacts/result.json\ntotal 0\n-rw-rw-rw-    1 1000     1000             0 Oct 19 18:10 result.json\noverlay on / type overlay (ro,relatime,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/6/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/5/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/4/fs,upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/18/fs,workdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/18/work)\nproc on /proc type proc (rw,nosuid,nodev,noexec,relatime)\ntmpfs on /dev type tmpfs (rw,nosuid,size=65536k,mode=755,inode64)\nsysfs on /sys type sysfs (ro,nosuid,nodev,noexec,relatime)\ntmpfs on /tmp type tmpfs (rw,nosuid,nodev,noexec,relatime,size=65536k,inode64)\n/dev/vda1 on /workspace type ext4 (ro,relatime,discard,errors=remount-ro)\ndevpts on /dev/pts type devpts (rw,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=666)\nshm on /dev/shm type tmpfs (rw,nosuid,nodev,noexec,relatime,size=65536k,inode64)\nmqueue on /dev/mqueue type mqueue (rw,nosuid,nodev,noexec,relatime)\n/dev/vda1 on /workspace/.artifacts type ext4 (rw,relatime,discard,errors=remount-ro)\ncgroup on /sys/fs/cgroup type cgroup2 (ro,nosuid,nodev,noexec,relatime)\n/dev/vda1 on /workspace/.artifacts/result.json type ext4 (rw,relatime,discard,errors=remount-ro)\nproc on /proc/bus type proc (ro,nosuid,nodev,noexec,relatime)\nproc on /proc/fs type proc (ro,nosuid,nodev,noexec,relatime)\nproc on /proc/irq type proc (ro,nosuid,nodev,noexec,relatime)\nproc on /proc/sys type proc (ro,nosuid,nodev,noexec,relatime)\nproc on /proc/sysrq-trigger type proc (ro,nosuid,nodev,noexec,relatime)\ntmpfs on /proc/acpi type tmpfs (ro,relatime,inode64)\ntmpfs on /proc/kcore type tmpfs (rw,nosuid,size=65536k,mode=755,inode64)\ntmpfs on /proc/keys type tmpfs (rw,nosuid,size=65536k,mode=755,inode64)\ntmpfs on /proc/timer_list type tmpfs (rw,nosuid,size=65536k,mode=755,inode64)\ntmpfs on /sys/… (truncated)",
+        "source": "container-exec",
+        "timestamp": "2025-10-19T18:10:12.397246694Z"
+      },
+      {
+        "level": "warning",
+        "message": "stderr: time=\"2025-10-19T18:10:12Z\" level=warning msg=\"failed to remove hosts file for container \\\"dea4aa135899e339b6b5d60b072e343fb6bee07588acfc58562f8f70e2c7a8c8\\\"\" error=\"hosts-store error\\nnot found\\nstat /var/lib/nerdctl/1935db59/etchosts/moby/dea4aa135899e339b6b5d60b072e343fb6bee07588acfc58562f8f70e2c7a8c8: no such file or directory\"\n",
+        "source": "container-exec",
+        "timestamp": "2025-10-19T18:10:12.397250325Z"
+      },
+      {
+        "level": "info",
+        "message": "runtime command: /home/ubuntu/bin/nerdctl-moby.sh run --rm --pull never --network none --read-only --security-opt no-new-privileges --user 1000:1000 --tmpfs /tmp:rw,noexec,nosuid,nodev,size=67108864 --mount type=bind,source=/home/ubuntu/afewell-hh/demon/.artifacts/ticket254/containerd/app-home/packs/ticket254-containerd/0.1.0,target=/workspace,readonly=true --mount type=bind,source=/tmp/demon-artifacts-pIIyjc,target=/workspace/.artifacts,readonly=false --workdir /workspace --mount type=bind,source=/tmp/demon-artifacts-pIIyjc/result.json,target=/workspace/.artifacts/result.json,readonly=false --env ENVELOPE_PATH=/workspace/.artifacts/result.json --env DEMON_DEBUG=1 --entrypoint  docker.io/library/bash@sha256:b63891058ebfb442f452080633a9400a2c8ebe090411b7148a2cace140e91c96 /bin/sh -c 'set -e; echo '\\''=== DEMON_DEBUG pre-run ==='\\''; echo uid: $(id -u); echo gid: $(id -g); echo \"ENVELOPE_PATH=${ENVELOPE_PATH}\"; p=\"$(dirname \"$ENVELOPE_PATH\")\"; ls -l \"$p\" || true; test -w \"$ENVELOPE_PATH\" || echo '\\''NOT WRITABLE'\\''; (mount 2>/… (truncated)",
+        "source": "container-exec",
+        "timestamp": "2025-10-19T18:10:12.397260644Z"
+      },
+      {
+        "level": "info",
+        "message": "host ls -l /tmp/demon-artifacts-pIIyjc/result.json:\n-rw-rw-rw- 1 ubuntu ubuntu 73 Oct 19 18:10 /tmp/demon-artifacts-pIIyjc/result.json\n",
+        "source": "container-exec",
+        "timestamp": "2025-10-19T18:10:12.409250679Z"
+      },
+      {
+        "level": "info",
+        "message": "host stat /tmp/demon-artifacts-pIIyjc/result.json:\n  File: /tmp/demon-artifacts-pIIyjc/result.json\n  Size: 73        \tBlocks: 8          IO Block: 4096   regular file\nDevice: fc01h/64513d\tInode: 2371012     Links: 1\nAccess: (0666/-rw-rw-rw-)  Uid: ( 1000/  ubuntu)   Gid: ( 1000/  ubuntu)\nAccess: 2025-10-19 18:10:12.375516296 +0000\nModify: 2025-10-19 18:10:12.223510604 +0000\nChange: 2025-10-19 18:10:12.223510604 +0000\n Birth: 2025-10-19 18:10:11.751492931 +0000\n",
+        "source": "container-exec",
+        "timestamp": "2025-10-19T18:10:12.409261462Z"
+      }
+    ],
+    "metrics": {
+      "duration": {
+        "total_ms": 622.016857
+      }
+    },
+    "provenance": {
+      "source": {
+        "instance": "writer",
+        "system": "container-exec",
+        "version": "0.0.1"
+      },
+      "timestamp": "2025-10-19T18:10:12.409419858Z"
+    },
+    "result": {
+      "data": {
+        "note": "containerd"
+      },
+      "success": true
+    }
+  },
+  "ritualId": "ticket254-containerd:containerd",
+  "runId": "86c2e61a-8c98-45ac-95f0-0f1434c15922",
+  "ts": "2025-10-19T18:10:12.409880371+00:00"
+}

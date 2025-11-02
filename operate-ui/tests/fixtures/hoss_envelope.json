@@ -1,0 +1,109 @@
+{
+  "result": {
+    "success": true,
+    "data": {
+      "message": "HOSS 0.2.0-rc1 promotion dry-run completed",
+      "id": "hoss-promote-rc1-001",
+      "outputs": {
+        "artifacts_published": 12,
+        "warnings": 1,
+        "total": 13,
+        "cards": {
+          "primaryStatus": "Promotion ✓",
+          "secondaryStatus": "Warnings: 1"
+        }
+      },
+      "schemaVersion": "0.2.0-rc1",
+      "compat": {
+        "forward": true,
+        "backfill": true
+      },
+      "newFieldFromRc1": {
+        "tolerance": "ignored-by-mapper",
+        "notes": "Demonstrates mapping tolerance for unknown fields"
+      }
+    }
+  },
+  "diagnostics": [
+    {
+      "level": "info",
+      "message": "Starting HOSS rc1 publish",
+      "timestamp": "2025-10-13T16:59:00Z",
+      "source": "hoss.release"
+    },
+    {
+      "level": "warning",
+      "message": "1 artifact skipped due to soft validation",
+      "timestamp": "2025-10-13T17:04:00Z",
+      "source": "hoss.validator"
+    }
+  ],
+  "suggestions": [
+    {
+      "type": "optimization",
+      "description": "Enable delta sync for large manifests",
+      "priority": "medium"
+    }
+  ],
+  "metrics": {
+    "duration": {
+      "total_ms": 45231,
+      "phases": {
+        "validation_ms": 3800,
+        "publish_ms": 41000
+      }
+    },
+    "resources": {
+      "memory_bytes": 402653184,
+      "cpu_percent": 36.2
+    },
+    "counters": {
+      "api_calls": 48
+    },
+    "runtime": {
+      "capsule": {
+        "image": "ghcr.io/hoss/hfab@sha256:d34db33f",
+        "exitCode": 0,
+        "duration_ms": 44666
+      }
+    },
+    "counts": {
+      "steps": {
+        "completed": {
+          "total": 8,
+          "retry": 0
+        },
+        "failed": 0
+      }
+    },
+    "custom": {
+      "builds_promoted": 5
+    }
+  },
+  "provenance": {
+    "source": {
+      "system": "hoss",
+      "version": "0.2.0-rc1",
+      "instance": "ci-east-1"
+    },
+    "timestamp": "2025-10-13T17:05:00Z",
+    "trace_id": "9c9b2b3c4d5e6f708192a3b4c5d6e7f8",
+    "chain": [
+      {
+        "step": "request_received",
+        "timestamp": "2025-10-13T16:59:00Z",
+        "actor": "api-gateway"
+      },
+      {
+        "step": "validation_completed",
+        "timestamp": "2025-10-13T17:00:00Z",
+        "actor": "hoss.validator"
+      },
+      {
+        "step": "publish_completed",
+        "timestamp": "2025-10-13T17:04:56Z",
+        "actor": "hoss.publisher"
+      }
+    ]
+  }
+}

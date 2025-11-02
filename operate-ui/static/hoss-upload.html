@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Operate UI — HOSS v0.2.0-rc1 Envelope Validation</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; color: #1f2937; }
+    h1 { margin: 0 0 8px 0; font-size: 20px; }
+    .sub { color: #6b7280; margin-bottom: 16px; }
+    .row { display: flex; gap: 16px; }
+    .card { flex: 1; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+    .card h2 { margin: 0; padding: 10px 12px; background: #f3f4f6; font-size: 14px; border-bottom: 1px solid #e5e7eb; }
+    pre { margin: 0; padding: 12px; background: #fff; max-height: 560px; overflow: auto; font-size: 12px; }
+    .status { margin-top: 16px; padding: 10px 12px; border-radius: 6px; font-weight: 600; }
+    .ok { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+    .err { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .badge { display: inline-block; font-size: 11px; padding: 2px 6px; border-radius: 999px; background: #e5e7eb; color: #374151; margin-left: 8px; }
+  </style>
+  <script>
+    const ENVELOPE = {
+  "result": {
+    "success": true,
+    "data": {
+      "message": "HOSS 0.2.0-rc1 promotion dry-run completed",
+      "id": "hoss-promote-rc1-001",
+      "outputs": {
+        "artifacts_published": 12,
+        "warnings": 1,
+        "total": 13
+      },
+      "schemaVersion": "0.2.0-rc1",
+      "compat": {"forward": true, "backfill": true},
+      "newFieldFromRc1": {
+        "tolerance": "ignored-by-mapper",
+        "notes": "Demonstrates mapping tolerance for unknown fields"
+      }
+    }
+  },
+  "diagnostics": [
+    {"level": "info", "message": "Starting HOSS rc1 publish", "timestamp": "2025-10-13T16:59:00Z", "source": "hoss.release"},
+    {"level": "warning", "message": "1 artifact skipped due to soft validation", "timestamp": "2025-10-13T17:04:00Z", "source": "hoss.validator"}
+  ],
+  "suggestions": [
+    {"type": "optimization", "description": "Enable delta sync for large manifests", "priority": "medium"}
+  ],
+  "metrics": {
+    "duration": {"total_ms": 45231, "phases": {"validation_ms": 3800, "publish_ms": 41000}},
+    "resources": {"memory_bytes": 402653184, "cpu_percent": 36.2},
+    "counters": {"api_calls": 48},
+    "runtime": {"capsule": {"image": "ghcr.io/hoss/hfab@sha256:d34db33f", "exitCode": 0, "duration_ms": 44666}},
+    "counts": {"steps": {"completed": {"total": 8, "retry": 0}, "failed": 0}},
+    "custom": {"builds_promoted": 5}
+  },
+  "provenance": {
+    "source": {"system": "hoss", "version": "0.2.0-rc1", "instance": "ci-east-1"},
+    "timestamp": "2025-10-13T17:05:00Z",
+    "trace_id": "9c9b2b3c4d5e6f708192a3b4c5d6e7f8",
+    "chain": [
+      {"step": "request_received", "timestamp": "2025-10-13T16:59:00Z", "actor": "api-gateway"},
+      {"step": "validation_completed", "timestamp": "2025-10-13T17:00:00Z", "actor": "hoss.validator"},
+      {"step": "publish_completed", "timestamp": "2025-10-13T17:04:56Z", "actor": "hoss.publisher"}
+    ]
+  }
+}
+
+ ;
+    async function run() {
+      document.getElementById('envelope').textContent = JSON.stringify(ENVELOPE, null, 2);
+      try {
+        const res = await fetch('/api/contracts/validate/envelope', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ENVELOPE) });
+        const data = await res.json();
+        const ok = !!data.valid && (!data.errors || data.errors.length === 0);
+        document.getElementById('status').className = 'status ' + (ok ? 'ok' : 'err');
+        document.getElementById('status').innerHTML = (ok ? 'Valid: true' : 'Valid: false') + `<span class="badge">HOSS v0.2.0-rc1</span>`;
+        document.getElementById('response').textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        document.getElementById('status').className = 'status err';
+        document.getElementById('status').textContent = 'Request failed: ' + e.message;
+      }
+    }
+    window.addEventListener('DOMContentLoaded', run);
+  </script>
+ </head>
+<body>
+  <h1>Operate UI — Envelope Validation</h1>
+  <div class="sub">Uploading HOSS v0.2.0-rc1 envelope (tolerance for new fields)</div>
+  <div id="status" class="status">Loading…</div>
+  <div class="row">
+    <div class="card">
+      <h2>Envelope (payload)</h2>
+      <pre id="envelope"></pre>
+    </div>
+    <div class="card">
+      <h2>Validation Response</h2>
+      <pre id="response"></pre>
+    </div>
+  </div>
+</body>
+</html>
+

@@ -1,0 +1,3 @@
+Commands:
+1. DEMON_APP_HOME=$PWD/.artifacts/ticket257/app-home cargo run -p demonctl --quiet -- app install $PWD/.artifacts/ticket257/pack --overwrite
+2. DEMON_APP_HOME=$PWD/.artifacts/ticket257/app-home DEMON_CONTAINER_USER=1000:1000 DEMON_DEBUG=1 cargo run -p demonctl --quiet -- run ticket257:day7 --save --output-dir $PWD/.artifacts/ticket257/run

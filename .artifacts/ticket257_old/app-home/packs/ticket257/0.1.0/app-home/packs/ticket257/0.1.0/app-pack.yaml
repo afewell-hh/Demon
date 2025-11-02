@@ -1,0 +1,21 @@
+apiVersion: demon.io/v1
+kind: AppPack
+metadata:
+  name: ticket257
+  version: 0.1.0
+contracts:
+  - id: ticket/contracts/result
+    version: 0.1.0
+    path: contracts/test/result.json
+capsules:
+  - type: container-exec
+    name: writer
+    imageDigest: docker.io/library/bash@sha256:b63891058ebfb442f452080633a9400a2c8ebe090411b7148a2cace140e91c96
+    command:
+      - /workspace/capsules/test/scripts/write_envelope.sh
+    outputs:
+      envelopePath: /workspace/.artifacts/result.json
+rituals:
+  - name: day7
+    steps:
+      - capsule: writer
