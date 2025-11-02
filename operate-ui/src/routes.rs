@@ -25,6 +25,8 @@ pub struct GraphScopeQuery {
     #[serde(rename = "graphId")]
     pub graph_id: Option<String>,
     pub limit: Option<usize>,
+    #[serde(rename = "runId")]
+    pub run_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -2388,6 +2390,43 @@ pub async fn graph_viewer_html(
     context.insert("namespace", &namespace);
     context.insert("graph_id", &graph_id);
     context.insert("runtime_api_url", &get_runtime_api_url());
+
+    // If run_id is provided, fetch run details and render cards
+    if let Some(ref run_id) = query.run_id {
+        context.insert("run_id", run_id);
+
+        if let Some(client) = &state.jetstream_client {
+            match client.get_run_detail_for_tenant("default", run_id).await {
+                Ok(Some(run)) => {
+                    // Render App Pack cards for this ritual
+                    if let Some(registry) = &state.app_pack_registry {
+                        let matching_cards = registry.get_cards_for_ritual(&run.ritual_id);
+                        let mut rendered_cards = Vec::new();
+
+                        for card in matching_cards {
+                            match crate::card_renderers::render_card(&card, &run) {
+                                Ok(rendered) => rendered_cards.push(rendered),
+                                Err(e) => {
+                                    warn!("Failed to render card '{}': {}", card.id, e);
+                                }
+                            }
+                        }
+
+                        if !rendered_cards.is_empty() {
+                            context.insert("rendered_cards", &rendered_cards);
+                            context.insert("run_ritual_id", &run.ritual_id);
+                        }
+                    }
+                }
+                Ok(None) => {
+                    warn!("Run not found: {}", run_id);
+                }
+                Err(e) => {
+                    error!("Failed to fetch run for graph viewer: {}", e);
+                }
+            }
+        }
+    }
 
     let html = state
         .tera

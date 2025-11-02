@@ -87,6 +87,35 @@
     <div id="commitDetailContainer"></div>
 </div>
 
+{% if rendered_cards %}
+<div class="card" id="runCardsPanel">
+    <div class="card-header">
+        <h3 class="card-title">Run Cards - {{ run_id }}</h3>
+        <a href="/runs/{{ run_id }}" class="btn btn-secondary" style="margin-left: auto; margin-right: 0.5rem;">View Run Detail</a>
+    </div>
+    <div style="margin-bottom: 1rem; padding: 0 1rem;">
+        <p><strong>Run ID:</strong> <code>{{ run_id }}</code></p>
+        <p><strong>Ritual:</strong> <code>{{ run_ritual_id }}</code></p>
+    </div>
+    <div class="app-pack-cards-container" style="padding: 0 1rem;">
+        {% for card in rendered_cards %}
+        <div class="app-pack-card" data-card-id="{{ card.id }}" data-card-kind="{{ card.kind }}" style="margin-bottom: 1rem;">
+            <div class="app-pack-card-header">
+                <h4 class="app-pack-card-title">{{ card.title }}</h4>
+                <span class="card-kind-badge">{{ card.kind }}</span>
+            </div>
+            {% if card.description %}
+            <p class="app-pack-card-description">{{ card.description }}</p>
+            {% endif %}
+            <div class="app-pack-card-content">
+                {{ card.html | safe }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 <script>
 const RUNTIME_API_URL = "{{ runtime_api_url }}";
 
