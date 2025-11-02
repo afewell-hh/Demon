@@ -69,7 +69,7 @@ fn render_result_envelope(card: &CardDefinition, run: &RunDetail) -> Result<Stri
     let duration = duration_path
         .and_then(|path| extract_json_path(outputs, path))
         .and_then(|v| v.as_f64())
-        .map(|ms| format_duration(ms));
+        .map(format_duration);
 
     // Extract markdown content
     let markdown_content = markdown_path

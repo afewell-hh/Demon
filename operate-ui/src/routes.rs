@@ -301,6 +301,25 @@ pub async fn get_run_html_tenant(
         if let Some(summary) = ApprovalsSummary::from_events(&rd.events) {
             context.insert("approvals", &summary);
         }
+
+        // Render App Pack cards for this ritual
+        if let Some(registry) = &state.app_pack_registry {
+            let matching_cards = registry.get_cards_for_ritual(&rd.ritual_id);
+            let mut rendered_cards = Vec::new();
+
+            for card in matching_cards {
+                match crate::card_renderers::render_card(&card, rd) {
+                    Ok(rendered) => rendered_cards.push(rendered),
+                    Err(e) => {
+                        warn!("Failed to render card '{}': {}", card.id, e);
+                    }
+                }
+            }
+
+            if !rendered_cards.is_empty() {
+                context.insert("rendered_cards", &rendered_cards);
+            }
+        }
     }
 
     let html = state
