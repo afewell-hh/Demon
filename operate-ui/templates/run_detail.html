@@ -209,7 +209,13 @@
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">App Pack Cards</h3>
-        <a href="/graph?runId={{ run_id }}" class="btn btn-secondary" style="margin-left: auto;">View in Graph</a>
+        <a
+            href="/graph?{% if tenant %}tenantId={{ tenant }}&amp;{% endif %}runId={{ run_id }}"
+            class="btn btn-secondary"
+            style="margin-left: auto;"
+        >
+            View in Graph
+        </a>
     </div>
     <div class="app-pack-cards-container">
         {% for card in rendered_cards %}
