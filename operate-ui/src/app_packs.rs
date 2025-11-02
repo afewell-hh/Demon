@@ -42,7 +42,7 @@ pub struct CardDefinition {
     pub description: Option<String>,
     #[serde(rename = "match")]
     pub match_rules: MatchRules,
-    #[serde(default)]
+    #[serde(default, alias = "fields")]
     pub config: Option<serde_json::Value>,
 }
 
