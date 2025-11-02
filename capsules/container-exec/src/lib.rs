@@ -1705,6 +1705,7 @@ esac
 
     #[test]
     fn configure_command_clears_entrypoint_and_preserves_command_order() {
+        let _guard = env_guard();
         // Ensure debug mode is off so command parts are not wrapped
         env::remove_var("DEMON_DEBUG");
 

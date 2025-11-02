@@ -128,23 +128,58 @@ Each ritual defines a sequence of capsule invocations. The `with` block passes c
 ```yaml
 ui:
   cards:
-    - id: my-card
-      kind: json-viewer
-      title: My Output
-      description: Displays workflow results
+    # Result summary with status badges
+    - id: my-result-card
+      kind: result-envelope
+      title: Execution Summary
+      description: Shows outcome, duration, and status
       match:
         rituals:
           - my-workflow
-      fields:
-        show:
-          - payload.result
-          - metadata.timestamp
-        map:
-          Result: payload.result
-          Timestamp: metadata.timestamp
+      config:
+        statusPath: result.success
+        durationPath: duration
+        showTimestamp: true
+
+    # Structured field display
+    - id: my-fields-card
+      kind: fields-table
+      title: Key Outputs
+      description: Important fields from the execution
+      match:
+        rituals:
+          - my-workflow
+      config:
+        fields:
+          - label: Status
+            path: result.success
+            format: badge
+          - label: Message
+            path: result.data.message
+            format: text
+
+    # Full JSON inspection
+    - id: my-json-card
+      kind: json-viewer
+      title: Complete Output
+      description: Full ritual output for debugging
+      match:
+        rituals:
+          - my-workflow
+      config:
+        expandDepth: 2
 ```
 
-UI cards define how Operate UI displays ritual execution results.
+UI cards define how Operate UI displays ritual execution results. The Operate UI supports four card types:
+
+- **result-envelope**: Status badges, duration, timestamps, and markdown summaries
+- **fields-table**: Configurable key-value table with formatted values
+- **markdown-view**: Long-form text or log content with scrolling
+- **json-viewer**: Full JSON output inspection with syntax highlighting
+
+Cards are matched to rituals by name and automatically rendered when viewing run details. Multiple cards can be defined for the same ritual to show different aspects of the output.
+
+**See [UI Manifests Guide](./ui-manifests.md) for complete card type specifications, JSON path syntax, and examples.**
 
 ### Signature Verification (Optional)
 

@@ -205,6 +205,37 @@
 </div>
 {% endif %}
 
+{% if rendered_cards %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">App Pack Cards</h3>
+        <a
+            href="/graph?{% if tenant %}tenantId={{ tenant }}&amp;{% endif %}runId={{ run_id }}"
+            class="btn btn-secondary"
+            style="margin-left: auto;"
+        >
+            View in Graph
+        </a>
+    </div>
+    <div class="app-pack-cards-container">
+        {% for card in rendered_cards %}
+        <div class="app-pack-card" data-card-id="{{ card.id }}" data-card-kind="{{ card.kind }}">
+            <div class="app-pack-card-header">
+                <h4 class="app-pack-card-title">{{ card.title }}</h4>
+                <span class="card-kind-badge">{{ card.kind }}</span>
+            </div>
+            {% if card.description %}
+            <p class="app-pack-card-description">{{ card.description }}</p>
+            {% endif %}
+            <div class="app-pack-card-content">
+                {{ card.html | safe }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">Event Timeline</h3>
@@ -363,6 +394,169 @@
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.3; }
+}
+
+/* App Pack Cards Styling */
+.app-pack-cards-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.app-pack-card {
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: 8px;
+    padding: 1.5rem;
+    background: var(--card-background, #ffffff);
+}
+
+.app-pack-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color, #e0e0e0);
+}
+
+.app-pack-card-title {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary, #333);
+}
+
+.card-kind-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background-color: var(--bg-secondary, #f5f5f5);
+    color: var(--text-secondary, #666);
+}
+
+.app-pack-card-description {
+    margin: 0 0 1rem 0;
+    color: var(--text-secondary, #666);
+    font-size: 0.875rem;
+}
+
+.app-pack-card-content {
+    margin-top: 1rem;
+}
+
+/* result-envelope card styles */
+.result-envelope-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.card-status, .card-duration, .card-timestamp {
+    padding: 0.5rem;
+    background-color: var(--bg-secondary, #f9f9f9);
+    border-radius: 4px;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-transform: capitalize;
+}
+
+.status-badge.status-success {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.status-badge.status-failed {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.status-badge.status-unknown {
+    background-color: #e2e3e5;
+    color: #383d41;
+}
+
+.card-markdown {
+    margin-top: 0.75rem;
+    padding: 1rem;
+    background-color: var(--bg-secondary, #f9f9f9);
+    border-left: 3px solid var(--primary-color, #007bff);
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 0.875rem;
+}
+
+/* fields-table card styles */
+.fields-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.fields-table tr {
+    border-bottom: 1px solid var(--border-color, #e0e0e0);
+}
+
+.fields-table td {
+    padding: 0.75rem;
+}
+
+.field-label {
+    width: 30%;
+    color: var(--text-secondary, #666);
+    vertical-align: top;
+}
+
+.field-value {
+    color: var(--text-primary, #333);
+}
+
+.field-value code {
+    background-color: var(--bg-secondary, #f5f5f5);
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
+    font-size: 0.875rem;
+}
+
+/* markdown-view card styles */
+.markdown-view-card {
+    overflow-y: auto;
+}
+
+.markdown-content {
+    padding: 1rem;
+    background-color: var(--bg-secondary, #f9f9f9);
+    border-radius: 4px;
+    white-space: pre-wrap;
+    font-family: var(--font-mono, 'Courier New', monospace);
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+/* json-viewer card styles */
+.json-viewer-card {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.json-content {
+    background-color: var(--bg-secondary, #f9f9f9);
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: 4px;
+    padding: 1rem;
+    overflow-x: auto;
+}
+
+.json-content code {
+    font-family: var(--font-mono, 'Courier New', monospace);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--text-primary, #333);
 }
 </style>
 

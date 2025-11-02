@@ -43,18 +43,14 @@ pub struct CardDefinition {
     #[serde(rename = "match")]
     pub match_rules: MatchRules,
     #[serde(default)]
-    pub fields: Option<CardFields>,
+    pub config: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchRules {
     pub rituals: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CardFields {
     #[serde(default)]
-    pub show: Vec<String>,
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -167,12 +163,9 @@ impl CardDefinition {
         self.match_rules.rituals.contains(&ritual_name.to_string())
     }
 
-    /// Get the list of fields to show (empty vec if not specified)
-    pub fn fields_to_show(&self) -> Vec<String> {
-        self.fields
-            .as_ref()
-            .map(|f| f.show.clone())
-            .unwrap_or_default()
+    /// Get the card configuration as a JSON value
+    pub fn get_config(&self) -> Option<&serde_json::Value> {
+        self.config.as_ref()
     }
 }
 
@@ -212,8 +205,8 @@ ui:
       title: Test Card
       match:
         rituals: ["test-ritual"]
-      fields:
-        show: ["status"]
+      config:
+        statusPath: result.success
 "#;
         fs::write(&manifest_path, manifest_content).unwrap();
 
@@ -247,8 +240,9 @@ ui:
             description: None,
             match_rules: MatchRules {
                 rituals: vec!["ritual-a".to_string(), "ritual-b".to_string()],
+                tags: vec![],
             },
-            fields: None,
+            config: None,
         };
 
         assert!(card.matches_ritual("ritual-a"));

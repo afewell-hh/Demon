@@ -1,6 +1,7 @@
 // Library interface for operate-ui
 
 pub mod app_packs;
+pub mod card_renderers;
 pub mod contracts;
 pub mod jetstream;
 pub mod routes;
