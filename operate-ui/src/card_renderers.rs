@@ -183,7 +183,10 @@ fn render_markdown_view(card: &CardDefinition, run: &RunDetail) -> Result<String
         .and_then(|v| v.as_str())
         .ok_or_else(|| anyhow::anyhow!("markdown-view config must have 'contentPath'"))?;
 
-    let max_height = config.get("maxHeight").and_then(|v| v.as_str());
+    let max_height = config
+        .get("maxHeight")
+        .and_then(|v| v.as_str())
+        .and_then(sanitize_css_length);
 
     // Find ritual.completed event
     let completed_event = run.events.iter().find(|e| e.event == "ritual.completed:v1");
@@ -197,7 +200,12 @@ fn render_markdown_view(card: &CardDefinition, run: &RunDetail) -> Result<String
         .unwrap_or("*No content available*");
 
     let style = max_height
-        .map(|h| format!(" style=\"max-height: {}; overflow-y: auto;\"", h))
+        .map(|h| {
+            format!(
+                " style=\"max-height: {}; overflow-y: auto;\"",
+                escape_html(&h)
+            )
+        })
         .unwrap_or_default();
 
     let html = format!(
@@ -329,6 +337,56 @@ fn format_field_value(value: &Option<&Value>, format: &str) -> String {
     }
 }
 
+fn sanitize_css_length(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    if matches!(trimmed.to_ascii_lowercase().as_str(), "auto" | "inherit" | "initial" | "none") {
+        return Some(trimmed.to_string());
+    }
+
+    let mut chars = trimmed.chars().peekable();
+    let mut digits = 0usize;
+
+    while matches!(chars.peek(), Some(c) if c.is_ascii_digit()) {
+        digits += 1;
+        chars.next();
+    }
+
+    if digits == 0 {
+        return None;
+    }
+
+    if matches!(chars.peek(), Some('.')) {
+        chars.next();
+        let mut fractional_digits = 0usize;
+        while matches!(chars.peek(), Some(c) if c.is_ascii_digit()) {
+            fractional_digits += 1;
+            chars.next();
+        }
+        if fractional_digits == 0 {
+            return None;
+        }
+    }
+
+    let unit: String = chars.collect::<String>().to_ascii_lowercase();
+
+    let valid_unit = matches!(
+        unit.as_str(),
+        "" | "%" | "px" | "rem" | "em" | "ch" | "ex" | "vh" | "vw" | "vmin" | "vmax"
+            | "cm" | "mm" | "in" | "pt" | "pc"
+    );
+
+    if !valid_unit {
+        return None;
+    }
+
+    Some(trimmed.to_string())
+}
+
 /// Basic HTML escaping
 fn escape_html(s: &str) -> String {
     s.replace('&', "&amp;")
@@ -387,5 +445,17 @@ mod tests {
         assert_eq!(format_duration(123.45), "123.45ms");
         assert_eq!(format_duration(1500.0), "1.50s");
         assert_eq!(format_duration(125000.0), "2m 5.00s");
+    }
+
+    #[test]
+    fn test_sanitize_css_length() {
+        assert_eq!(sanitize_css_length("400px"), Some("400px".to_string()));
+        assert_eq!(sanitize_css_length(" 50%"), Some("50%".to_string()));
+        assert_eq!(sanitize_css_length("auto"), Some("auto".to_string()));
+        assert_eq!(sanitize_css_length("12.5rem"), Some("12.5rem".to_string()));
+        assert_eq!(sanitize_css_length("inherit"), Some("inherit".to_string()));
+        assert_eq!(sanitize_css_length(""), None);
+        assert_eq!(sanitize_css_length("calc(100% - 2rem)"), None);
+        assert_eq!(sanitize_css_length("400px\" onmouseover=\"alert(1)"), None);
     }
 }
