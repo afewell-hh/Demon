@@ -2396,7 +2396,7 @@ pub async fn graph_viewer_html(
         context.insert("run_id", run_id);
 
         if let Some(client) = &state.jetstream_client {
-            match client.get_run_detail_for_tenant("default", run_id).await {
+            match client.get_run_detail_for_tenant(&tenant_id, run_id).await {
                 Ok(Some(run)) => {
                     // Render App Pack cards for this ritual
                     if let Some(registry) = &state.app_pack_registry {
