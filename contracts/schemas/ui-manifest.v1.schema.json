@@ -141,7 +141,8 @@
               "config": {
                 "$ref": "#/$defs/fieldsTableConfig"
               }
-            }
+            },
+            "required": ["config"]
           }
         },
         {
@@ -157,7 +158,8 @@
               "config": {
                 "$ref": "#/$defs/markdownViewConfig"
               }
-            }
+            },
+            "required": ["config"]
           }
         },
         {

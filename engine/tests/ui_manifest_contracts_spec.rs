@@ -219,3 +219,119 @@ fn ui_manifest_rejects_mismatched_kind_and_config() {
         validation2.ok()
     );
 }
+
+#[test]
+fn ui_manifest_requires_config_for_fields_table() {
+    let schema_path = "../contracts/schemas/ui-manifest.v1.schema.json";
+    let schema_text = fs::read_to_string(schema_path).expect(schema_path);
+    let schema = JSONSchema::compile(&serde_json::from_str(&schema_text).expect("parse schema"))
+        .expect("schema compiles");
+
+    // fields-table without config (should be rejected)
+    let missing_config = serde_json::json!({
+        "apiVersion": "demon.io/v1",
+        "kind": "UIManifest",
+        "metadata": {
+            "name": "test",
+            "version": "1.0.0"
+        },
+        "cards": [{
+            "id": "test-card",
+            "kind": "fields-table",
+            "match": {
+                "rituals": ["test"]
+            }
+        }]
+    });
+
+    let validation = schema.validate(&missing_config);
+    assert!(
+        validation.is_err(),
+        "should reject fields-table without config: {:?}",
+        validation.ok()
+    );
+}
+
+#[test]
+fn ui_manifest_requires_config_for_markdown_view() {
+    let schema_path = "../contracts/schemas/ui-manifest.v1.schema.json";
+    let schema_text = fs::read_to_string(schema_path).expect(schema_path);
+    let schema = JSONSchema::compile(&serde_json::from_str(&schema_text).expect("parse schema"))
+        .expect("schema compiles");
+
+    // markdown-view without config (should be rejected)
+    let missing_config = serde_json::json!({
+        "apiVersion": "demon.io/v1",
+        "kind": "UIManifest",
+        "metadata": {
+            "name": "test",
+            "version": "1.0.0"
+        },
+        "cards": [{
+            "id": "test-card",
+            "kind": "markdown-view",
+            "match": {
+                "rituals": ["test"]
+            }
+        }]
+    });
+
+    let validation = schema.validate(&missing_config);
+    assert!(
+        validation.is_err(),
+        "should reject markdown-view without config: {:?}",
+        validation.ok()
+    );
+}
+
+#[test]
+fn ui_manifest_allows_optional_config_for_other_kinds() {
+    let schema_path = "../contracts/schemas/ui-manifest.v1.schema.json";
+    let schema_text = fs::read_to_string(schema_path).expect(schema_path);
+    let schema = JSONSchema::compile(&serde_json::from_str(&schema_text).expect("parse schema"))
+        .expect("schema compiles");
+
+    // result-envelope without config (should be allowed - config is optional)
+    let no_config_envelope = serde_json::json!({
+        "apiVersion": "demon.io/v1",
+        "kind": "UIManifest",
+        "metadata": {
+            "name": "test",
+            "version": "1.0.0"
+        },
+        "cards": [{
+            "id": "test-card",
+            "kind": "result-envelope",
+            "match": {
+                "rituals": ["test"]
+            }
+        }]
+    });
+
+    assert!(
+        schema.validate(&no_config_envelope).is_ok(),
+        "should allow result-envelope without config (config is optional)"
+    );
+
+    // json-viewer without config (should be allowed - config is optional)
+    let no_config_viewer = serde_json::json!({
+        "apiVersion": "demon.io/v1",
+        "kind": "UIManifest",
+        "metadata": {
+            "name": "test",
+            "version": "1.0.0"
+        },
+        "cards": [{
+            "id": "test-card",
+            "kind": "json-viewer",
+            "match": {
+                "rituals": ["test"]
+            }
+        }]
+    });
+
+    assert!(
+        schema.validate(&no_config_viewer).is_ok(),
+        "should allow json-viewer without config (config is optional)"
+    );
+}
