@@ -1,0 +1,63 @@
+{
+  "diagnostics": [
+    {
+      "context": {
+        "image": "docker.io/library/bash@sha256:b63891058ebfb442f452080633a9400a2c8ebe090411b7148a2cace140e91c96",
+        "mount": "/workspace/.artifacts"
+      },
+      "level": "info",
+      "message": "container runtime exited with code 0",
+      "source": "container-exec",
+      "timestamp": "2025-10-19T18:08:05.448874339Z"
+    },
+    {
+      "level": "info",
+      "message": "stdout: === DEMON_DEBUG pre-run ===\nuid: 1000\ngid: 1000\nENVELOPE_PATH=/workspace/.artifacts/result.json\ntotal 0\n-rw-rw-rw-    1 1000     1000             0 Oct 19 18:08 result.json\noverlay on / type overlay (ro,relatime,lowerdir=/var/lib/docker/overlay2/l/I7SUPOZ7CPLEGHHAJMP4RK5BSW:/var/lib/docker/overlay2/l/ZSNMQHKQIWV3FS23VNSII3I7LX:/var/lib/docker/overlay2/l/JXAGSWVC4V76VZ6JH6ZCKEEOMN:/var/lib/docker/overlay2/l/DPTPC5NY5ZPLFV3WRE3YHODQTL,upperdir=/var/lib/docker/overlay2/a7941c6b59881285e0735076777ce6ad08ce768bd2ac5534456d5b770f5b72ee/diff,workdir=/var/lib/docker/overlay2/a7941c6b59881285e0735076777ce6ad08ce768bd2ac5534456d5b770f5b72ee/work)\nproc on /proc type proc (rw,nosuid,nodev,noexec,relatime)\ntmpfs on /dev type tmpfs (rw,nosuid,size=65536k,mode=755,inode64)\ndevpts on /dev/pts type devpts (rw,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=666)\nsysfs on /sys type sysfs (ro,nosuid,nodev,noexec,relatime)\ncgroup on /sys/fs/cgroup type cgroup2 (ro,nosuid,nodev,noexec,relatime)\nmqueue on /dev/mqueue type mqueue (rw,nosuid,nodev,noexec,relatime)\nshm on /dev/shm type tmpfs (rw,nosuid,nodev,noexec,relatime,size=65536k,inode64)\ntmpfs on /tmp type tmpfs (rw,nosuid,nodev,noexec,relatime,size=65536k,inode64)\n/dev/vda1 on /workspace type ext4 (ro,relatime,discard,errors=remount-ro)\n/dev/vda1 on /workspace/.artifacts type ext4 (rw,relatime,discard,errors=remount-ro)\n/dev/vda1 on /etc/resolv.conf type ext4 (ro,relatime,discard,errors=remount-ro)\n/dev/vda1 on /etc/hostname type ext4 (ro,relatime,discard,errors=remount-ro)\n/dev/vda1 on /etc/hosts type ext4 (ro,relatime,discard,errors=remount-ro)\n/dev/vda1 on /workspace/.artifacts/result.json type ext4 (rw,relatime,discard,errors=remount-ro)\nproc on /proc/bus type proc (ro,nosuid,nodev,noexec,relatime)\nproc on /proc/fs type proc (ro,nosuid,nodev,noexec,relatime)\nproc on /proc/irq type proc (ro,nosuid,nodev,noexec,relatime)\nproc on /proc/sys type proc (ro,nosuid,nodev,noexec,relatime)\nproc on /proc/sysrq-trigger type proc (ro,nosuid,nodev,noexec,relatime)\ntmpfs on /proc/acpi type tm… (truncated)",
+      "source": "container-exec",
+      "timestamp": "2025-10-19T18:08:05.449008558Z"
+    },
+    {
+      "level": "warning",
+      "message": "stderr: [capsule] writing envelope to /workspace/.artifacts/result.json\n",
+      "source": "container-exec",
+      "timestamp": "2025-10-19T18:08:05.449011524Z"
+    },
+    {
+      "level": "info",
+      "message": "runtime command: docker run --rm --pull never --network none --read-only --security-opt no-new-privileges --user 1000:1000 --tmpfs /tmp:rw,noexec,nosuid,nodev,size=67108864 --mount type=bind,source=/home/ubuntu/afewell-hh/demon/.artifacts/ticket257/app-home/packs/ticket257/0.1.0,target=/workspace,readonly=true --mount type=bind,source=/tmp/demon-artifacts-zMUjmP,target=/workspace/.artifacts,readonly=false --workdir /workspace --mount type=bind,source=/tmp/demon-artifacts-zMUjmP/result.json,target=/workspace/.artifacts/result.json,readonly=false --env ENVELOPE_PATH=/workspace/.artifacts/result.json --env DEMON_DEBUG=1 --entrypoint  docker.io/library/bash@sha256:b63891058ebfb442f452080633a9400a2c8ebe090411b7148a2cace140e91c96 /bin/sh -c 'set -e; echo '\\''=== DEMON_DEBUG pre-run ==='\\''; echo uid: $(id -u); echo gid: $(id -g); echo \"ENVELOPE_PATH=${ENVELOPE_PATH}\"; p=\"$(dirname \"$ENVELOPE_PATH\")\"; ls -l \"$p\" || true; test -w \"$ENVELOPE_PATH\" || echo '\\''NOT WRITABLE'\\''; (mount 2>/dev/null || cat /proc/mounts 2>/dev/null) | sed … (truncated)",
+      "source": "container-exec",
+      "timestamp": "2025-10-19T18:08:05.449028509Z"
+    },
+    {
+      "level": "info",
+      "message": "host ls -l /tmp/demon-artifacts-zMUjmP/result.json:\n-rw-rw-rw- 1 ubuntu ubuntu 76 Oct 19 18:08 /tmp/demon-artifacts-zMUjmP/result.json\n",
+      "source": "container-exec",
+      "timestamp": "2025-10-19T18:08:05.461002077Z"
+    },
+    {
+      "level": "info",
+      "message": "host stat /tmp/demon-artifacts-zMUjmP/result.json:\n  File: /tmp/demon-artifacts-zMUjmP/result.json\n  Size: 76        \tBlocks: 8          IO Block: 4096   regular file\nDevice: fc01h/64513d\tInode: 2371012     Links: 1\nAccess: (0666/-rw-rw-rw-)  Uid: ( 1000/  ubuntu)   Gid: ( 1000/  ubuntu)\nAccess: 2025-10-19 18:08:05.430758995 +0000\nModify: 2025-10-19 18:08:05.306754343 +0000\nChange: 2025-10-19 18:08:05.306754343 +0000\n Birth: 2025-10-19 18:08:04.978742039 +0000\n",
+      "source": "container-exec",
+      "timestamp": "2025-10-19T18:08:05.461012839Z"
+    }
+  ],
+  "metrics": {
+    "duration": {
+      "total_ms": 449.69309499999997
+    }
+  },
+  "provenance": {
+    "source": {
+      "instance": "writer",
+      "system": "container-exec",
+      "version": "0.0.1"
+    },
+    "timestamp": "2025-10-19T18:08:05.461156355Z"
+  },
+  "result": {
+    "data": {
+      "note": "entrypoint-ok"
+    },
+    "success": true
+  }
+}

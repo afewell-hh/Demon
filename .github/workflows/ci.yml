@@ -296,6 +296,53 @@ jobs:
         run: cargo deny check --all-features
         continue-on-error: true
 
+  sandbox-verification:
+    name: Verify container-exec sandbox flags
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify sandbox flags are present
+        run: |
+          set -euo pipefail
+          CONTAINER_EXEC_FILE="capsules/container-exec/src/lib.rs"
+
+          echo "Verifying required sandbox flags in ${CONTAINER_EXEC_FILE}..."
+
+          # Check for --network=none
+          if ! grep -q '\.arg("--network")\.arg("none")' "${CONTAINER_EXEC_FILE}"; then
+            echo "ERROR: --network=none flag not found in container-exec"
+            exit 1
+          fi
+          echo "✓ --network=none present"
+
+          # Check for --read-only
+          if ! grep -q '\.arg("--read-only")' "${CONTAINER_EXEC_FILE}"; then
+            echo "ERROR: --read-only flag not found in container-exec"
+            exit 1
+          fi
+          echo "✓ --read-only present"
+
+          # Check for --security-opt no-new-privileges
+          if ! grep -q '\.arg("--security-opt")\.arg("no-new-privileges")' "${CONTAINER_EXEC_FILE}"; then
+            echo "ERROR: --security-opt no-new-privileges flag not found in container-exec"
+            exit 1
+          fi
+          echo "✓ --security-opt no-new-privileges present"
+
+          # Check for --tmpfs with restrictions
+          if ! grep -q '\.arg("--tmpfs")' "${CONTAINER_EXEC_FILE}"; then
+            echo "ERROR: --tmpfs flag not found in container-exec"
+            exit 1
+          fi
+          if ! grep -q 'arg("/tmp:rw,noexec,nosuid,nodev' "${CONTAINER_EXEC_FILE}"; then
+            echo "ERROR: --tmpfs restrictions (noexec,nosuid,nodev) not found in container-exec"
+            exit 1
+          fi
+          echo "✓ --tmpfs with security restrictions present"
+
+          echo ""
+          echo "All required sandbox flags verified successfully!"
+
   bootstrapper-smoke:
     runs-on: ubuntu-latest
     needs: build-test

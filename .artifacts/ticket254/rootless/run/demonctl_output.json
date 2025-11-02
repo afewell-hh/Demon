@@ -1,0 +1,63 @@
+{
+  "event": "ritual.completed:v1",
+  "outputs": {
+    "diagnostics": [
+      {
+        "context": {
+          "image": "docker.io/library/bash@sha256:b63891058ebfb442f452080633a9400a2c8ebe090411b7148a2cace140e91c96",
+          "mount": "/workspace/.artifacts"
+        },
+        "level": "info",
+        "message": "container runtime exited with code 0",
+        "source": "container-exec",
+        "timestamp": "2025-10-19T18:09:13.842880663Z"
+      },
+      {
+        "level": "info",
+        "message": "stdout: === DEMON_DEBUG pre-run ===\nuid: 1000\ngid: 1000\nENVELOPE_PATH=/workspace/.artifacts/result.json\ntotal 0\n-rw-rw-rw-    1 root     root             0 Oct 19 18:09 result.json\noverlay on / type overlay (ro,relatime,lowerdir=/home/ubuntu/.local/share/docker/overlay2/l/4JFF2SHJEKLR5HORCT3N5CPFJT:/home/ubuntu/.local/share/docker/overlay2/l/ZLHH4G4UWGXNWWZE4M67LERJKN:/home/ubuntu/.local/share/docker/overlay2/l/F34QV26CNDIG6VGEAZW6T7KYRB:/home/ubuntu/.local/share/docker/overlay2/l/6IU6ZR53K4AFSG2GDE6OOUAKWD,upperdir=/home/ubuntu/.local/share/docker/overlay2/ca42fe4f094e230cd257ae88b4165c38f31de090ae1b20d63299cda4b6221235/diff,workdir=/home/ubuntu/.local/share/docker/overlay2/ca42fe4f094e230cd257ae88b4165c38f31de090ae1b20d63299cda4b6221235/work,userxattr)\nproc on /proc type proc (rw,nosuid,nodev,noexec,relatime)\ntmpfs on /dev type tmpfs (rw,nosuid,size=65536k,mode=755,uid=1000,gid=1000,inode64)\ndevpts on /dev/pts type devpts (rw,nosuid,noexec,relatime,gid=100004,mode=620,ptmxmode=666)\nsysfs on /sys type sysfs (ro,nosuid,nodev,noexec,relatime)\ncgroup on /sys/fs/cgroup type cgroup2 (ro,nosuid,nodev,noexec,relatime)\nmqueue on /dev/mqueue type mqueue (rw,nosuid,nodev,noexec,relatime)\nshm on /dev/shm type tmpfs (rw,nosuid,nodev,noexec,relatime,size=65536k,uid=1000,gid=1000,inode64)\ntmpfs on /tmp type tmpfs (rw,nosuid,nodev,noexec,relatime,size=65536k,uid=1000,gid=1000,inode64)\n/dev/vda1 on /workspace type ext4 (ro,relatime,discard,errors=remount-ro)\n/dev/vda1 on /workspace/.artifacts type ext4 (rw,relatime,discard,errors=remount-ro)\n/dev/vda1 on /etc/resolv.conf type ext4 (ro,relatime,discard,errors=remount-ro)\n/dev/vda1 on /etc/hostname type ext4 (ro,relatime,discard,errors=remount-ro)\n/dev/vda1 on /etc/hosts type ext4 (ro,relatime,discard,errors=remount-ro)\n/dev/vda1 on /workspace/.artifacts/result.json type ext4 (rw,relatime,discard,errors=remount-ro)\nudev on /dev/null type devtmpfs (rw,nosuid,relatime,size=30832620k,nr_inodes=7708155,mode=755,inode64)\nudev on /dev/random type devtmpfs (rw,nosuid,relatime,size=30832620k,nr_… (truncated)",
+        "source": "container-exec",
+        "timestamp": "2025-10-19T18:09:13.842973691Z"
+      },
+      {
+        "level": "info",
+        "message": "runtime command: docker run --rm --pull never --network none --read-only --security-opt no-new-privileges --user 1000:1000 --tmpfs /tmp:rw,noexec,nosuid,nodev,size=67108864 --mount type=bind,source=/home/ubuntu/afewell-hh/demon/.artifacts/ticket254/rootless/app-home/packs/ticket254-rootless/0.1.0,target=/workspace,readonly=true --mount type=bind,source=/tmp/demon-artifacts-YzW7l6,target=/workspace/.artifacts,readonly=false --workdir /workspace --mount type=bind,source=/tmp/demon-artifacts-YzW7l6/result.json,target=/workspace/.artifacts/result.json,readonly=false --env ENVELOPE_PATH=/workspace/.artifacts/result.json --env DEMON_DEBUG=1 --entrypoint  docker.io/library/bash@sha256:b63891058ebfb442f452080633a9400a2c8ebe090411b7148a2cace140e91c96 /bin/sh -c 'set -e; echo '\\''=== DEMON_DEBUG pre-run ==='\\''; echo uid: $(id -u); echo gid: $(id -g); echo \"ENVELOPE_PATH=${ENVELOPE_PATH}\"; p=\"$(dirname \"$ENVELOPE_PATH\")\"; ls -l \"$p\" || true; test -w \"$ENVELOPE_PATH\" || echo '\\''NOT WRITABLE'\\''; (mount 2>/dev/null || cat /proc/mounts 2… (truncated)",
+        "source": "container-exec",
+        "timestamp": "2025-10-19T18:09:13.842985770Z"
+      },
+      {
+        "level": "info",
+        "message": "host ls -l /tmp/demon-artifacts-YzW7l6/result.json:\n-rw-rw-rw- 1 ubuntu ubuntu 71 Oct 19 18:09 /tmp/demon-artifacts-YzW7l6/result.json\n",
+        "source": "container-exec",
+        "timestamp": "2025-10-19T18:09:13.850694917Z"
+      },
+      {
+        "level": "info",
+        "message": "host stat /tmp/demon-artifacts-YzW7l6/result.json:\n  File: /tmp/demon-artifacts-YzW7l6/result.json\n  Size: 71        \tBlocks: 8          IO Block: 4096   regular file\nDevice: fc01h/64513d\tInode: 2371012     Links: 1\nAccess: (0666/-rw-rw-rw-)  Uid: ( 1000/  ubuntu)   Gid: ( 1000/  ubuntu)\nAccess: 2025-10-19 18:09:13.825323209 +0000\nModify: 2025-10-19 18:09:13.693318262 +0000\nChange: 2025-10-19 18:09:13.693318262 +0000\n Birth: 2025-10-19 18:09:13.349305372 +0000\n",
+        "source": "container-exec",
+        "timestamp": "2025-10-19T18:09:13.850704074Z"
+      }
+    ],
+    "metrics": {
+      "duration": {
+        "total_ms": 475.316091
+      }
+    },
+    "provenance": {
+      "source": {
+        "instance": "writer",
+        "system": "container-exec",
+        "version": "0.0.1"
+      },
+      "timestamp": "2025-10-19T18:09:13.850856803Z"
+    },
+    "result": {
+      "data": {
+        "note": "rootless"
+      },
+      "success": true
+    }
+  },
+  "ritualId": "ticket254-rootless:rootless",
+  "runId": "676ae1fe-a6fa-4cef-a823-b490a2198cdc",
+  "ts": "2025-10-19T18:09:13.851327839+00:00"
+}

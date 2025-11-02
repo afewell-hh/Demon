@@ -1,0 +1,13 @@
+{
+  "apps": {
+    "ticket254-containerd": [
+      {
+        "version": "0.1.0",
+        "manifest_path": "/home/ubuntu/afewell-hh/demon/.artifacts/ticket254/containerd/app-home/packs/ticket254-containerd/0.1.0/app-pack.yaml",
+        "installed_at": "2025-10-19T18:09:56.333643959Z",
+        "source": "/home/ubuntu/afewell-hh/demon/.artifacts/ticket254/containerd/pack",
+        "schema_range": ">=1.0.0 <2.0.0"
+      }
+    ]
+  }
+}

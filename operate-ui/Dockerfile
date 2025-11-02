@@ -1,6 +1,7 @@
 # Multi-stage build for operate-ui
 # Stage 1: cargo-chef planner for dependency caching
-FROM rust:alpine AS chef
+# Pin rust:alpine to specific digest for supply chain security
+FROM rust:alpine@sha256:a3e3d30122c08c0ed85dcd8867d956f066be23c32ed67a0453bc04ce478ad69b AS chef
 RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static gcc
 RUN cargo install cargo-chef
 WORKDIR /app
@@ -53,7 +54,8 @@ RUN case "$TARGETPLATFORM" in \
     esac
 
 # Runtime stage - use static distroless for musl-built binaries
-FROM gcr.io/distroless/static-debian12
+# Pin distroless to specific digest for supply chain security
+FROM gcr.io/distroless/static-debian12@sha256:87bce11be0af225e4ca761c40babb06d6d559f5767fbf7dc3c47f0f1a466b92c
 
 # Copy template files
 COPY --from=builder /app/operate-ui/templates /app/templates

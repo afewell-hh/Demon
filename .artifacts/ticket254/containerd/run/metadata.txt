@@ -1,0 +1,4 @@
+Commands:
+1. DEMON_APP_HOME=$PWD/.artifacts/ticket254/containerd/app-home cargo run -p demonctl --quiet -- app install $PWD/.artifacts/ticket254/containerd/pack --overwrite
+2. DEMON_APP_HOME=$PWD/.artifacts/ticket254/containerd/app-home DEMON_CONTAINER_RUNTIME=/home/ubuntu/bin/nerdctl-moby.sh DEMON_CONTAINER_USER=1000:1000 DEMON_DEBUG=1 cargo run -p demonctl --quiet -- run ticket254-containerd:containerd --save --output-dir $PWD/.artifacts/ticket254/containerd/run
+3. sudo nerdctl --address /run/containerd/containerd.sock --namespace moby version

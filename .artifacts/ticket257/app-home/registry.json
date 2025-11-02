@@ -1,0 +1,13 @@
+{
+  "apps": {
+    "ticket257": [
+      {
+        "version": "0.1.0",
+        "manifest_path": "/home/ubuntu/afewell-hh/demon/.artifacts/ticket257/app-home/packs/ticket257/0.1.0/app-pack.yaml",
+        "installed_at": "2025-10-19T18:07:56.747104137Z",
+        "source": "/home/ubuntu/afewell-hh/demon/.artifacts/ticket257/pack",
+        "schema_range": ">=1.0.0 <2.0.0"
+      }
+    ]
+  }
+}

@@ -1,0 +1,3 @@
+Commands:
+1. DEMON_APP_HOME=$PWD/.artifacts/ticket254/rootless/app-home cargo run -p demonctl --quiet -- app install $PWD/.artifacts/ticket254/rootless/pack --overwrite
+2. DOCKER_HOST=unix:///run/user/1000/docker.sock DEMON_APP_HOME=$PWD/.artifacts/ticket254/rootless/app-home DEMON_CONTAINER_USER=1000:1000 DEMON_DEBUG=1 cargo run -p demonctl --quiet -- run ticket254-rootless:rootless --save --output-dir $PWD/.artifacts/ticket254/rootless/run
