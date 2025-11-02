@@ -342,7 +342,10 @@ fn sanitize_css_length(value: &str) -> Option<String> {
         return None;
     }
 
-    if matches!(trimmed.to_ascii_lowercase().as_str(), "auto" | "inherit" | "initial" | "none") {
+    if matches!(
+        trimmed.to_ascii_lowercase().as_str(),
+        "auto" | "inherit" | "initial" | "none"
+    ) {
         return Some(trimmed.to_string());
     }
 
@@ -374,8 +377,21 @@ fn sanitize_css_length(value: &str) -> Option<String> {
 
     let valid_unit = matches!(
         unit.as_str(),
-        "" | "%" | "px" | "rem" | "em" | "ch" | "ex" | "vh" | "vw" | "vmin" | "vmax"
-            | "cm" | "mm" | "in" | "pt" | "pc"
+        "" | "%"
+            | "px"
+            | "rem"
+            | "em"
+            | "ch"
+            | "ex"
+            | "vh"
+            | "vw"
+            | "vmin"
+            | "vmax"
+            | "cm"
+            | "mm"
+            | "in"
+            | "pt"
+            | "pc"
     );
 
     if !valid_unit {
