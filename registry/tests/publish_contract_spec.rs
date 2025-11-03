@@ -198,3 +198,30 @@ async fn test_publish_contract_invalid_json() {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
+
+#[tokio::test]
+#[ignore] // Requires NATS JetStream
+async fn test_publish_contract_payload_too_large() {
+    std::env::set_var("JWT_SECRET", "test-secret");
+    std::env::set_var("NATS_URL", "nats://127.0.0.1:4222");
+
+    let state = AppState::new().await.expect("Failed to create app state");
+    let app = create_app(state);
+
+    let token = create_test_token(vec!["contracts:write".to_string()], "test-secret");
+
+    // Create a payload larger than 10 MB limit
+    let large_string = "x".repeat(11 * 1024 * 1024); // 11 MB
+
+    let request = Request::builder()
+        .method("POST")
+        .uri("/registry/contracts")
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(Body::from(large_string))
+        .unwrap();
+
+    let response = app.oneshot(request).await.unwrap();
+
+    assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+}

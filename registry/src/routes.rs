@@ -106,12 +106,24 @@ pub async fn publish_contract(
         });
     }
 
-    // Extract request body
-    let body_bytes = axum::body::to_bytes(request.into_body(), usize::MAX)
+    // Extract request body with size limit to prevent DoS
+    // 10 MB limit is reasonable for contract bundles (schemas + metadata)
+    const MAX_BODY_SIZE: usize = 10 * 1024 * 1024;
+    let body_bytes = axum::body::to_bytes(request.into_body(), MAX_BODY_SIZE)
         .await
-        .map_err(|e| AppError {
-            status_code: StatusCode::BAD_REQUEST,
-            message: format!("Failed to read request body: {}", e),
+        .map_err(|e| {
+            let err_msg = e.to_string();
+            if err_msg.contains("length limit") || err_msg.contains("too large") {
+                AppError {
+                    status_code: StatusCode::PAYLOAD_TOO_LARGE,
+                    message: format!("Request body exceeds maximum size of {} bytes", MAX_BODY_SIZE),
+                }
+            } else {
+                AppError {
+                    status_code: StatusCode::BAD_REQUEST,
+                    message: format!("Failed to read request body: {}", e),
+                }
+            }
         })?;
 
     let payload: PublishContractRequest =
