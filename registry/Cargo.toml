@@ -1,0 +1,35 @@
+[package]
+name = "demon-registry"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "demon-registry"
+path = "src/main.rs"
+
+[dependencies]
+# Workspace dependencies
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber = { workspace = true, features = ["json"] }
+tokio.workspace = true
+async-nats.workspace = true
+futures-util.workspace = true
+
+# HTTP server
+axum = { version = "0.7", features = ["macros"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["trace", "cors"] }
+
+# JWT placeholder (TODO: real verification in follow-up)
+jsonwebtoken = "9.3"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+uuid.workspace = true
+tower = { version = "0.4", features = ["util"] }

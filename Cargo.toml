@@ -8,6 +8,7 @@ members = [
   "capsules/graph",
   "demonctl",
   "operate-ui",
+  "registry",
   "bootstrapper/demonctl",
   "crates/envelope",
   "crates/envelope-derive",
