@@ -1,0 +1,27 @@
+[package]
+name = "contract-linter"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "contract-linter"
+path = "src/main.rs"
+
+[dependencies]
+# Workspace dependencies
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+clap.workspace = true
+
+# Semver parsing
+semver = "1.0"
+
+# JSON Schema validation
+jsonschema.workspace = true
+
+[dev-dependencies]
+tempfile = "3.10"

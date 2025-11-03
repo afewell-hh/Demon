@@ -73,7 +73,10 @@ async fn healthz() -> impl IntoResponse {
 pub fn create_app(state: AppState) -> Router {
     Router::new()
         .route("/healthz", get(healthz))
-        .route("/registry/contracts", get(routes::list_contracts))
+        .route(
+            "/registry/contracts",
+            get(routes::list_contracts).post(routes::publish_contract),
+        )
         .route(
             "/registry/contracts/:name/:version",
             get(routes::get_contract),

@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
@@ -473,6 +473,33 @@ enum ContractsCommands {
         /// Include WIT definitions in the bundle
         #[arg(long)]
         include_wit: bool,
+    },
+    /// Publish a contract bundle to the schema registry
+    Publish {
+        /// Contract name
+        #[arg(long)]
+        name: String,
+        /// Contract version (semver)
+        #[arg(long)]
+        version: String,
+        /// Optional description
+        #[arg(long)]
+        description: Option<String>,
+        /// Path to JSON schema file
+        #[arg(long)]
+        json_schema: Option<PathBuf>,
+        /// Path to WIT interface file
+        #[arg(long)]
+        wit_path: Option<PathBuf>,
+        /// Path to protobuf descriptor file
+        #[arg(long)]
+        descriptor_path: Option<PathBuf>,
+        /// Registry endpoint URL
+        #[arg(long, default_value = "http://localhost:8090")]
+        registry_endpoint: String,
+        /// JWT token for authentication (or use JWT_TOKEN env var)
+        #[arg(long)]
+        jwt: Option<String>,
     },
 }
 
@@ -960,6 +987,37 @@ async fn handle_contracts_command(cmd: ContractsCommands) -> Result<()> {
         } => {
             export_contracts_bundle(&format, include_wit).await?;
         }
+        ContractsCommands::Publish {
+            name,
+            version,
+            description,
+            json_schema,
+            wit_path,
+            descriptor_path,
+            registry_endpoint,
+            jwt,
+        } => {
+            // Get JWT from arg or environment variable
+            let jwt_token = jwt
+                .or_else(|| std::env::var("JWT_TOKEN").ok())
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "JWT token required: use --jwt or set JWT_TOKEN environment variable"
+                    )
+                })?;
+
+            publish_contract(
+                &name,
+                &version,
+                description.as_deref(),
+                json_schema.as_deref(),
+                wit_path.as_deref(),
+                descriptor_path.as_deref(),
+                &registry_endpoint,
+                &jwt_token,
+            )
+            .await?;
+        }
     }
     Ok(())
 }
@@ -1338,6 +1396,105 @@ async fn export_contracts_bundle(format: &str, include_wit: bool) -> Result<()> 
     }
 
     Ok(())
+}
+
+/// Publish a contract bundle to the schema registry
+async fn publish_contract(
+    name: &str,
+    version: &str,
+    description: Option<&str>,
+    json_schema_path: Option<&Path>,
+    wit_path: Option<&Path>,
+    descriptor_path: Option<&Path>,
+    registry_endpoint: &str,
+    jwt: &str,
+) -> Result<()> {
+    use std::fs;
+
+    // Read schema files if provided
+    let json_schema = if let Some(path) = json_schema_path {
+        Some(
+            fs::read_to_string(path)
+                .with_context(|| format!("Failed to read JSON schema file: {}", path.display()))?,
+        )
+    } else {
+        None
+    };
+
+    let wit_content = if let Some(path) = wit_path {
+        Some(path.display().to_string())
+    } else {
+        None
+    };
+
+    let descriptor_content = if let Some(path) = descriptor_path {
+        Some(path.display().to_string())
+    } else {
+        None
+    };
+
+    // Build the payload
+    let payload = serde_json::json!({
+        "name": name,
+        "version": version,
+        "description": description,
+        "jsonSchema": json_schema,
+        "witPath": wit_content,
+        "descriptorPath": descriptor_content
+    });
+
+    // Make HTTP POST request to registry
+    let client = reqwest::Client::new();
+    let url = format!("{}/registry/contracts", registry_endpoint);
+
+    println!("Publishing contract {} v{} to {}", name, version, url);
+
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", jwt))
+        .header("Content-Type", "application/json")
+        .json(&payload)
+        .send()
+        .await
+        .with_context(|| format!("Failed to send request to registry at {}", url))?;
+
+    let status = response.status();
+    let body_text = response
+        .text()
+        .await
+        .unwrap_or_else(|_| "<failed to read response>".to_string());
+
+    if status.is_success() {
+        // Parse and display success response
+        if let Ok(body_json) = serde_json::from_str::<serde_json::Value>(&body_text) {
+            println!("✓ Successfully published contract!");
+            println!();
+            println!(
+                "  Name:      {}",
+                body_json["name"].as_str().unwrap_or(name)
+            );
+            println!(
+                "  Version:   {}",
+                body_json["version"].as_str().unwrap_or(version)
+            );
+            if let Some(digest) = body_json["digest"].as_str() {
+                println!("  Digest:    {}", digest);
+            }
+            if let Some(created_at) = body_json["createdAt"].as_str() {
+                println!("  Created:   {}", created_at);
+            }
+        } else {
+            println!("✓ Contract published successfully");
+            println!("{}", body_text);
+        }
+        Ok(())
+    } else {
+        anyhow::bail!(
+            "Failed to publish contract (HTTP {}): {}",
+            status.as_u16(),
+            body_text
+        )
+    }
 }
 
 fn handle_secrets_command(cmd: SecretsCommands) -> Result<()> {

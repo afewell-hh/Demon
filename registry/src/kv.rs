@@ -33,6 +33,8 @@ pub struct ContractBundle {
     pub wit_path: Option<String>,
     #[serde(rename = "descriptorPath")]
     pub descriptor_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub digest: Option<String>,
 }
 
 /// JetStream KV client for contract storage
@@ -209,14 +211,17 @@ mod tests {
             json_schema: Some("{}".to_string()),
             wit_path: Some("/path/to/schema.wit".to_string()),
             descriptor_path: Some("/path/to/descriptor.json".to_string()),
+            digest: Some("abc123".to_string()),
         };
 
         let json = serde_json::to_string(&bundle).unwrap();
         assert!(json.contains("jsonSchema"));
         assert!(json.contains("witPath"));
         assert!(json.contains("descriptorPath"));
+        assert!(json.contains("digest"));
 
         let deserialized: ContractBundle = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.name, "test-contract");
+        assert_eq!(deserialized.digest, Some("abc123".to_string()));
     }
 }

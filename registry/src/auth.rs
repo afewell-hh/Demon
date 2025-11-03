@@ -1,19 +1,65 @@
-//! JWT authentication middleware (placeholder implementation)
-//!
-//! TODO: Real JWT verification will be added in a follow-up story.
-//! Currently, this module only parses the Bearer token without verification.
+//! JWT authentication middleware with scope validation
 
-use axum::{extract::Request, http::StatusCode, middleware::Next, response::Response};
+use axum::{
+    body::Body,
+    extract::Request,
+    http::StatusCode,
+    middleware::Next,
+    response::{IntoResponse, Response},
+};
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
-/// JWT middleware that parses Authorization header
-///
-/// TODO: Add real JWT verification in follow-up story:
-/// - Validate signature using public key
-/// - Check token expiration
-/// - Verify issuer and audience claims
-/// - Extract and validate scopes/permissions
-pub async fn jwt_middleware(request: Request, next: Next) -> Response {
+/// JWT Claims structure
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Claims {
+    pub sub: String,         // Subject (user identifier)
+    pub exp: usize,          // Expiration time (Unix timestamp)
+    pub iat: Option<usize>,  // Issued at (Unix timestamp)
+    pub scopes: Vec<String>, // Permission scopes
+}
+
+/// JWT configuration loaded from environment
+#[derive(Clone)]
+pub struct JwtConfig {
+    pub secret: String,
+    pub algorithm: Algorithm,
+}
+
+impl JwtConfig {
+    /// Load JWT configuration from environment variables
+    pub fn from_env() -> Self {
+        let secret = std::env::var("JWT_SECRET")
+            .unwrap_or_else(|_| "dev-secret-change-in-production".to_string());
+
+        let algorithm = std::env::var("JWT_ALGORITHM")
+            .ok()
+            .and_then(|a| match a.as_str() {
+                "HS256" => Some(Algorithm::HS256),
+                "HS384" => Some(Algorithm::HS384),
+                "HS512" => Some(Algorithm::HS512),
+                _ => None,
+            })
+            .unwrap_or(Algorithm::HS256);
+
+        Self { secret, algorithm }
+    }
+
+    /// Create from explicit secret (for testing)
+    pub fn new(secret: String, algorithm: Algorithm) -> Self {
+        Self { secret, algorithm }
+    }
+}
+
+/// Extension to attach validated claims to the request
+#[derive(Clone, Debug)]
+pub struct AuthClaims(pub Claims);
+
+/// JWT middleware that validates tokens and extracts claims
+pub async fn jwt_middleware(mut request: Request, next: Next) -> Response {
+    let config = JwtConfig::from_env();
+
     // Extract Authorization header
     let auth_header = request.headers().get("Authorization").cloned();
 
@@ -21,62 +67,156 @@ pub async fn jwt_middleware(request: Request, next: Next) -> Response {
         Some(header_value) => match header_value.to_str() {
             Ok(auth_str) => {
                 if let Some(token) = auth_str.strip_prefix("Bearer ") {
-                    debug!(
-                        "JWT token present (length: {} chars) - TODO: verification not yet implemented",
-                        token.len()
-                    );
-                    // TODO: Verify token signature, expiration, claims
-                    // For now, just log that we received a token
+                    match verify_jwt(token, &config) {
+                        Ok(claims) => {
+                            debug!(
+                                "JWT token validated for subject: {}, scopes: {:?}",
+                                claims.sub, claims.scopes
+                            );
+                            // Attach claims to request extensions
+                            request.extensions_mut().insert(AuthClaims(claims));
+                            return next.run(request).await;
+                        }
+                        Err(e) => {
+                            warn!("JWT validation failed: {}", e);
+                            return unauthorized_response(format!("Invalid token: {}", e));
+                        }
+                    }
                 } else {
-                    warn!("Authorization header present but not Bearer format");
+                    warn!("Authorization header not in Bearer format");
+                    return unauthorized_response(
+                        "Authorization header must use Bearer scheme".to_string(),
+                    );
                 }
             }
             Err(e) => {
                 warn!("Failed to parse Authorization header: {}", e);
+                return unauthorized_response("Invalid Authorization header".to_string());
             }
         },
         None => {
-            debug!("No Authorization header present - proceeding without auth (placeholder mode)");
+            debug!("No Authorization header present - returning 401");
+            return unauthorized_response("Missing Authorization header".to_string());
         }
     }
-
-    // For now, allow all requests through
-    // TODO: Return 401 Unauthorized for invalid/missing tokens in production
-    next.run(request).await
 }
 
-/// Helper to extract and parse JWT claims (placeholder)
-///
-/// TODO: Implement real JWT parsing and validation
-#[allow(dead_code)]
-fn parse_jwt_claims(_token: &str) -> Result<serde_json::Value, String> {
-    // Placeholder implementation
-    // TODO: Use jsonwebtoken crate to decode and verify
-    Err("JWT verification not yet implemented".to_string())
+/// Verify JWT token and extract claims
+fn verify_jwt(token: &str, config: &JwtConfig) -> Result<Claims, String> {
+    let mut validation = Validation::new(config.algorithm);
+    validation.validate_exp = true;
+
+    let decoding_key = DecodingKey::from_secret(config.secret.as_bytes());
+
+    let token_data = decode::<Claims>(token, &decoding_key, &validation)
+        .map_err(|e| format!("Token decode error: {}", e))?;
+
+    Ok(token_data.claims)
 }
 
-/// Create a 401 Unauthorized response (for future use)
-#[allow(dead_code)]
-fn unauthorized_response() -> Response {
-    (
-        StatusCode::UNAUTHORIZED,
-        "Unauthorized: Invalid or missing JWT token",
-    )
-        .into_response()
+/// Create a 401 Unauthorized response
+fn unauthorized_response(message: String) -> Response {
+    (StatusCode::UNAUTHORIZED, message).into_response()
 }
 
-use axum::response::IntoResponse;
+/// Check if claims contain a specific scope
+pub fn has_scope(claims: &Claims, required_scope: &str) -> bool {
+    claims.scopes.iter().any(|s| s == required_scope)
+}
+
+/// Extract claims from request extensions
+pub fn extract_claims(request: &Request<Body>) -> Option<Claims> {
+    request
+        .extensions()
+        .get::<AuthClaims>()
+        .map(|ac| ac.0.clone())
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use jsonwebtoken::{encode, EncodingKey, Header};
+
+    fn create_test_token(scopes: Vec<String>, secret: &str) -> String {
+        let claims = Claims {
+            sub: "test-user".to_string(),
+            exp: (chrono::Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
+            iat: Some(chrono::Utc::now().timestamp() as usize),
+            scopes,
+        };
+
+        let header = Header::new(Algorithm::HS256);
+        encode(
+            &header,
+            &claims,
+            &EncodingKey::from_secret(secret.as_bytes()),
+        )
+        .unwrap()
+    }
 
     #[test]
-    fn test_parse_jwt_claims_placeholder() {
-        let result = parse_jwt_claims("dummy.token.here");
+    fn test_verify_valid_jwt() {
+        let secret = "test-secret";
+        let config = JwtConfig::new(secret.to_string(), Algorithm::HS256);
+        let token = create_test_token(vec!["contracts:read".to_string()], secret);
+
+        let result = verify_jwt(&token, &config);
+        assert!(result.is_ok());
+
+        let claims = result.unwrap();
+        assert_eq!(claims.sub, "test-user");
+        assert!(claims.scopes.contains(&"contracts:read".to_string()));
+    }
+
+    #[test]
+    fn test_verify_invalid_secret() {
+        let secret = "test-secret";
+        let wrong_secret = "wrong-secret";
+        let config = JwtConfig::new(wrong_secret.to_string(), Algorithm::HS256);
+        let token = create_test_token(vec!["contracts:read".to_string()], secret);
+
+        let result = verify_jwt(&token, &config);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .contains("JWT verification not yet implemented"));
+    }
+
+    #[test]
+    fn test_has_scope() {
+        let claims = Claims {
+            sub: "user".to_string(),
+            exp: 9999999999,
+            iat: None,
+            scopes: vec!["contracts:write".to_string(), "contracts:read".to_string()],
+        };
+
+        assert!(has_scope(&claims, "contracts:write"));
+        assert!(has_scope(&claims, "contracts:read"));
+        assert!(!has_scope(&claims, "contracts:delete"));
+    }
+
+    #[test]
+    fn test_expired_token() {
+        let secret = "test-secret";
+        let config = JwtConfig::new(secret.to_string(), Algorithm::HS256);
+
+        let expired_claims = Claims {
+            sub: "test-user".to_string(),
+            exp: (chrono::Utc::now() - chrono::Duration::hours(1)).timestamp() as usize,
+            iat: Some(chrono::Utc::now().timestamp() as usize),
+            scopes: vec!["contracts:read".to_string()],
+        };
+
+        let header = Header::new(Algorithm::HS256);
+        let token = encode(
+            &header,
+            &expired_claims,
+            &EncodingKey::from_secret(secret.as_bytes()),
+        )
+        .unwrap();
+
+        let result = verify_jwt(&token, &config);
+        assert!(result.is_err());
+        // JWT library may use "ExpiredSignature" or similar error message
+        let err_msg = result.unwrap_err().to_lowercase();
+        assert!(err_msg.contains("exp") || err_msg.contains("token"));
     }
 }

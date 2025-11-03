@@ -26,10 +26,18 @@ axum = { version = "0.7", features = ["macros"] }
 tower = "0.4"
 tower-http = { version = "0.5", features = ["trace", "cors"] }
 
-# JWT placeholder (TODO: real verification in follow-up)
+# JWT verification
 jsonwebtoken = "9.3"
+
+# Cryptography
+sha2 = "0.10"
+hex = "0.4"
+
+# Time
+chrono.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
 uuid.workspace = true
 tower = { version = "0.4", features = ["util"] }
+chrono.workspace = true
