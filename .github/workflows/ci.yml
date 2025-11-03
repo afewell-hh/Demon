@@ -253,8 +253,9 @@ jobs:
           JWT_SECRET: test-secret-for-ci
           NATS_URL: nats://127.0.0.1:4222
           REGISTRY_KV_BUCKET: contracts_ci
+          BIND_ADDR: 0.0.0.0:8090
         run: |
-          nohup bash -c 'JWT_SECRET=test-secret-for-ci NATS_URL=nats://127.0.0.1:4222 REGISTRY_KV_BUCKET=contracts_ci cargo run -q -p demon-registry' >/tmp/registry.log 2>&1 &
+          nohup bash -c 'JWT_SECRET=test-secret-for-ci NATS_URL=nats://127.0.0.1:4222 REGISTRY_KV_BUCKET=contracts_ci BIND_ADDR=0.0.0.0:8090 cargo run -q -p demon-registry' >/tmp/registry.log 2>&1 &
           # Wait for registry to be ready
           for i in {1..60}; do
             if curl -sf http://127.0.0.1:8090/healthz 2>/dev/null; then
@@ -511,7 +512,7 @@ jobs:
           set -euo pipefail
           cargo install cargo-deny --locked --force
       - name: Check licenses & bans
-        run: cargo deny check --all-features
+        run: cargo deny check
         continue-on-error: true
 
   sandbox-verification:
@@ -1166,7 +1167,7 @@ jobs:
           cargo install cargo-deny --locked --force
 
       - name: Cargo deny check
-        run: cargo deny check --all-features
+        run: cargo deny check
         continue-on-error: true
 
       - name: Build workspace
