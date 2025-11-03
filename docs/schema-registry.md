@@ -135,6 +135,9 @@ BIND_ADDR="127.0.0.1:8080" cargo run -p registry
 
 - `NATS_URL`: NATS server address (default: `nats://127.0.0.1:4222`)
 - `NATS_CREDS_PATH`: Path to NATS credentials file (optional)
+- `REGISTRY_KV_BUCKET`: JetStream KV bucket name (default: `contracts`)
+  - Override for test isolation or multi-tenant deployments
+  - Integration tests use per-test isolated buckets via this variable
 - `BIND_ADDR`: HTTP server bind address (default: `0.0.0.0:3001`)
 - `RUST_LOG`: Logging level (default: `info,registry=debug`)
 
