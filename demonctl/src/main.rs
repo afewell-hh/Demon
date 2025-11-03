@@ -1006,16 +1006,16 @@ async fn handle_contracts_command(cmd: ContractsCommands) -> Result<()> {
                     )
                 })?;
 
-            publish_contract(
-                &name,
-                &version,
-                description.as_deref(),
-                json_schema.as_deref(),
-                wit_path.as_deref(),
-                descriptor_path.as_deref(),
-                &registry_endpoint,
-                &jwt_token,
-            )
+            publish_contract(PublishContractInput {
+                name: &name,
+                version: &version,
+                description: description.as_deref(),
+                json_schema_path: json_schema.as_deref(),
+                wit_path: wit_path.as_deref(),
+                descriptor_path: descriptor_path.as_deref(),
+                registry_endpoint: &registry_endpoint,
+                jwt: &jwt_token,
+            })
             .await?;
         }
     }
@@ -1398,18 +1398,31 @@ async fn export_contracts_bundle(format: &str, include_wit: bool) -> Result<()> 
     Ok(())
 }
 
+struct PublishContractInput<'a> {
+    name: &'a str,
+    version: &'a str,
+    description: Option<&'a str>,
+    json_schema_path: Option<&'a Path>,
+    wit_path: Option<&'a Path>,
+    descriptor_path: Option<&'a Path>,
+    registry_endpoint: &'a str,
+    jwt: &'a str,
+}
+
 /// Publish a contract bundle to the schema registry
-async fn publish_contract(
-    name: &str,
-    version: &str,
-    description: Option<&str>,
-    json_schema_path: Option<&Path>,
-    wit_path: Option<&Path>,
-    descriptor_path: Option<&Path>,
-    registry_endpoint: &str,
-    jwt: &str,
-) -> Result<()> {
+async fn publish_contract(input: PublishContractInput<'_>) -> Result<()> {
     use std::fs;
+
+    let PublishContractInput {
+        name,
+        version,
+        description,
+        json_schema_path,
+        wit_path,
+        descriptor_path,
+        registry_endpoint,
+        jwt,
+    } = input;
 
     // Read schema files if provided
     let json_schema = if let Some(path) = json_schema_path {
@@ -1421,17 +1434,9 @@ async fn publish_contract(
         None
     };
 
-    let wit_content = if let Some(path) = wit_path {
-        Some(path.display().to_string())
-    } else {
-        None
-    };
+    let wit_content = wit_path.map(|path| path.display().to_string());
 
-    let descriptor_content = if let Some(path) = descriptor_path {
-        Some(path.display().to_string())
-    } else {
-        None
-    };
+    let descriptor_content = descriptor_path.map(|path| path.display().to_string());
 
     // Build the payload
     let payload = serde_json::json!({
