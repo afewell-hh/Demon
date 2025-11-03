@@ -3,7 +3,7 @@
 //! Provides REST API for contract schema management with JetStream KV backend.
 
 use anyhow::Result;
-use registry::{create_app, AppState};
+use demon_registry::{create_app, AppState};
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
@@ -13,7 +13,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::registry()
         .with(
             EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("info,registry=debug")),
+                .unwrap_or_else(|_| EnvFilter::new("info,demon_registry=debug")),
         )
         .with(tracing_subscriber::fmt::layer().json())
         .init();

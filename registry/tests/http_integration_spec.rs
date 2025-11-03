@@ -6,7 +6,7 @@
 use anyhow::Result;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use registry::{create_app, kv::ContractBundle, AppState};
+use demon_registry::{create_app, kv::ContractBundle, AppState};
 use tower::util::ServiceExt; // for `oneshot`
 
 #[tokio::test]

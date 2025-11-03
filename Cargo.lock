@@ -871,6 +871,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a2330da5de22e8a3cb63252ce2abb30116bf5265e89c0e01bc17015ce30a476"
 
 [[package]]
+name = "demon-registry"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-nats",
+ "axum",
+ "futures-util",
+ "jsonwebtoken",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tower 0.4.13",
+ "tower-http 0.5.2",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "demonctl"
 version = "0.0.1"
 dependencies = [
@@ -3054,26 +3074,6 @@ name = "regex-syntax"
 version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "caf4aa5b0f434c91fe5c7f1ecb6a5ece2130b02ad2a590589dda5146df959001"
-
-[[package]]
-name = "registry"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-nats",
- "axum",
- "futures-util",
- "jsonwebtoken",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tower 0.4.13",
- "tower-http 0.5.2",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
 
 [[package]]
 name = "reqwest"

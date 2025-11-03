@@ -122,13 +122,13 @@ This starts NATS on `localhost:4222` with JetStream enabled.
 
 ```bash
 # Build the registry binary
-cargo build -p registry
+cargo build -p demon-registry
 
 # Run the server (defaults to 0.0.0.0:3001)
-cargo run -p registry
+cargo run -p demon-registry
 
 # Or with custom bind address
-BIND_ADDR="127.0.0.1:8080" cargo run -p registry
+BIND_ADDR="127.0.0.1:8080" cargo run -p demon-registry
 ```
 
 ### Environment Variables
@@ -145,10 +145,10 @@ BIND_ADDR="127.0.0.1:8080" cargo run -p registry
 
 ```bash
 # Run unit tests
-cargo test -p registry
+cargo test -p demon-registry
 
 # Run integration tests (requires NATS running)
-cargo test -p registry -- --nocapture --ignored
+cargo test -p demon-registry -- --nocapture --ignored
 ```
 
 Integration tests are marked with `#[ignore]` and require a running NATS server with JetStream enabled.

@@ -1,10 +1,10 @@
 //! Integration tests for JetStream KV client
 //!
 //! These tests require a running NATS server with JetStream enabled.
-//! Run with: NATS_URL=nats://127.0.0.1:4222 cargo test -p registry -- --nocapture
+//! Run with: NATS_URL=nats://127.0.0.1:4222 cargo test -p demon-registry -- --nocapture
 
 use anyhow::Result;
-use registry::kv::{ContractBundle, KvClient};
+use demon_registry::kv::{ContractBundle, KvClient};
 
 async fn new_isolated_client() -> Result<(KvClient, String)> {
     let url = nats_url();
