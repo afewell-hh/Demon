@@ -49,6 +49,7 @@ async fn given_stored_contract_when_http_get_requested_then_returns_bundle() -> 
         json_schema: Some(r#"{"type": "string"}"#.to_string()),
         wit_path: Some("/test.wit".to_string()),
         descriptor_path: Some("/test.json".to_string()),
+        digest: Some("abc123".to_string()),
     };
 
     // Store contract via KV client directly

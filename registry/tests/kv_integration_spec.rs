@@ -56,6 +56,7 @@ async fn given_contract_when_stored_and_retrieved_then_data_matches() -> Result<
         json_schema: Some(r#"{"type": "object"}"#.to_string()),
         wit_path: Some("/contracts/test.wit".to_string()),
         descriptor_path: Some("/contracts/test.json".to_string()),
+        digest: Some("abc123".to_string()),
     };
 
     // Act - Store the contract
@@ -96,6 +97,7 @@ async fn given_stored_contract_when_listed_then_appears_in_results() -> Result<(
         json_schema: None,
         wit_path: None,
         descriptor_path: None,
+        digest: Some("def456".to_string()),
     };
 
     // Act

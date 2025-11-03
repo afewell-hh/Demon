@@ -90,7 +90,7 @@ pub struct PublishContractRequest {
 pub async fn publish_contract(
     State(state): State<AppState>,
     request: Request<Body>,
-) -> AppResult<Json<Value>> {
+) -> AppResult<(StatusCode, Json<Value>)> {
     // Extract and validate JWT claims
     let claims = auth::extract_claims(&request).ok_or_else(|| AppError {
         status_code: StatusCode::UNAUTHORIZED,
@@ -186,13 +186,16 @@ pub async fn publish_contract(
         payload.name, payload.version, digest
     );
 
-    Ok(Json(json!({
-        "status": "created",
-        "name": payload.name,
-        "version": payload.version,
-        "digest": digest,
-        "createdAt": now
-    })))
+    Ok((
+        StatusCode::CREATED,
+        Json(json!({
+            "status": "created",
+            "name": payload.name,
+            "version": payload.version,
+            "digest": digest,
+            "createdAt": now
+        })),
+    ))
 }
 
 #[cfg(test)]
