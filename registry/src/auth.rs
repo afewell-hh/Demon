@@ -75,28 +75,26 @@ pub async fn jwt_middleware(mut request: Request, next: Next) -> Response {
                             );
                             // Attach claims to request extensions
                             request.extensions_mut().insert(AuthClaims(claims));
-                            return next.run(request).await;
+                            next.run(request).await
                         }
                         Err(e) => {
                             warn!("JWT validation failed: {}", e);
-                            return unauthorized_response(format!("Invalid token: {}", e));
+                            unauthorized_response(format!("Invalid token: {}", e))
                         }
                     }
                 } else {
                     warn!("Authorization header not in Bearer format");
-                    return unauthorized_response(
-                        "Authorization header must use Bearer scheme".to_string(),
-                    );
+                    unauthorized_response("Authorization header must use Bearer scheme".to_string())
                 }
             }
             Err(e) => {
                 warn!("Failed to parse Authorization header: {}", e);
-                return unauthorized_response("Invalid Authorization header".to_string());
+                unauthorized_response("Invalid Authorization header".to_string())
             }
         },
         None => {
             debug!("No Authorization header present - returning 401");
-            return unauthorized_response("Missing Authorization header".to_string());
+            unauthorized_response("Missing Authorization header".to_string())
         }
     }
 }
