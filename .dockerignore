@@ -43,6 +43,8 @@ README.md
 # Scripts and tools
 scripts/
 tooling/
+!tooling/contract-linter/
+!tooling/contract-linter/**
 audit-*.sh
 
 # Temporary files

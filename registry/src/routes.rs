@@ -116,7 +116,10 @@ pub async fn publish_contract(
             if err_msg.contains("length limit") || err_msg.contains("too large") {
                 AppError {
                     status_code: StatusCode::PAYLOAD_TOO_LARGE,
-                    message: format!("Request body exceeds maximum size of {} bytes", MAX_BODY_SIZE),
+                    message: format!(
+                        "Request body exceeds maximum size of {} bytes",
+                        MAX_BODY_SIZE
+                    ),
                 }
             } else {
                 AppError {
