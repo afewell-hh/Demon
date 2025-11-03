@@ -3,12 +3,7 @@
 //! TODO: Real JWT verification will be added in a follow-up story.
 //! Currently, this module only parses the Bearer token without verification.
 
-use axum::{
-    extract::Request,
-    http::{HeaderMap, StatusCode},
-    middleware::Next,
-    response::Response,
-};
+use axum::{extract::Request, http::StatusCode, middleware::Next, response::Response};
 use tracing::{debug, warn};
 
 /// JWT middleware that parses Authorization header
@@ -18,30 +13,28 @@ use tracing::{debug, warn};
 /// - Check token expiration
 /// - Verify issuer and audience claims
 /// - Extract and validate scopes/permissions
-pub async fn jwt_middleware(headers: HeaderMap, request: Request, next: Next) -> Response {
+pub async fn jwt_middleware(request: Request, next: Next) -> Response {
     // Extract Authorization header
-    let auth_header = headers.get("Authorization");
+    let auth_header = request.headers().get("Authorization").cloned();
 
     match auth_header {
-        Some(header_value) => {
-            match header_value.to_str() {
-                Ok(auth_str) => {
-                    if let Some(token) = auth_str.strip_prefix("Bearer ") {
-                        debug!(
-                            "JWT token present (length: {} chars) - TODO: verification not yet implemented",
-                            token.len()
-                        );
-                        // TODO: Verify token signature, expiration, claims
-                        // For now, just log that we received a token
-                    } else {
-                        warn!("Authorization header present but not Bearer format");
-                    }
-                }
-                Err(e) => {
-                    warn!("Failed to parse Authorization header: {}", e);
+        Some(header_value) => match header_value.to_str() {
+            Ok(auth_str) => {
+                if let Some(token) = auth_str.strip_prefix("Bearer ") {
+                    debug!(
+                        "JWT token present (length: {} chars) - TODO: verification not yet implemented",
+                        token.len()
+                    );
+                    // TODO: Verify token signature, expiration, claims
+                    // For now, just log that we received a token
+                } else {
+                    warn!("Authorization header present but not Bearer format");
                 }
             }
-        }
+            Err(e) => {
+                warn!("Failed to parse Authorization header: {}", e);
+            }
+        },
         None => {
             debug!("No Authorization header present - proceeding without auth (placeholder mode)");
         }
