@@ -6,6 +6,17 @@
 use anyhow::Result;
 use registry::kv::{ContractBundle, KvClient};
 
+async fn new_isolated_client() -> Result<(KvClient, String)> {
+    let url = nats_url();
+    std::env::set_var("NATS_URL", &url);
+
+    let bucket = format!("contracts_test_{}", uuid::Uuid::new_v4());
+    std::env::set_var("REGISTRY_KV_BUCKET", &bucket);
+
+    let client = KvClient::new().await?;
+    Ok((client, bucket))
+}
+
 fn nats_url() -> String {
     std::env::var("NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".to_string())
 }
@@ -14,14 +25,18 @@ fn nats_url() -> String {
 #[ignore] // Requires NATS server running
 async fn given_empty_kv_when_listing_contracts_then_returns_empty_array() -> Result<()> {
     // Arrange
-    let client = KvClient::new().await?;
+    let (client, bucket) = new_isolated_client().await?;
 
     // Act
     let contracts = client.list_contracts().await?;
 
     // Assert
-    // May not be empty if other tests ran, but shouldn't error
-    assert!(contracts.len() >= 0);
+    assert!(
+        contracts.is_empty(),
+        "Expected empty KV bucket {}, found {} items",
+        bucket,
+        contracts.len()
+    );
 
     Ok(())
 }
@@ -30,7 +45,7 @@ async fn given_empty_kv_when_listing_contracts_then_returns_empty_array() -> Res
 #[ignore] // Requires NATS server running
 async fn given_contract_when_stored_and_retrieved_then_data_matches() -> Result<()> {
     // Arrange
-    let client = KvClient::new().await?;
+    let (client, _) = new_isolated_client().await?;
     let test_name = format!("test-contract-{}", uuid::Uuid::new_v4());
 
     let bundle = ContractBundle {
@@ -70,7 +85,7 @@ async fn given_contract_when_stored_and_retrieved_then_data_matches() -> Result<
 #[ignore] // Requires NATS server running
 async fn given_stored_contract_when_listed_then_appears_in_results() -> Result<()> {
     // Arrange
-    let client = KvClient::new().await?;
+    let (client, _) = new_isolated_client().await?;
     let test_name = format!("list-test-{}", uuid::Uuid::new_v4());
 
     let bundle = ContractBundle {
@@ -104,7 +119,7 @@ async fn given_stored_contract_when_listed_then_appears_in_results() -> Result<(
 #[ignore] // Requires NATS server running
 async fn given_nonexistent_contract_when_retrieved_then_returns_none() -> Result<()> {
     // Arrange
-    let client = KvClient::new().await?;
+    let (client, _) = new_isolated_client().await?;
 
     // Act
     let result = client

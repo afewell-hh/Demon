@@ -14,7 +14,7 @@ use axum::{
     routing::get,
     Router,
 };
-use tower_http::trace::{DefaultMakeSpan, TraceLayer};
+use tower_http::trace::TraceLayer;
 use tracing::info;
 
 /// Application state shared across handlers
@@ -79,9 +79,7 @@ pub fn create_app(state: AppState) -> Router {
             get(routes::get_contract),
         )
         .layer(middleware::from_fn(auth::jwt_middleware))
-        .layer(
-            TraceLayer::new_for_http()
-                .make_span_with(DefaultMakeSpan::default().include_headers(true)),
-        )
+        // Avoid logging request headers so Authorization tokens never reach logs.
+        .layer(TraceLayer::new_for_http())
         .with_state(state)
 }

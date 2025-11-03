@@ -13,6 +13,7 @@ use tower::util::ServiceExt; // for `oneshot`
 #[ignore] // Requires NATS server running
 async fn given_server_when_healthz_requested_then_returns_ok() -> Result<()> {
     // Arrange
+    configure_env();
     let state = AppState::new().await?;
     let app = create_app(state);
 
@@ -36,6 +37,7 @@ async fn given_server_when_healthz_requested_then_returns_ok() -> Result<()> {
 #[ignore] // Requires NATS server running
 async fn given_stored_contract_when_http_get_requested_then_returns_bundle() -> Result<()> {
     // Arrange
+    configure_env();
     let state = AppState::new().await?;
     let test_name = format!("http-test-{}", uuid::Uuid::new_v4());
 
@@ -79,6 +81,7 @@ async fn given_stored_contract_when_http_get_requested_then_returns_bundle() -> 
 #[ignore] // Requires NATS server running
 async fn given_no_contracts_when_list_requested_then_returns_json_array() -> Result<()> {
     // Arrange
+    configure_env();
     let state = AppState::new().await?;
     let app = create_app(state);
 
@@ -103,6 +106,7 @@ async fn given_no_contracts_when_list_requested_then_returns_json_array() -> Res
 #[ignore] // Requires NATS server running
 async fn given_nonexistent_contract_when_requested_then_returns_404() -> Result<()> {
     // Arrange
+    configure_env();
     let state = AppState::new().await?;
     let app = create_app(state);
 
@@ -120,4 +124,11 @@ async fn given_nonexistent_contract_when_requested_then_returns_404() -> Result<
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 
     Ok(())
+}
+
+fn configure_env() {
+    let url = std::env::var("NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".to_string());
+    std::env::set_var("NATS_URL", url);
+    let bucket = format!("contracts_test_{}", uuid::Uuid::new_v4());
+    std::env::set_var("REGISTRY_KV_BUCKET", bucket);
 }

@@ -46,25 +46,34 @@ impl KvClient {
     pub async fn new() -> Result<Self> {
         let nats_url =
             std::env::var("NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".to_string());
+        let bucket_name =
+            std::env::var("REGISTRY_KV_BUCKET").unwrap_or_else(|_| "contracts".to_string());
 
-        info!("Connecting to NATS at {} for KV operations", nats_url);
+        Self::with_connection(&nats_url, &bucket_name).await
+    }
+
+    /// Create a KV client using the provided connection settings.
+    async fn with_connection(nats_url: &str, bucket_name: &str) -> Result<Self> {
+        info!(
+            "Connecting to NATS at {} for KV operations (bucket: {})",
+            nats_url, bucket_name
+        );
 
         let client = if let Ok(creds_path) = std::env::var("NATS_CREDS_PATH") {
             info!("Using credentials file: {}", creds_path);
             async_nats::ConnectOptions::new()
                 .credentials_file(&creds_path)
                 .await?
-                .connect(&nats_url)
+                .connect(nats_url)
                 .await?
         } else {
             warn!("No NATS credentials provided, connecting without auth");
-            async_nats::connect(&nats_url).await?
+            async_nats::connect(nats_url).await?
         };
 
         let jetstream = jetstream::new(client);
 
         // Get or create KV bucket for contract metadata
-        let bucket_name = "contracts";
         let kv_store = match jetstream.get_key_value(bucket_name).await {
             Ok(store) => {
                 info!("Using existing KV bucket: {}", bucket_name);
