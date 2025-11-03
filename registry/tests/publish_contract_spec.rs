@@ -4,7 +4,7 @@ use axum::{
     body::Body,
     http::{Request, StatusCode},
 };
-use chrono;
+use chrono::{Duration, Utc};
 use demon_registry::{auth::Claims, create_app, AppState};
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use serde_json::json;
@@ -14,8 +14,8 @@ use tower::ServiceExt;
 fn create_test_token(scopes: Vec<String>, secret: &str) -> String {
     let claims = Claims {
         sub: "test-user".to_string(),
-        exp: (chrono::Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
-        iat: Some(chrono::Utc::now().timestamp() as usize),
+        exp: (Utc::now() + Duration::hours(1)).timestamp() as usize,
+        iat: Some(Utc::now().timestamp() as usize),
         scopes,
     };
 
