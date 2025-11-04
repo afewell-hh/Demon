@@ -83,20 +83,14 @@
             <!-- P95 Latency -->
             <div class="metric-card">
                 <div class="metric-label">P95 Latency</div>
-                <div class="metric-value">
-                    {% if scale_hint.metrics.p95LatencyMs < 1000 %}
-                        {{ scale_hint.metrics.p95LatencyMs | round }}ms
-                    {% else %}
-                        {{ scale_hint.metrics.p95LatencyMs | round }}ms
-                    {% endif %}
-                </div>
+                <div class="metric-value">{{ scale_hint.metrics.formattedP95Latency }}</div>
                 <div class="metric-subtitle">95th percentile</div>
             </div>
 
             <!-- Error Rate -->
             <div class="metric-card">
                 <div class="metric-label">Error Rate</div>
-                <div class="metric-value">{{ scale_hint.metrics.errorRate * 100 | round }}%</div>
+                <div class="metric-value">{{ scale_hint.metrics.formattedErrorRate }}</div>
                 <div class="metric-subtitle">{{ scale_hint.metrics.totalErrors }} / {{ scale_hint.metrics.totalProcessed }} requests</div>
             </div>
         </div>

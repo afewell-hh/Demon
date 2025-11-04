@@ -79,6 +79,22 @@ pub struct ScaleMetrics {
     pub total_errors: u64,
 }
 
+impl ScaleMetrics {
+    /// Format P95 latency with appropriate units and precision
+    pub fn formatted_p95_latency(&self) -> String {
+        if self.p95_latency_ms < 1000.0 {
+            format!("{:.2}ms", self.p95_latency_ms)
+        } else {
+            format!("{:.2}s", self.p95_latency_ms / 1000.0)
+        }
+    }
+
+    /// Format error rate as percentage with precision
+    pub fn formatted_error_rate(&self) -> String {
+        format!("{:.2}%", self.error_rate * 100.0)
+    }
+}
+
 /// Scale hint event with metrics and recommendation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

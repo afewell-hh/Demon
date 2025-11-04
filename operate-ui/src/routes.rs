@@ -308,7 +308,24 @@ pub async fn get_run_html_tenant(
         if let Some(client) = &state.jetstream_client {
             match client.get_latest_scale_hint(&tenant).await {
                 Ok(Some(hint)) => {
-                    context.insert("scale_hint", &hint);
+                    // Create a context-friendly version with formatted strings
+                    let hint_context = serde_json::json!({
+                        "ts": hint.ts,
+                        "tenantId": hint.tenant_id,
+                        "recommendation": hint.recommendation,
+                        "reason": hint.reason,
+                        "traceId": hint.trace_id,
+                        "metrics": {
+                            "queueLag": hint.metrics.queue_lag,
+                            "p95LatencyMs": hint.metrics.p95_latency_ms,
+                            "errorRate": hint.metrics.error_rate,
+                            "totalProcessed": hint.metrics.total_processed,
+                            "totalErrors": hint.metrics.total_errors,
+                            "formattedP95Latency": hint.metrics.formatted_p95_latency(),
+                            "formattedErrorRate": hint.metrics.formatted_error_rate(),
+                        }
+                    });
+                    context.insert("scale_hint", &hint_context);
                 }
                 Ok(None) => {
                     debug!("No scale hint available for tenant: {}", tenant);
