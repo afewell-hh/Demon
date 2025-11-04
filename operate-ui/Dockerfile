@@ -13,7 +13,9 @@ COPY crates/ ./crates/
 COPY contracts/ ./contracts/
 COPY runtime/ ./runtime/
 COPY engine/ ./engine/
+COPY registry/ ./registry/
 COPY operate-ui/ ./operate-ui/
+COPY tooling/ ./tooling/
 COPY wards/ ./wards/
 COPY capsules/ ./capsules/
 COPY demonctl/ ./demonctl/
@@ -41,7 +43,9 @@ COPY crates/ ./crates/
 COPY contracts/ ./contracts/
 COPY runtime/ ./runtime/
 COPY engine/ ./engine/
+COPY registry/ ./registry/
 COPY operate-ui/ ./operate-ui/
+COPY tooling/ ./tooling/
 COPY wards/ ./wards/
 COPY capsules/ ./capsules/
 COPY demonctl/ ./demonctl/

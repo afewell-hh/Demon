@@ -710,6 +710,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
 
 [[package]]
+name = "contract-linter"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "jsonschema 0.18.3",
+ "semver",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "cookie"
 version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -877,10 +891,13 @@ dependencies = [
  "anyhow",
  "async-nats",
  "axum",
+ "chrono",
  "futures-util",
+ "hex",
  "jsonwebtoken",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror 1.0.69",
  "tokio",
  "tower 0.4.13",

@@ -71,15 +71,23 @@ async fn healthz() -> impl IntoResponse {
 
 /// Create the Axum application router
 pub fn create_app(state: AppState) -> Router {
-    Router::new()
-        .route("/healthz", get(healthz))
-        .route("/registry/contracts", get(routes::list_contracts))
+    // Create authenticated routes with JWT middleware
+    let authenticated_routes = Router::new()
+        .route(
+            "/registry/contracts",
+            get(routes::list_contracts).post(routes::publish_contract),
+        )
         .route(
             "/registry/contracts/:name/:version",
             get(routes::get_contract),
         )
         .layer(middleware::from_fn(auth::jwt_middleware))
+        .with_state(state);
+
+    // Combine with public routes (no auth required)
+    Router::new()
+        .route("/healthz", get(healthz))
+        .merge(authenticated_routes)
         // Avoid logging request headers so Authorization tokens never reach logs.
         .layer(TraceLayer::new_for_http())
-        .with_state(state)
 }

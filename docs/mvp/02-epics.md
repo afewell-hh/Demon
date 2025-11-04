@@ -7,6 +7,7 @@
 | MVP-E6 | UI Dashboard | MVP-Alpha  | @afewell-hh | Complete (M1-1) | PR: #105 |
 | MVP-E7 | Multi-tenant Foundations | MVP-Alpha  | @afewell-hh | Complete (M1-2) | PR: #107 |
 | MVP-E8 | Advanced Policy Engine | MVP-Alpha  | @afewell-hh | Complete (M1-3) | PRs: #108, #109 |
+| MVP-E9 | Schema Registry & Observability | MVP-Beta | @afewell-hh | In Progress (Sprint C) | Epic: #304 |
 
 | Epic | Title | Outcome | Links |
 |------|-------|---------|-------|

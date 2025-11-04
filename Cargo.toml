@@ -12,7 +12,8 @@ members = [
   "bootstrapper/demonctl",
   "crates/envelope",
   "crates/envelope-derive",
-  "crates/config-loader"
+  "crates/config-loader",
+  "tooling/contract-linter"
 ]
 resolver = "2"
 

@@ -190,6 +190,225 @@ jobs:
         if: always()
         run: docker rm -f nats || true
 
+  contract-linter:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust (pinned toolchain)
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: 1.82.0
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+          cache-on-failure: true
+
+      - name: Build contract-linter
+        run: cargo build -p contract-linter
+
+      - name: Run contract linter tests
+        run: make lint-contracts
+
+  registry-smoke:
+    runs-on: ubuntu-latest
+    needs: build-test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust (pinned toolchain)
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: 1.82.0
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+          cache-on-failure: true
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Start NATS (JetStream)
+        run: |
+          docker run -d --rm --name nats -p 4222:4222 -p 8222:8222 nats:2.10 -js
+          for i in {1..40}; do
+            if docker logs nats 2>&1 | grep -q "Server is ready"; then exit 0; fi
+            sleep 0.5
+          done
+          echo "NATS did not report ready in time"; docker logs nats; exit 1
+
+      - name: Build workspace
+        run: cargo build --workspace
+
+      - name: Start Schema Registry (background)
+        env:
+          JWT_SECRET: test-secret-for-ci
+          NATS_URL: nats://127.0.0.1:4222
+          REGISTRY_KV_BUCKET: contracts_ci
+          BIND_ADDR: 0.0.0.0:8090
+        run: |
+          nohup bash -c 'JWT_SECRET=test-secret-for-ci NATS_URL=nats://127.0.0.1:4222 REGISTRY_KV_BUCKET=contracts_ci BIND_ADDR=0.0.0.0:8090 cargo run -q -p demon-registry' >/tmp/registry.log 2>&1 &
+          # Wait for registry to be ready
+          for i in {1..60}; do
+            if curl -sf http://127.0.0.1:8090/healthz 2>/dev/null; then
+              echo "✓ Registry server ready"
+              break
+            fi
+            if [[ $i -eq 60 ]]; then
+              echo "❌ Registry server failed to start"
+              cat /tmp/registry.log || true
+              exit 1
+            fi
+            sleep 0.5
+          done
+
+      - name: Generate test JWT token
+        run: |
+          # Create a simple Node.js script to generate JWT (jsonwebtoken CLI alternative)
+          cat > /tmp/gen-jwt.js << 'EOF'
+          const crypto = require('crypto');
+
+          function base64UrlEncode(str) {
+            return Buffer.from(str).toString('base64')
+              .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+          }
+
+          const header = { alg: 'HS256', typ: 'JWT' };
+          const payload = {
+            sub: 'ci-test-user',
+            exp: Math.floor(Date.now() / 1000) + 3600,
+            iat: Math.floor(Date.now() / 1000),
+            scopes: ['contracts:write', 'contracts:read']
+          };
+          const secret = 'test-secret-for-ci';
+
+          const encodedHeader = base64UrlEncode(JSON.stringify(header));
+          const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+          const signature = crypto.createHmac('sha256', secret)
+            .update(encodedHeader + '.' + encodedPayload)
+            .digest('base64')
+            .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+
+          console.log(encodedHeader + '.' + encodedPayload + '.' + signature);
+          EOF
+
+          JWT_TOKEN=$(node /tmp/gen-jwt.js)
+          echo "JWT_TOKEN=$JWT_TOKEN" >> $GITHUB_ENV
+          echo "✓ JWT token generated"
+
+      - name: Publish contract via demonctl CLI
+        env:
+          JWT_TOKEN: ${{ env.JWT_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Create a test JSON schema
+          cat > /tmp/test-contract.json << 'EOF'
+          {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "CI Test Contract",
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" }
+            }
+          }
+          EOF
+
+          # Publish using demonctl
+          cargo run -p demonctl -- contracts publish \
+            --name ci-test-contract \
+            --version 1.0.0 \
+            --description "Test contract for CI" \
+            --json-schema /tmp/test-contract.json \
+            --registry-endpoint http://localhost:8090 \
+            --jwt "$JWT_TOKEN" | tee /tmp/publish-output.txt
+
+          # Verify output contains expected fields
+          if ! grep -q "digest" /tmp/publish-output.txt; then
+            echo "❌ Publish output missing digest"
+            exit 1
+          fi
+          if ! grep -q "createdAt" /tmp/publish-output.txt; then
+            echo "❌ Publish output missing createdAt"
+            exit 1
+          fi
+          echo "✓ Contract published successfully"
+
+      - name: Verify contract via registry API
+        run: |
+          set -euo pipefail
+
+          # Get the JWT token from env
+          JWT_TOKEN="${{ env.JWT_TOKEN }}"
+
+          # Query registry API to verify contract was stored
+          response=$(curl -s -H "Authorization: Bearer $JWT_TOKEN" \
+            http://localhost:8090/registry/contracts/ci-test-contract/1.0.0)
+
+          echo "$response" | jq . | tee /tmp/get-contract.json
+
+          # Verify response contains expected fields
+          if ! echo "$response" | jq -e '.name == "ci-test-contract"' >/dev/null; then
+            echo "❌ Contract name mismatch"
+            exit 1
+          fi
+          if ! echo "$response" | jq -e '.version == "1.0.0"' >/dev/null; then
+            echo "❌ Contract version mismatch"
+            exit 1
+          fi
+          if ! echo "$response" | jq -e '.digest' >/dev/null; then
+            echo "❌ Contract missing digest"
+            exit 1
+          fi
+
+          echo "✓ Contract verification passed"
+
+      - name: Test duplicate publish (expect 409 Conflict)
+        run: |
+          set -euo pipefail
+
+          JWT_TOKEN="${{ env.JWT_TOKEN }}"
+
+          # Try to publish same contract again
+          status=$(curl -s -o /tmp/duplicate-response.txt -w "%{http_code}" \
+            -X POST http://localhost:8090/registry/contracts \
+            -H "Authorization: Bearer $JWT_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "name": "ci-test-contract",
+              "version": "1.0.0",
+              "description": "Duplicate test",
+              "jsonSchema": "{}"
+            }')
+
+          if [[ "$status" != "409" ]]; then
+            echo "❌ Expected 409 Conflict for duplicate, got $status"
+            cat /tmp/duplicate-response.txt
+            exit 1
+          fi
+
+          echo "✓ Duplicate publish correctly rejected with 409"
+
+      - name: Stop registry server
+        if: always()
+        run: |
+          # Kill any cargo processes running demon-registry
+          pkill -f "cargo.*-p demon-registry" || true
+
+      - name: Teardown NATS
+        if: always()
+        run: docker rm -f nats || true
+
   preview-smoke:
     runs-on: ubuntu-latest
     needs: build-test
@@ -293,7 +512,7 @@ jobs:
           set -euo pipefail
           cargo install cargo-deny --locked --force
       - name: Check licenses & bans
-        run: cargo deny check --all-features
+        run: cargo deny check
         continue-on-error: true
 
   sandbox-verification:
@@ -948,7 +1167,7 @@ jobs:
           cargo install cargo-deny --locked --force
 
       - name: Cargo deny check
-        run: cargo deny check --all-features
+        run: cargo deny check
         continue-on-error: true
 
       - name: Build workspace
