@@ -1,0 +1,29 @@
+{
+  "event": "agent.scale.hint:v1",
+  "ts": "2025-01-06T11:15:30Z",
+  "tenantId": "default",
+  "recommendation": "scale_down",
+  "metrics": {
+    "queueLag": 15,
+    "p95LatencyMs": 45.2,
+    "errorRate": 0.001,
+    "totalProcessed": 5000,
+    "totalErrors": 5
+  },
+  "thresholds": {
+    "queueLagHigh": 500,
+    "queueLagLow": 50,
+    "p95LatencyHighMs": 1000.0,
+    "p95LatencyLowMs": 100.0,
+    "errorRateHigh": 0.05
+  },
+  "hysteresis": {
+    "currentState": "normal",
+    "stateChangedAt": "2025-01-06T11:10:00Z",
+    "consecutiveHighSignals": 0,
+    "consecutiveLowSignals": 8,
+    "minSignalsForTransition": 3
+  },
+  "reason": "Queue lag (15) below low threshold (50) and P95 latency (45.2ms) below low threshold (100ms) for 8 consecutive intervals",
+  "traceId": "trace-scale-down-001"
+}

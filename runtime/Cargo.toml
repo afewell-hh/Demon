@@ -9,6 +9,10 @@ authors.workspace = true
 name = "runtime"
 path = "src/main.rs"
 
+[[example]]
+name = "simulate_scale_hints"
+path = "../examples/scale-hint/simulate.rs"
+
 [dependencies]
 anyhow = { workspace = true }
 envelope = { path = "../crates/envelope" }
