@@ -1,7 +1,6 @@
 //! Configuration for the scale hint handler service
 
 use clap::Parser;
-use std::env;
 
 /// Configuration for scale hint handler
 #[derive(Debug, Clone, Parser)]
@@ -9,7 +8,7 @@ use std::env;
 #[command(about = "Consumes agent.scale.hint events and triggers autoscale actions")]
 pub struct Config {
     /// NATS server URL
-    #[arg(long, env)]
+    #[arg(long, env, default_value = "nats://localhost:4222")]
     pub nats_url: String,
 
     /// Path to NATS credentials file
@@ -17,7 +16,7 @@ pub struct Config {
     pub nats_creds_path: Option<String>,
 
     /// JetStream stream name
-    #[arg(long, env)]
+    #[arg(long, env, default_value = "SCALE_HINTS")]
     pub stream_name: String,
 
     /// Tenant ID filter (if specified, only consume events for this tenant)
@@ -25,7 +24,7 @@ pub struct Config {
     pub tenant_filter: Option<String>,
 
     /// Dry-run mode (log only, no actual autoscale calls)
-    #[arg(long, env)]
+    #[arg(long, env, default_value = "true")]
     pub dry_run: bool,
 
     /// Autoscale endpoint URL (HTTP POST endpoint for scale actions)
@@ -33,67 +32,28 @@ pub struct Config {
     pub autoscale_endpoint: Option<String>,
 
     /// Output logs in JSON format
-    #[arg(long, env)]
+    #[arg(long, env, default_value = "false")]
     pub log_json: bool,
 
     /// Prometheus metrics port
-    #[arg(long, env)]
+    #[arg(long, env, default_value = "9090")]
     pub metrics_port: u16,
 
     /// Consumer name (for durable JetStream consumer)
-    #[arg(long, env)]
+    #[arg(long, env, default_value = "scale-hint-handler")]
     pub consumer_name: String,
 
     /// Backoff retry delay in milliseconds
-    #[arg(long, env)]
+    #[arg(long, env, default_value = "1000")]
     pub retry_backoff_ms: u64,
 
     /// Maximum retry attempts for failed autoscale calls
-    #[arg(long, env)]
+    #[arg(long, env, default_value = "3")]
     pub max_retry_attempts: u32,
 
     /// Autoscale API timeout in seconds
-    #[arg(long, env)]
+    #[arg(long, env, default_value = "10")]
     pub autoscale_timeout_secs: u64,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            nats_url: env::var("NATS_URL").unwrap_or_else(|_| "nats://localhost:4222".to_string()),
-            nats_creds_path: env::var("NATS_CREDS_PATH").ok(),
-            stream_name: env::var("SCALE_HINT_STREAM_NAME")
-                .unwrap_or_else(|_| "SCALE_HINTS".to_string()),
-            tenant_filter: env::var("TENANT_FILTER").ok(),
-            dry_run: env::var("DRY_RUN")
-                .unwrap_or_else(|_| "true".to_string())
-                .parse()
-                .unwrap_or(true),
-            autoscale_endpoint: env::var("AUTOSCALE_ENDPOINT").ok(),
-            log_json: env::var("LOG_JSON")
-                .unwrap_or_else(|_| "false".to_string())
-                .parse()
-                .unwrap_or(false),
-            metrics_port: env::var("METRICS_PORT")
-                .unwrap_or_else(|_| "9090".to_string())
-                .parse()
-                .unwrap_or(9090),
-            consumer_name: env::var("CONSUMER_NAME")
-                .unwrap_or_else(|_| "scale-hint-handler".to_string()),
-            retry_backoff_ms: env::var("RETRY_BACKOFF_MS")
-                .unwrap_or_else(|_| "1000".to_string())
-                .parse()
-                .unwrap_or(1000),
-            max_retry_attempts: env::var("MAX_RETRY_ATTEMPTS")
-                .unwrap_or_else(|_| "3".to_string())
-                .parse()
-                .unwrap_or(3),
-            autoscale_timeout_secs: env::var("AUTOSCALE_TIMEOUT_SECS")
-                .unwrap_or_else(|_| "10".to_string())
-                .parse()
-                .unwrap_or(10),
-        }
-    }
 }
 
 impl Config {
