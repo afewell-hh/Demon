@@ -13,7 +13,8 @@ members = [
   "crates/envelope",
   "crates/envelope-derive",
   "crates/config-loader",
-  "tooling/contract-linter"
+  "tooling/contract-linter",
+  "controller/scale-hint-handler"
 ]
 resolver = "2"
 

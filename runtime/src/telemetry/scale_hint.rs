@@ -354,12 +354,15 @@ impl ScaleHintEmitter {
             return Ok(None);
         }
 
-        let (recommendation, reason) = {
+        // Atomically update hysteresis and capture snapshot to avoid race conditions
+        let (recommendation, reason, hyst_snapshot) = {
             let mut hyst = self
                 .hysteresis
                 .lock()
                 .map_err(|e| anyhow::anyhow!("Hysteresis lock poisoned: {}", e))?;
-            hyst.update(&metrics, &self.config)
+            let (rec, reason) = hyst.update(&metrics, &self.config);
+            let snapshot = hyst.clone();
+            (rec, reason, snapshot)
         };
 
         // Only emit if recommendation is not steady or if we want all events
@@ -376,14 +379,6 @@ impl ScaleHintEmitter {
             );
             return Ok(None);
         }
-
-        let hyst_snapshot = {
-            let hyst = self
-                .hysteresis
-                .lock()
-                .map_err(|e| anyhow::anyhow!("Hysteresis lock poisoned: {}", e))?;
-            hyst.clone()
-        };
 
         let event = ScaleHintEvent {
             event: "agent.scale.hint:v1".to_string(),
