@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.demon.ai/events/agent.scale.hint.v1.json",
+  "title": "Agent Scale Hint Event",
+  "description": "Event emitted when the runtime detects conditions requiring scale adjustments based on queue lag, processing latency, and error rates",
+  "type": "object",
+  "properties": {
+    "event": {
+      "type": "string",
+      "const": "agent.scale.hint:v1"
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of the event"
+    },
+    "tenantId": {
+      "type": "string",
+      "description": "Tenant identifier"
+    },
+    "recommendation": {
+      "type": "string",
+      "enum": ["scale_up", "scale_down", "steady"],
+      "description": "Scale recommendation based on current metrics and thresholds"
+    },
+    "metrics": {
+      "type": "object",
+      "description": "Current runtime metrics that triggered this hint",
+      "properties": {
+        "queueLag": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of pending messages in the queue"
+        },
+        "p95LatencyMs": {
+          "type": "number",
+          "minimum": 0,
+          "description": "95th percentile processing latency in milliseconds"
+        },
+        "errorRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Error rate as a fraction (0.0 to 1.0)"
+        },
+        "totalProcessed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of messages processed in the observation window"
+        },
+        "totalErrors": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of errors in the observation window"
+        }
+      },
+      "required": ["queueLag", "p95LatencyMs", "errorRate", "totalProcessed", "totalErrors"],
+      "additionalProperties": false
+    },
+    "thresholds": {
+      "type": "object",
+      "description": "Active threshold configuration used for this evaluation",
+      "properties": {
+        "queueLagHigh": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Queue lag threshold for scale-up consideration"
+        },
+        "queueLagLow": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Queue lag threshold for scale-down consideration"
+        },
+        "p95LatencyHighMs": {
+          "type": "number",
+          "minimum": 0,
+          "description": "P95 latency threshold for scale-up (milliseconds)"
+        },
+        "p95LatencyLowMs": {
+          "type": "number",
+          "minimum": 0,
+          "description": "P95 latency threshold for scale-down (milliseconds)"
+        },
+        "errorRateHigh": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Error rate threshold for scale-up consideration"
+        }
+      },
+      "required": ["queueLagHigh", "queueLagLow", "p95LatencyHighMs", "p95LatencyLowMs", "errorRateHigh"],
+      "additionalProperties": false
+    },
+    "hysteresis": {
+      "type": "object",
+      "description": "Hysteresis state to prevent oscillations",
+      "properties": {
+        "currentState": {
+          "type": "string",
+          "enum": ["normal", "pressure", "overload"],
+          "description": "Current pressure state"
+        },
+        "stateChangedAt": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Timestamp when state last changed"
+        },
+        "consecutiveHighSignals": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count of consecutive high-pressure signals"
+        },
+        "consecutiveLowSignals": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count of consecutive low-pressure signals"
+        },
+        "minSignalsForTransition": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Minimum consecutive signals required to change state"
+        }
+      },
+      "required": ["currentState", "stateChangedAt", "consecutiveHighSignals", "consecutiveLowSignals", "minSignalsForTransition"],
+      "additionalProperties": false
+    },
+    "reason": {
+      "type": "string",
+      "description": "Human-readable explanation for the recommendation"
+    },
+    "traceId": {
+      "type": "string",
+      "description": "Distributed trace identifier"
+    }
+  },
+  "required": [
+    "event",
+    "ts",
+    "tenantId",
+    "recommendation",
+    "metrics",
+    "thresholds",
+    "hysteresis",
+    "reason"
+  ],
+  "additionalProperties": false
+}

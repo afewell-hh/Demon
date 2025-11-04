@@ -1,0 +1,29 @@
+{
+  "event": "agent.scale.hint:v1",
+  "ts": "2025-01-06T10:30:02Z",
+  "tenantId": "default",
+  "recommendation": "scale_up",
+  "metrics": {
+    "queueLag": 850,
+    "p95LatencyMs": 1250.5,
+    "errorRate": 0.08,
+    "totalProcessed": 1000,
+    "totalErrors": 80
+  },
+  "thresholds": {
+    "queueLagHigh": 500,
+    "queueLagLow": 50,
+    "p95LatencyHighMs": 1000.0,
+    "p95LatencyLowMs": 100.0,
+    "errorRateHigh": 0.05
+  },
+  "hysteresis": {
+    "currentState": "overload",
+    "stateChangedAt": "2025-01-06T10:29:00Z",
+    "consecutiveHighSignals": 5,
+    "consecutiveLowSignals": 0,
+    "minSignalsForTransition": 3
+  },
+  "reason": "Queue lag (850) exceeds high threshold (500) and P95 latency (1250.5ms) exceeds high threshold (1000ms)",
+  "traceId": "trace-scale-up-001"
+}

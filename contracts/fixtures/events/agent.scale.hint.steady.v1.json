@@ -1,0 +1,29 @@
+{
+  "event": "agent.scale.hint:v1",
+  "ts": "2025-01-06T12:00:00Z",
+  "tenantId": "production",
+  "recommendation": "steady",
+  "metrics": {
+    "queueLag": 120,
+    "p95LatencyMs": 350.8,
+    "errorRate": 0.02,
+    "totalProcessed": 2500,
+    "totalErrors": 50
+  },
+  "thresholds": {
+    "queueLagHigh": 500,
+    "queueLagLow": 50,
+    "p95LatencyHighMs": 1000.0,
+    "p95LatencyLowMs": 100.0,
+    "errorRateHigh": 0.05
+  },
+  "hysteresis": {
+    "currentState": "normal",
+    "stateChangedAt": "2025-01-06T11:45:00Z",
+    "consecutiveHighSignals": 0,
+    "consecutiveLowSignals": 2,
+    "minSignalsForTransition": 3
+  },
+  "reason": "Metrics within normal operating range; no scaling action needed",
+  "traceId": "trace-steady-001"
+}

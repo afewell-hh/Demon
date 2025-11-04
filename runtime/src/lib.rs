@@ -4,3 +4,4 @@ pub mod contracts;
 pub mod graph;
 pub mod link;
 pub mod server;
+pub mod telemetry;
