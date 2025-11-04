@@ -1,6 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { seedRun, waitForOperateUI, SeedEvent } from './support/jetstream';
-import { seedScaleHint } from './support/scale_hints';
+import { seedScaleHint, clearScaleHints } from './support/scale_hints';
 
 const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:3000';
 const ritualId = 'test-ritual';
@@ -178,6 +178,9 @@ test.describe('Scale Metrics Display', () => {
 
   test('run detail page hides scale metrics panel when no scale hint available', async ({ page }) => {
     const runId = buildRunId('no-scale-hint');
+
+    // Clear any existing scale hints from previous tests
+    await clearScaleHints(tenantId);
 
     await seedRun({
       runId,
