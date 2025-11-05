@@ -1348,6 +1348,26 @@ async fn export_contracts_bundle(format: &str, include_wit: bool) -> Result<()> 
         schemas.insert("result-envelope.json".to_string(), content);
     }
 
+    // Collect API contracts (YAML files)
+    let mut api_contracts = BTreeMap::new();
+    let api_contracts_dir = contracts_dir.join("api-contracts");
+    if api_contracts_dir.exists() {
+        for entry in fs::read_dir(&api_contracts_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("yaml")
+                || path.extension().and_then(|s| s.to_str()) == Some("yml")
+            {
+                let name = path
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unknown");
+                let content = fs::read_to_string(&path)?;
+                api_contracts.insert(name.to_string(), content);
+            }
+        }
+    }
+
     // Collect WIT definitions if requested
     let mut wit_definitions = BTreeMap::new();
     if include_wit {
@@ -1373,6 +1393,7 @@ async fn export_contracts_bundle(format: &str, include_wit: bool) -> Result<()> 
             let bundle = serde_json::json!({
                 "version": "1.0.0",
                 "schemas": schemas,
+                "apiContracts": api_contracts,
                 "wit": wit_definitions,
             });
             println!("{}", serde_json::to_string_pretty(&bundle)?);
@@ -1388,6 +1409,16 @@ async fn export_contracts_bundle(format: &str, include_wit: bool) -> Result<()> 
                 println!("  - {} ({} lines, {} bytes)", name, lines, bytes);
             }
 
+            if !api_contracts.is_empty() {
+                println!();
+                println!("API Contracts ({}):", api_contracts.len());
+                for (name, content) in &api_contracts {
+                    let lines = content.lines().count();
+                    let bytes = content.len();
+                    println!("  - {} ({} lines, {} bytes)", name, lines, bytes);
+                }
+            }
+
             if include_wit && !wit_definitions.is_empty() {
                 println!();
                 println!("WIT Definitions ({}):", wit_definitions.len());
@@ -1399,7 +1430,10 @@ async fn export_contracts_bundle(format: &str, include_wit: bool) -> Result<()> 
             }
 
             println!();
-            println!("Total contracts: {}", schemas.len() + wit_definitions.len());
+            println!(
+                "Total contracts: {}",
+                schemas.len() + api_contracts.len() + wit_definitions.len()
+            );
         }
     }
 
