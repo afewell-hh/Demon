@@ -20,6 +20,7 @@ COPY wards/ ./wards/
 COPY capsules/ ./capsules/
 COPY demonctl/ ./demonctl/
 COPY bootstrapper/ ./bootstrapper/
+COPY controller/ ./controller/
 RUN cargo chef prepare --recipe-path recipe.json
 
 # Stage 3: Build dependencies (cached layer)
@@ -48,6 +49,7 @@ COPY operate-ui/ ./operate-ui/
 COPY tooling/ ./tooling/
 COPY wards/ ./wards/
 COPY capsules/ ./capsules/
+COPY controller/ ./controller/
 COPY demonctl/ ./demonctl/
 COPY bootstrapper/ ./bootstrapper/
 

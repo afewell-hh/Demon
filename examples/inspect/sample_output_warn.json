@@ -1,0 +1,14 @@
+{
+  "tenant": "default",
+  "subject": "demon.scale.v1.default.hints",
+  "status": "warn",
+  "queue_lag": 350,
+  "p95_latency_ms": 650.5,
+  "error_rate": 0.032,
+  "total_processed": 10000,
+  "total_errors": 320,
+  "last_error": null,
+  "recommendation": "scale_up",
+  "reason": "Queue lag (350) exceeds warning threshold (300) and P95 latency (650.5ms) exceeds warning threshold (500ms)",
+  "timestamp": "2025-01-06T15:35:12Z"
+}

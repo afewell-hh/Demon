@@ -1,0 +1,12 @@
+$ demonctl inspect --graph
+
+╭─────────┬────────┬───────────┬─────────────┬────────────┬─────────────────┬────────────────╮
+│ TENANT  │ STATUS │ QUEUE LAG │ P95 LATENCY │ ERROR RATE │ TOTAL PROCESSED │ RECOMMENDATION │
+├─────────┼────────┼───────────┼─────────────┼────────────┼─────────────────┼────────────────┤
+│ default │ OK     │ 45        │ 125.3ms     │ 0.50%      │ 5000            │ ➡ Steady       │
+╰─────────┴────────┴───────────┴─────────────┴────────────┴─────────────────┴────────────────╯
+
+Reason: All metrics within normal operating parameters
+Last Updated: 2025-01-06T15:30:45Z
+
+Total Errors: 25 / 5000 (0.50%)

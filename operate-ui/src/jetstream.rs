@@ -154,9 +154,9 @@ impl JetStreamClient {
         let mut message_count = 0;
 
         // Get messages from JetStream stream
-        // Use DeliverPolicy::All to get all messages, then sort by timestamp to prioritize recent runs
+        // Fetch from the tail to ensure we see the most recent runs even when stream has > 10k messages
         match self
-            .query_stream_messages(&subject_filter, None, DeliverPolicy::All)
+            .query_stream_messages_from_tail(&subject_filter, None)
             .await
         {
             Ok(messages) => {
@@ -227,7 +227,7 @@ impl JetStreamClient {
             );
 
             match self
-                .query_stream_messages(legacy_subject, None, DeliverPolicy::All)
+                .query_stream_messages_from_tail(legacy_subject, None)
                 .await
             {
                 Ok(messages) => {
@@ -530,7 +530,11 @@ impl JetStreamClient {
         Ok(all_messages)
     }
 
-    /// Query stream messages with optional limit and delivery policy
+    /// Query stream messages with custom deliver policy
+    ///
+    /// Note: Prefer `query_stream_messages_from_tail` for run listing to avoid
+    /// missing recent data when streams grow large.
+    #[allow(dead_code)]
     async fn query_stream_messages(
         &self,
         subject_filter: &str,
@@ -621,6 +625,116 @@ impl JetStreamClient {
 
         // Note: Ephemeral consumers should be automatically cleaned up by JetStream
         // when the client connection is closed or after a timeout period
+    }
+
+    /// Query messages from the tail of the stream to get the most recent data
+    ///
+    /// This addresses the issue where streams with >10k messages would only show
+    /// the oldest 10k runs. By starting from near the end of the stream, we ensure
+    /// the UI always shows the most recent runs even as the stream grows.
+    async fn query_stream_messages_from_tail(
+        &self,
+        subject_filter: &str,
+        limit: Option<usize>,
+    ) -> Result<Vec<async_nats::jetstream::Message>> {
+        debug!(
+            "Querying messages from tail with subject filter: {}",
+            subject_filter
+        );
+
+        // Resolve stream with precedence
+        let desired = std::env::var("RITUAL_STREAM_NAME").ok();
+        let mut stream = if let Some(name) = desired {
+            self.jetstream
+                .get_stream(&name)
+                .await
+                .with_context(|| format!("JetStream stream '{}' not found", name))?
+        } else {
+            match self.jetstream.get_stream("RITUAL_EVENTS").await {
+                Ok(s) => s,
+                Err(_) => {
+                    let s = self
+                        .jetstream
+                        .get_stream("DEMON_RITUAL_EVENTS")
+                        .await
+                        .with_context(|| "JetStream stream 'RITUAL_EVENTS' not found; 'DEMON_RITUAL_EVENTS' also missing")?;
+                    warn!("Using deprecated stream name 'DEMON_RITUAL_EVENTS'; set RITUAL_STREAM_NAME or migrate to 'RITUAL_EVENTS'");
+                    s
+                }
+            }
+        };
+
+        // Get stream info to determine how many messages exist
+        let stream_info = stream.info().await.context("Failed to get stream info")?;
+        let total_messages = stream_info.state.messages;
+
+        debug!(
+            "Stream has {} total messages, fetching from tail",
+            total_messages
+        );
+
+        // Determine the starting sequence: fetch the last ~10k messages
+        // This ensures we see recent runs even when the stream is large
+        let batch_size = limit.unwrap_or(10_000).min(10_000);
+        let batch_size_u64 = batch_size as u64;
+        let start_sequence = if total_messages > batch_size_u64 {
+            total_messages.saturating_sub(batch_size_u64) + 1
+        } else {
+            1 // Start from beginning if stream is small
+        };
+
+        // Create ephemeral consumer starting from calculated sequence
+        let consumer_config = jetstream::consumer::pull::Config {
+            filter_subject: subject_filter.to_string(),
+            durable_name: None,
+            deliver_policy: DeliverPolicy::ByStartSequence { start_sequence },
+            ack_policy: async_nats::jetstream::consumer::AckPolicy::None,
+            inactive_threshold: std::time::Duration::from_secs(60),
+            ..Default::default()
+        };
+
+        let consumer = stream
+            .create_consumer(consumer_config)
+            .await
+            .context("Failed to create ephemeral consumer")?;
+
+        debug!(
+            "Created consumer starting at sequence {} for subject filter: {}",
+            start_sequence, subject_filter
+        );
+
+        // Fetch messages
+        match consumer
+            .batch()
+            .max_messages(batch_size)
+            .expires(std::time::Duration::from_secs(5))
+            .messages()
+            .await
+        {
+            Ok(mut messages) => {
+                let mut collected_messages = Vec::new();
+
+                while let Some(msg_result) = messages.next().await {
+                    match msg_result {
+                        Ok(msg) => collected_messages.push(msg),
+                        Err(e) => {
+                            error!("Error receiving message from JetStream: {}", e);
+                        }
+                    }
+                }
+
+                debug!(
+                    "Collected {} messages from tail (starting at seq {})",
+                    collected_messages.len(),
+                    start_sequence
+                );
+                Ok(collected_messages)
+            }
+            Err(e) => {
+                error!("Failed to fetch messages from tail: {}", e);
+                Err(e.into())
+            }
+        }
     }
 
     /// Parse a NATS message for run summary information

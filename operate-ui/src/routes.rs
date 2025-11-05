@@ -305,6 +305,7 @@ pub async fn get_run_html_tenant(
         }
 
         // Scale hint metrics for this tenant
+        // Always insert scale_hint into context (as null if unavailable) to prevent Tera render errors
         if let Some(client) = &state.jetstream_client {
             match client.get_latest_scale_hint(&tenant).await {
                 Ok(Some(hint)) => {
@@ -329,11 +330,16 @@ pub async fn get_run_html_tenant(
                 }
                 Ok(None) => {
                     debug!("No scale hint available for tenant: {}", tenant);
+                    context.insert("scale_hint", &serde_json::Value::Null);
                 }
                 Err(e) => {
                     warn!("Failed to fetch scale hint for tenant {}: {}", tenant, e);
+                    context.insert("scale_hint", &serde_json::Value::Null);
                 }
             }
+        } else {
+            // No JetStream client configured - insert null to prevent template errors
+            context.insert("scale_hint", &serde_json::Value::Null);
         }
 
         // Render App Pack cards for this ritual
