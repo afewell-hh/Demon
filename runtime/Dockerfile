@@ -20,6 +20,7 @@ COPY wards/ ./wards/
 COPY capsules/ ./capsules/
 COPY demonctl/ ./demonctl/
 COPY bootstrapper/ ./bootstrapper/
+COPY controller/ ./controller/
 RUN cargo chef prepare --recipe-path recipe.json
 
 # Stage 3: Build dependencies (cached layer)
@@ -50,6 +51,7 @@ COPY wards/ ./wards/
 COPY capsules/ ./capsules/
 COPY demonctl/ ./demonctl/
 COPY bootstrapper/ ./bootstrapper/
+COPY controller/ ./controller/
 
 ENV RUSTFLAGS="-C target-feature=+crt-static"
 RUN case "$TARGETPLATFORM" in \
