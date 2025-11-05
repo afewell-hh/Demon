@@ -8,7 +8,6 @@
 //! - Retry and backoff logic
 
 use anyhow::Result;
-use async_nats::jetstream;
 use scale_hint_handler::{
     autoscale::{
         AutoscaleClient, HysteresisPayload, MetricsPayload, Recommendation, ScaleHintEvent,
@@ -17,42 +16,10 @@ use scale_hint_handler::{
     Config, LogOnlyAutoscaleClient,
 };
 use serde_json::json;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
 use wiremock::{
     matchers::{method, path},
     Mock, MockServer, ResponseTemplate,
 };
-
-/// Test autoscale client that records calls
-struct TestAutoscaleClient {
-    calls: Arc<Mutex<Vec<ScaleHintEvent>>>,
-    should_fail: bool,
-}
-
-impl TestAutoscaleClient {
-    fn new(should_fail: bool) -> Self {
-        Self {
-            calls: Arc::new(Mutex::new(Vec::new())),
-            should_fail,
-        }
-    }
-
-    fn get_calls(&self) -> Vec<ScaleHintEvent> {
-        self.calls.lock().unwrap().clone()
-    }
-}
-
-#[async_trait::async_trait]
-impl AutoscaleClient for TestAutoscaleClient {
-    async fn handle_scale_hint(&self, event: &ScaleHintEvent) -> Result<()> {
-        self.calls.lock().unwrap().push(event.clone());
-        if self.should_fail {
-            anyhow::bail!("Simulated autoscale failure");
-        }
-        Ok(())
-    }
-}
 
 #[tokio::test]
 async fn test_log_only_client_handles_event() {

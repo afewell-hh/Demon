@@ -339,6 +339,71 @@ When calling the autoscale endpoint, the controller POSTs the following JSON:
 - **Metrics**: Full Prometheus support pending resolution of metrics crate version conflict. Current implementation uses structured logging.
 - **Testing**: One flaky retry test marked as ignored; core functionality verified by other tests.
 
+## Operate UI Integration (Story #309)
+
+The Operate UI displays scale feedback metrics in run detail pages, providing operators with visibility into system performance and scaling recommendations.
+
+### UI Features
+
+When scale hint telemetry is enabled and events are published to JetStream, the Operate UI run detail page displays a "Scale Feedback Metrics" panel showing:
+
+1. **Recommendation Badge**: Color-coded badge indicating the current scale recommendation:
+   - **⬆ Scale Up** (yellow) - System under pressure, consider increasing capacity
+   - **⬇ Scale Down** (blue) - System underutilized, consider reducing capacity
+   - **➡ Steady** (green) - System operating within normal parameters
+
+2. **Metrics Cards**: Three key performance indicators displayed in a responsive grid:
+   - **Queue Lag**: Number of pending messages in the queue
+   - **P95 Latency**: 95th percentile processing latency (displayed in ms or seconds)
+   - **Error Rate**: Percentage of failed requests with total counts
+
+3. **Reason**: Human-readable explanation for the recommendation
+4. **Last Updated**: Timestamp of the latest scale hint event
+
+### Accessing Scale Metrics
+
+Navigate to any run detail page: `/runs/{runId}` or `/tenants/{tenant}/runs/{runId}`
+
+The scale metrics panel appears automatically when:
+- Scale hint telemetry is enabled (`SCALE_HINT_ENABLED=true`)
+- The SCALE_HINTS JetStream stream exists
+- At least one scale hint event has been published for the tenant
+
+If no scale hints are available, the panel is hidden and the page functions normally.
+
+### Example
+
+```bash
+# Enable scale hints in the runtime
+export SCALE_HINT_ENABLED=true
+export SCALE_HINT_QUEUE_LAG_HIGH=500
+export SCALE_HINT_P95_LATENCY_HIGH_MS=1000.0
+
+# Start the runtime (will emit scale hints)
+cargo run -p runtime
+
+# Start Operate UI
+cargo run -p operate-ui
+
+# Navigate to a run detail page
+# Open browser to http://localhost:3000/runs/your-run-id
+```
+
+### Mobile Responsiveness
+
+The metrics panel is fully responsive and adapts to mobile screens:
+- Metric cards stack vertically on narrow screens
+- Font sizes adjust for readability
+- Badge remains visible and accessible
+
+### Technical Implementation
+
+The UI integration consists of:
+- **Backend**: `operate-ui/src/jetstream.rs` - Query latest scale hint from `demon.scale.v1.{tenant}.hints` subject
+- **Routes**: `operate-ui/src/routes.rs` - Fetch scale hint and add to template context
+- **Template**: `operate-ui/templates/run_detail.html` - Render metrics panel with Tera templating
+- **Tests**: `operate-ui/playwright/tests/scale_metrics.spec.ts` - End-to-end UI verification
+
 ## Future Enhancements
 
 - **Full Prometheus metrics**: Resolve crate version conflict and add comprehensive metrics
@@ -346,6 +411,9 @@ When calling the autoscale endpoint, the controller POSTs the following JSON:
 - **Predictive scaling**: Use trend analysis for proactive recommendations
 - **Custom policies**: Allow per-tenant threshold overrides
 - **Webhook notifications**: Support external alerting systems
+- **Real-time updates**: SSE integration to update metrics panel live without page refresh
+- **Historical trends**: Graph metrics over time in the UI
+- **Threshold visualization**: Show current vs configured thresholds
 
 ## References
 

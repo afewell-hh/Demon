@@ -60,6 +60,54 @@
     </div>
 </div>
 
+{% if scale_hint %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Scale Feedback Metrics</h3>
+        <span class="scale-recommendation-badge scale-recommendation-{{ scale_hint.recommendation }}">
+            {% if scale_hint.recommendation == "scale_up" %}⬆ Scale Up
+            {% elif scale_hint.recommendation == "scale_down" %}⬇ Scale Down
+            {% else %}➡ Steady{% endif %}
+        </span>
+    </div>
+
+    <div style="margin-bottom: 1.5rem;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            <!-- Queue Lag -->
+            <div class="metric-card">
+                <div class="metric-label">Queue Lag</div>
+                <div class="metric-value">{{ scale_hint.metrics.queueLag }}</div>
+                <div class="metric-subtitle">pending messages</div>
+            </div>
+
+            <!-- P95 Latency -->
+            <div class="metric-card">
+                <div class="metric-label">P95 Latency</div>
+                <div class="metric-value">{{ scale_hint.metrics.formattedP95Latency }}</div>
+                <div class="metric-subtitle">95th percentile</div>
+            </div>
+
+            <!-- Error Rate -->
+            <div class="metric-card">
+                <div class="metric-label">Error Rate</div>
+                <div class="metric-value">{{ scale_hint.metrics.formattedErrorRate }}</div>
+                <div class="metric-subtitle">{{ scale_hint.metrics.totalErrors }} / {{ scale_hint.metrics.totalProcessed }} requests</div>
+            </div>
+        </div>
+    </div>
+
+    {% if scale_hint.reason %}
+    <div style="padding: 1rem; background-color: var(--bg-secondary, #f8f9fa); border-left: 3px solid var(--primary-color, #007bff); border-radius: 4px;">
+        <strong>Reason:</strong> {{ scale_hint.reason }}
+    </div>
+    {% endif %}
+
+    <div style="margin-top: 1rem; font-size: 0.875rem; color: var(--text-secondary, #666);">
+        <strong>Last Updated:</strong> <time>{{ scale_hint.ts }}</time>
+    </div>
+</div>
+{% endif %}
+
 {% if approvals %}
 <div class="card">
     <div class="card-header">
@@ -557,6 +605,77 @@
     font-size: 0.875rem;
     line-height: 1.5;
     color: var(--text-primary, #333);
+}
+
+/* Scale Metrics Panel Styling */
+.scale-recommendation-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.scale-recommendation-scale_up {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffc107;
+}
+
+.scale-recommendation-scale_down {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #17a2b8;
+}
+
+.scale-recommendation-steady {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #28a745;
+}
+
+.metric-card {
+    padding: 1rem;
+    background-color: var(--card-background, #ffffff);
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: 8px;
+    text-align: center;
+}
+
+.metric-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary, #666);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.metric-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary, #333);
+    margin-bottom: 0.25rem;
+    font-family: var(--font-mono, 'Courier New', monospace);
+}
+
+.metric-subtitle {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #999);
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 640px) {
+    .metric-value {
+        font-size: 1.5rem;
+    }
+
+    .scale-recommendation-badge {
+        font-size: 0.75rem;
+        padding: 0.375rem 0.75rem;
+    }
 }
 </style>
 

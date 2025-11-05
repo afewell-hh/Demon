@@ -68,6 +68,46 @@ pub struct RitualEvent {
     pub extra: HashMap<String, serde_json::Value>,
 }
 
+/// Scale metrics from the scale hint telemetry
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScaleMetrics {
+    pub queue_lag: u64,
+    pub p95_latency_ms: f64,
+    pub error_rate: f64,
+    pub total_processed: u64,
+    pub total_errors: u64,
+}
+
+impl ScaleMetrics {
+    /// Format P95 latency with appropriate units and precision
+    pub fn formatted_p95_latency(&self) -> String {
+        if self.p95_latency_ms < 1000.0 {
+            format!("{:.2}ms", self.p95_latency_ms)
+        } else {
+            format!("{:.2}s", self.p95_latency_ms / 1000.0)
+        }
+    }
+
+    /// Format error rate as percentage with precision
+    pub fn formatted_error_rate(&self) -> String {
+        format!("{:.2}%", self.error_rate * 100.0)
+    }
+}
+
+/// Scale hint event with metrics and recommendation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScaleHint {
+    pub ts: DateTime<Utc>,
+    pub tenant_id: String,
+    pub recommendation: String,
+    pub metrics: ScaleMetrics,
+    pub reason: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trace_id: Option<String>,
+}
+
 impl JetStreamClient {
     /// Create a new JetStream client
     pub async fn new() -> Result<Self> {
@@ -818,6 +858,160 @@ impl JetStreamClient {
                 }
             }
         })
+    }
+
+    /// Get the latest scale hint for a tenant
+    pub async fn get_latest_scale_hint(&self, tenant: &str) -> Result<Option<ScaleHint>> {
+        debug!("Getting latest scale hint for tenant: {}", tenant);
+
+        // Query the scale hint subject
+        let subject_filter = format!("demon.scale.v1.{}.hints", tenant);
+
+        // Try to get the stream - it might not exist if scale hints aren't configured
+        let stream = match self.jetstream.get_stream("SCALE_HINTS").await {
+            Ok(s) => s,
+            Err(_) => {
+                debug!("SCALE_HINTS stream not found - scale hints may not be configured");
+                return Ok(None);
+            }
+        };
+
+        // Create ephemeral consumer to get the latest message
+        let consumer_config = jetstream::consumer::pull::Config {
+            filter_subject: subject_filter.clone(),
+            durable_name: None,
+            deliver_policy: DeliverPolicy::LastPerSubject, // Get only the last message
+            ack_policy: async_nats::jetstream::consumer::AckPolicy::None,
+            inactive_threshold: std::time::Duration::from_secs(60),
+            ..Default::default()
+        };
+
+        let consumer = match stream.create_consumer(consumer_config).await {
+            Ok(consumer) => {
+                debug!(
+                    "Created ephemeral consumer for scale hints: {}",
+                    subject_filter
+                );
+                consumer
+            }
+            Err(e) => {
+                debug!("Failed to create consumer for scale hints: {}", e);
+                return Ok(None);
+            }
+        };
+
+        // Fetch the latest message
+        let mut messages = consumer
+            .batch()
+            .max_messages(1)
+            .expires(std::time::Duration::from_secs(2))
+            .messages()
+            .await
+            .context("Failed to fetch scale hint messages")?;
+
+        if let Some(msg_result) = messages.next().await {
+            match msg_result {
+                Ok(msg) => match self.parse_scale_hint_message(&msg) {
+                    Ok(Some(hint)) => {
+                        debug!("Found scale hint: recommendation={}", hint.recommendation);
+                        return Ok(Some(hint));
+                    }
+                    Ok(None) => {
+                        debug!("Scale hint message present but couldn't parse");
+                    }
+                    Err(e) => {
+                        warn!("Error parsing scale hint message: {}", e);
+                    }
+                },
+                Err(e) => {
+                    warn!("Error receiving scale hint message: {}", e);
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Parse a scale hint message from JetStream
+    fn parse_scale_hint_message(
+        &self,
+        message: &async_nats::jetstream::Message,
+    ) -> Result<Option<ScaleHint>> {
+        let payload: serde_json::Value = serde_json::from_slice(&message.message.payload)
+            .context("Failed to parse scale hint payload as JSON")?;
+
+        // Verify it's a scale hint event
+        let event_type = payload.get("event").and_then(|v| v.as_str()).unwrap_or("");
+
+        if !event_type.starts_with("agent.scale.hint") {
+            return Ok(None);
+        }
+
+        let ts = if let Some(ts_str) = payload.get("ts").and_then(|v| v.as_str()) {
+            ts_str
+                .parse::<DateTime<Utc>>()
+                .context("Failed to parse timestamp")?
+        } else {
+            return Ok(None);
+        };
+
+        let tenant_id = payload
+            .get("tenantId")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown")
+            .to_string();
+
+        let recommendation = payload
+            .get("recommendation")
+            .and_then(|v| v.as_str())
+            .unwrap_or("steady")
+            .to_string();
+
+        let reason = payload
+            .get("reason")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        let trace_id = payload
+            .get("traceId")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        // Parse metrics
+        let metrics_obj = payload.get("metrics").context("Missing metrics field")?;
+
+        let metrics = ScaleMetrics {
+            queue_lag: metrics_obj
+                .get("queueLag")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0),
+            p95_latency_ms: metrics_obj
+                .get("p95LatencyMs")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0),
+            error_rate: metrics_obj
+                .get("errorRate")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0),
+            total_processed: metrics_obj
+                .get("totalProcessed")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0),
+            total_errors: metrics_obj
+                .get("totalErrors")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0),
+        };
+
+        Ok(Some(ScaleHint {
+            ts,
+            tenant_id,
+            recommendation,
+            metrics,
+            reason,
+            trace_id,
+        }))
     }
 }
 

@@ -1,0 +1,85 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e4]:
+      - heading "Demon Operate UI" [level=1] [ref=e6]
+      - navigation [ref=e7]:
+        - link "Runs" [ref=e8] [cursor=pointer]:
+          - /url: /runs
+        - link "Graph" [ref=e9] [cursor=pointer]:
+          - /url: /graph
+        - link "Form" [ref=e10] [cursor=pointer]:
+          - /url: /ui/form
+        - link "Health" [ref=e11] [cursor=pointer]:
+          - /url: /health
+  - main [ref=e12]:
+    - link "← Back to Runs" [ref=e14] [cursor=pointer]:
+      - /url: /runs
+    - generic [ref=e15]:
+      - generic [ref=e16]:
+        - heading "Run Details" [level=2] [ref=e17]
+        - generic [ref=e18]:
+          - generic [ref=e19]: Completed
+          - generic [ref=e20]:
+            - generic [ref=e21]: ●
+            - generic [ref=e22]: Connected
+      - generic [ref=e23]:
+        - generic [ref=e24]:
+          - strong [ref=e25]: "Run ID:"
+          - code [ref=e26]: playwright-scale-scale-down
+        - generic [ref=e27]:
+          - strong [ref=e28]: "Ritual ID:"
+          - code [ref=e29]: test-ritual
+        - generic [ref=e30]:
+          - strong [ref=e31]: "Started:"
+          - text: 2025-01-06T11:00:00+00:00
+        - generic [ref=e32]:
+          - strong [ref=e33]: "Events:"
+          - text: 2 events
+    - generic [ref=e34]:
+      - heading "Event Timeline" [level=3] [ref=e36]
+      - table [ref=e38]:
+        - rowgroup [ref=e39]:
+          - row "Timestamp Event State Transition Details" [ref=e40]:
+            - cell "Timestamp" [ref=e41]
+            - cell "Event" [ref=e42]
+            - cell "State Transition" [ref=e43]
+            - cell "Details" [ref=e44]
+        - rowgroup [ref=e45]:
+          - row "2025-01-06T11:00:00Z Ritual Started ritual.started:v1 - → running -" [ref=e46]:
+            - cell "2025-01-06T11:00:00Z" [ref=e47]:
+              - code [ref=e48]: 2025-01-06T11:00:00Z
+            - cell "Ritual Started ritual.started:v1" [ref=e49]:
+              - strong [ref=e50]: Ritual Started
+              - code [ref=e52]: ritual.started:v1
+            - cell "- → running" [ref=e53]:
+              - generic [ref=e54]:
+                - generic [ref=e55]: "-"
+                - generic [ref=e56]: →
+                - code [ref=e57]: running
+            - cell "-" [ref=e58]:
+              - generic [ref=e59]: "-"
+          - row "2025-01-06T11:01:00Z Ritual Completed ritual.completed:v1 running → completed -" [ref=e60]:
+            - cell "2025-01-06T11:01:00Z" [ref=e61]:
+              - code [ref=e62]: 2025-01-06T11:01:00Z
+            - cell "Ritual Completed ritual.completed:v1" [ref=e63]:
+              - strong [ref=e64]: Ritual Completed
+              - code [ref=e66]: ritual.completed:v1
+            - cell "running → completed" [ref=e67]:
+              - generic [ref=e68]:
+                - code [ref=e69]: running
+                - generic [ref=e70]: →
+                - code [ref=e71]: completed
+            - cell "-" [ref=e72]:
+              - generic [ref=e73]: "-"
+    - generic [ref=e74]:
+      - heading "API Access" [level=3] [ref=e76]
+      - paragraph [ref=e77]: "Get this run's data programmatically:"
+      - link "GET /api/runs/playwright-scale-scale-down" [ref=e79] [cursor=pointer]:
+        - /url: /api/runs/playwright-scale-scale-down
+        - code [ref=e80] [cursor=pointer]: GET /api/runs/playwright-scale-scale-down
+  - contentinfo [ref=e81]:
+    - paragraph [ref=e83]: Demon Meta-PaaS Operate UI © 2025
+```

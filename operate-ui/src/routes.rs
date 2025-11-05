@@ -304,6 +304,38 @@ pub async fn get_run_html_tenant(
             context.insert("approvals", &summary);
         }
 
+        // Scale hint metrics for this tenant
+        if let Some(client) = &state.jetstream_client {
+            match client.get_latest_scale_hint(&tenant).await {
+                Ok(Some(hint)) => {
+                    // Create a context-friendly version with formatted strings
+                    let hint_context = serde_json::json!({
+                        "ts": hint.ts,
+                        "tenantId": hint.tenant_id,
+                        "recommendation": hint.recommendation,
+                        "reason": hint.reason,
+                        "traceId": hint.trace_id,
+                        "metrics": {
+                            "queueLag": hint.metrics.queue_lag,
+                            "p95LatencyMs": hint.metrics.p95_latency_ms,
+                            "errorRate": hint.metrics.error_rate,
+                            "totalProcessed": hint.metrics.total_processed,
+                            "totalErrors": hint.metrics.total_errors,
+                            "formattedP95Latency": hint.metrics.formatted_p95_latency(),
+                            "formattedErrorRate": hint.metrics.formatted_error_rate(),
+                        }
+                    });
+                    context.insert("scale_hint", &hint_context);
+                }
+                Ok(None) => {
+                    debug!("No scale hint available for tenant: {}", tenant);
+                }
+                Err(e) => {
+                    warn!("Failed to fetch scale hint for tenant {}: {}", tenant, e);
+                }
+            }
+        }
+
         // Render App Pack cards for this ritual
         if let Some(registry) = &state.app_pack_registry {
             let matching_cards = registry.get_cards_for_ritual(&rd.ritual_id);
