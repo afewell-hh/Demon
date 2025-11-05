@@ -31,6 +31,11 @@ sigstore = { version = "0.12.1", default-features = false }
 semver = "1.0"
 tempfile = "3.10"
 walkdir = "2.5"
+tabled = "0.15"
+owo-colors = "4.0"
+supports-color = "3.0"
+atty = "0.2"
+futures-util = "0.3"
 
 [dev-dependencies]
 assert_cmd = "2.0"

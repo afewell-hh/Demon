@@ -6,6 +6,20 @@ The Demon runtime emits structured `agent.scale.hint:v1` events to provide autos
 
 The scale hint system monitors runtime performance metrics and emits recommendations when thresholds are exceeded. It implements hysteresis-based state transitions to prevent scale oscillations and provides actionable insights for capacity planning.
 
+## CLI Quick Access
+
+The `demonctl inspect` command provides instant visibility into scale metrics from the terminal:
+
+```bash
+# View current graph metrics
+demonctl inspect --graph
+
+# Machine-readable JSON output
+demonctl inspect --graph --json
+```
+
+**For complete CLI documentation, usage examples, and automation integration, see [CLI Inspect Documentation](cli-inspect.md).**
+
 ## Event Schema
 
 Events are published to JetStream subject `demon.scale.v1.<tenant>.hints` with the following structure:

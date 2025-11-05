@@ -1,0 +1,14 @@
+$ demonctl inspect --graph
+
+╭─────────┬────────┬───────────┬─────────────┬────────────┬─────────────────┬────────────────╮
+│ TENANT  │ STATUS │ QUEUE LAG │ P95 LATENCY │ ERROR RATE │ TOTAL PROCESSED │ RECOMMENDATION │
+├─────────┼────────┼───────────┼─────────────┼────────────┼─────────────────┼────────────────┤
+│ default │ ERROR  │ 850       │ 1.85s       │ 8.50%      │ 15000           │ ⬆ Scale Up     │
+╰─────────┴────────┴───────────┴─────────────┴────────────┴─────────────────┴────────────────╯
+
+Reason: Queue lag (850) exceeds error threshold (500), P95 latency (1850.0ms) exceeds error threshold (1000ms), and error rate (0.085) exceeds error threshold (0.05)
+Last Updated: 2025-01-06T15:40:33Z
+
+Total Errors: 1275 / 15000 (8.50%)
+
+Status: ERROR

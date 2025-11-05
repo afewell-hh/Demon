@@ -1,0 +1,14 @@
+{
+  "tenant": "default",
+  "subject": "demon.scale.v1.default.hints",
+  "status": "ok",
+  "queue_lag": 45,
+  "p95_latency_ms": 125.3,
+  "error_rate": 0.005,
+  "total_processed": 5000,
+  "total_errors": 25,
+  "last_error": null,
+  "recommendation": "steady",
+  "reason": "All metrics within normal operating parameters",
+  "timestamp": "2025-01-06T15:30:45Z"
+}
