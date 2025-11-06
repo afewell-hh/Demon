@@ -12,6 +12,7 @@ use tower::ServiceExt;
 async fn test_healthz_no_auth_required() {
     // Arrange
     std::env::set_var("NATS_URL", "nats://127.0.0.1:4222");
+    std::env::set_var("JWT_SECRET", "test-secret");
     let state = AppState::new().await.expect("Failed to create app state");
     let app = create_app(state);
 
@@ -40,6 +41,7 @@ async fn test_healthz_no_auth_required() {
 async fn test_registry_routes_require_auth() {
     // Arrange
     std::env::set_var("NATS_URL", "nats://127.0.0.1:4222");
+    std::env::set_var("JWT_SECRET", "test-secret");
     let state = AppState::new().await.expect("Failed to create app state");
     let app = create_app(state);
 

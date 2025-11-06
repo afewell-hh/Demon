@@ -192,7 +192,11 @@ BIND_ADDR="127.0.0.1:8080" cargo run -p demon-registry
   - Override for test isolation or multi-tenant deployments
   - Integration tests use per-test isolated buckets via this variable
 - `BIND_ADDR`: HTTP server bind address (default: `0.0.0.0:8090`)
-- `JWT_SECRET`: Secret key for JWT signature verification (default: `dev-secret-change-in-production`)
+- `JWT_SECRET`: **REQUIRED** - Secret key for JWT signature verification
+  - Must be set to a secure random string (minimum 32 characters recommended)
+  - Service will fail to start if not configured
+  - **Security Warning**: Never use default/hardcoded values in production
+  - Generate with: `openssl rand -base64 32`
 - `JWT_ALGORITHM`: JWT algorithm (HS256, HS384, or HS512; default: `HS256`)
 - `RUST_LOG`: Logging level (default: `info,registry=debug`)
 
@@ -227,7 +231,17 @@ Tokens must include the following claims:
 
 ### Generating Test Tokens
 
-For development/testing, you can generate tokens using the `jsonwebtoken` CLI or any JWT library:
+For development/testing, you can generate tokens using the `jsonwebtoken` CLI or any JWT library.
+
+**First, generate and set a secure JWT secret:**
+
+```bash
+# Generate a secure random secret
+export JWT_SECRET=$(openssl rand -base64 32)
+echo "JWT_SECRET=$JWT_SECRET"
+```
+
+**Then generate a test token:**
 
 ```bash
 # Using Node.js and crypto (no external dependencies)
@@ -241,7 +255,7 @@ const payload = b64(JSON.stringify({
   iat: Math.floor(Date.now()/1000),
   scopes: ['contracts:write', 'contracts:read']
 }));
-const secret = 'dev-secret-change-in-production';
+const secret = process.env.JWT_SECRET;
 const sig = b64(crypto.createHmac('sha256', secret).update(header+'.'+payload).digest());
 console.log(header+'.'+payload+'.'+sig);
 "

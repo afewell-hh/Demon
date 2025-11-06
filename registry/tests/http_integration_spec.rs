@@ -132,4 +132,6 @@ fn configure_env() {
     std::env::set_var("NATS_URL", url);
     let bucket = format!("contracts_test_{}", uuid::Uuid::new_v4());
     std::env::set_var("REGISTRY_KV_BUCKET", bucket);
+    // Set JWT_SECRET for authentication tests (required after security fix)
+    std::env::set_var("JWT_SECRET", "test-secret-for-integration-tests");
 }
