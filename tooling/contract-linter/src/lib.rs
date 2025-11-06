@@ -118,6 +118,20 @@ fn detect_breaking_changes(
                         curr_type, prop_type, path
                     ));
                 }
+
+                // When type is "array", recursively check items schema for breaking changes
+                if curr_type == "array" && prop_type == "array" {
+                    if let (Some(curr_items), Some(prop_items)) =
+                        (curr_obj.get("items"), prop_obj.get("items"))
+                    {
+                        detect_breaking_changes(
+                            curr_items,
+                            prop_items,
+                            &format!("{}[items]", path),
+                            changes,
+                        );
+                    }
+                }
             }
 
             // Check for stricter constraints
@@ -322,5 +336,58 @@ mod tests {
 
         assert!(result.has_breaking_changes());
         assert!(result.version_check_passed); // 0.x allows minor bump for breaking changes
+    }
+
+    #[test]
+    fn test_array_item_type_change_detected() {
+        let current = json!({
+            "type": "array",
+            "items": {"type": "string"}
+        });
+
+        let proposed = json!({
+            "type": "array",
+            "items": {"type": "number"}
+        });
+
+        let result = lint_schema_change(&current, &proposed, Some("1.0.0"), Some("2.0.0")).unwrap();
+
+        assert!(result.has_breaking_changes());
+        assert_eq!(result.breaking_changes.len(), 1);
+        assert!(result.breaking_changes[0].contains("Type changed"));
+        assert!(result.breaking_changes[0].contains("root[items]"));
+        assert!(result.version_check_passed); // Major bump is valid
+    }
+
+    #[test]
+    fn test_array_item_property_removal_detected() {
+        let current = json!({
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"}
+                }
+            }
+        });
+
+        let proposed = json!({
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"}
+                }
+            }
+        });
+
+        let result = lint_schema_change(&current, &proposed, Some("1.0.0"), Some("2.0.0")).unwrap();
+
+        assert!(result.has_breaking_changes());
+        assert_eq!(result.breaking_changes.len(), 1);
+        assert!(result.breaking_changes[0].contains("Removed"));
+        assert!(result.breaking_changes[0].contains("name"));
+        assert!(result.version_check_passed); // Major bump is valid
     }
 }
