@@ -1205,20 +1205,53 @@ jobs:
         env:
           RITUAL_STREAM_NAME: RITUAL_EVENTS
         run: |
-          # Start runtime server which publishes events to NATS
-          nohup cargo run -q -p runtime >/tmp/compat-smoke/runtime.log 2>&1 &
-          # Wait for runtime to be ready
-          for i in {1..30}; do
-            if curl -f http://127.0.0.1:8080/health 2>/dev/null; then
-              echo "✓ Runtime server ready"
+          set -euo pipefail
+
+          MAX_ATTEMPTS=3
+          BACKOFF_SECONDS=5
+
+          for attempt in $(seq 1 $MAX_ATTEMPTS); do
+            echo "=== Runtime startup attempt $attempt/$MAX_ATTEMPTS ==="
+
+            # Kill any existing runtime processes from previous attempts
+            pkill -f "cargo.*-p runtime" || true
+            sleep 1
+
+            # Clear previous log
+            rm -f /tmp/compat-smoke/runtime.log
+
+            # Start runtime server which publishes events to NATS
+            nohup cargo run -q -p runtime >/tmp/compat-smoke/runtime.log 2>&1 &
+            RUNTIME_PID=$!
+            echo "Started runtime server (PID: $RUNTIME_PID)"
+
+            # Wait for runtime to be ready
+            READY=0
+            for i in {1..30}; do
+              if curl -f http://127.0.0.1:8080/health 2>/dev/null; then
+                echo "✓ Runtime server ready on attempt $attempt"
+                READY=1
+                break
+              fi
+              sleep 0.5
+            done
+
+            if [[ $READY -eq 1 ]]; then
+              echo "✓ Runtime startup succeeded"
               break
             fi
-            if [[ $i -eq 30 ]]; then
-              echo "❌ Runtime server failed to start"
-              cat /tmp/compat-smoke/runtime.log || true
+
+            echo "⚠ Runtime failed to start on attempt $attempt"
+            echo "=== Runtime log (attempt $attempt) ==="
+            cat /tmp/compat-smoke/runtime.log || echo "(no log available)"
+
+            if [[ $attempt -eq $MAX_ATTEMPTS ]]; then
+              echo "❌ Runtime server failed to start after $MAX_ATTEMPTS attempts"
               exit 1
             fi
-            sleep 0.5
+
+            echo "Waiting ${BACKOFF_SECONDS}s before retry..."
+            sleep $BACKOFF_SECONDS
           done
 
       - name: Submit ritual via runtime API
