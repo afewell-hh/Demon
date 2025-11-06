@@ -29,9 +29,14 @@ pub struct JwtConfig {
 
 impl JwtConfig {
     /// Load JWT configuration from environment variables
+    ///
+    /// # Panics
+    ///
+    /// Panics if `JWT_SECRET` environment variable is not set, as this is required
+    /// for production security.
     pub fn from_env() -> Self {
         let secret = std::env::var("JWT_SECRET")
-            .unwrap_or_else(|_| "dev-secret-change-in-production".to_string());
+            .expect("JWT_SECRET environment variable must be set. Set it to a secure random string (minimum 32 characters recommended).");
 
         let algorithm = std::env::var("JWT_ALGORITHM")
             .ok()
@@ -57,8 +62,12 @@ impl JwtConfig {
 pub struct AuthClaims(pub Claims);
 
 /// JWT middleware that validates tokens and extracts claims
-pub async fn jwt_middleware(mut request: Request, next: Next) -> Response {
-    let config = JwtConfig::from_env();
+pub async fn jwt_middleware(
+    state: axum::extract::State<crate::AppState>,
+    mut request: Request,
+    next: Next,
+) -> Response {
+    let config = &state.jwt_config;
 
     // Extract Authorization header
     let auth_header = request.headers().get("Authorization").cloned();
@@ -67,7 +76,7 @@ pub async fn jwt_middleware(mut request: Request, next: Next) -> Response {
         Some(header_value) => match header_value.to_str() {
             Ok(auth_str) => {
                 if let Some(token) = auth_str.strip_prefix("Bearer ") {
-                    match verify_jwt(token, &config) {
+                    match verify_jwt(token, config) {
                         Ok(claims) => {
                             debug!(
                                 "JWT token validated for subject: {}, scopes: {:?}",
@@ -216,5 +225,15 @@ mod tests {
         // JWT library may use "ExpiredSignature" or similar error message
         let err_msg = result.unwrap_err().to_lowercase();
         assert!(err_msg.contains("exp") || err_msg.contains("token"));
+    }
+
+    #[test]
+    #[should_panic(expected = "JWT_SECRET environment variable must be set")]
+    fn given_missing_jwt_secret_when_from_env_called_then_panics() {
+        // Ensure JWT_SECRET is not set for this test
+        std::env::remove_var("JWT_SECRET");
+
+        // This should panic with a clear error message
+        let _config = JwtConfig::from_env();
     }
 }
