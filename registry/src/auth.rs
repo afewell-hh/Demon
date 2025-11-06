@@ -62,8 +62,12 @@ impl JwtConfig {
 pub struct AuthClaims(pub Claims);
 
 /// JWT middleware that validates tokens and extracts claims
-pub async fn jwt_middleware(mut request: Request, next: Next) -> Response {
-    let config = JwtConfig::from_env();
+pub async fn jwt_middleware(
+    state: axum::extract::State<crate::AppState>,
+    mut request: Request,
+    next: Next,
+) -> Response {
+    let config = &state.jwt_config;
 
     // Extract Authorization header
     let auth_header = request.headers().get("Authorization").cloned();
@@ -72,7 +76,7 @@ pub async fn jwt_middleware(mut request: Request, next: Next) -> Response {
         Some(header_value) => match header_value.to_str() {
             Ok(auth_str) => {
                 if let Some(token) = auth_str.strip_prefix("Bearer ") {
-                    match verify_jwt(token, &config) {
+                    match verify_jwt(token, config) {
                         Ok(claims) => {
                             debug!(
                                 "JWT token validated for subject: {}, scopes: {:?}",

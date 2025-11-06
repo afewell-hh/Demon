@@ -21,14 +21,23 @@ use tracing::info;
 #[derive(Clone)]
 pub struct AppState {
     pub kv_client: kv::KvClient,
+    pub jwt_config: auth::JwtConfig,
 }
 
 impl AppState {
-    /// Create new application state with JetStream KV client
+    /// Create new application state with JetStream KV client and JWT config
+    ///
+    /// # Panics
+    ///
+    /// Panics if `JWT_SECRET` environment variable is not set (enforced during startup).
     pub async fn new() -> Result<Self> {
         let kv_client = kv::KvClient::new().await?;
+        let jwt_config = auth::JwtConfig::from_env();
         info!("Successfully initialized Schema Registry application state");
-        Ok(Self { kv_client })
+        Ok(Self {
+            kv_client,
+            jwt_config,
+        })
     }
 }
 
@@ -81,7 +90,10 @@ pub fn create_app(state: AppState) -> Router {
             "/registry/contracts/:name/:version",
             get(routes::get_contract),
         )
-        .layer(middleware::from_fn(auth::jwt_middleware))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth::jwt_middleware,
+        ))
         .with_state(state);
 
     // Combine with public routes (no auth required)
