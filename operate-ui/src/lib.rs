@@ -4,6 +4,7 @@ pub mod api_version;
 pub mod app_packs;
 pub mod card_renderers;
 pub mod contracts;
+pub mod feature_flags;
 pub mod jetstream;
 pub mod routes;
 
@@ -34,6 +35,9 @@ pub struct AppState {
 
 impl AppState {
     pub async fn new() -> Self {
+        // Initialize feature flags from environment
+        feature_flags::init_feature_flags();
+
         // Initialize JetStream client and ensure stream exists
         let jetstream_client = match Self::init_jetstream().await {
             Ok(client) => {
@@ -342,6 +346,16 @@ pub fn create_app(state: AppState) -> Router {
         .route(
             "/api/contracts/status",
             get(contracts::bundle_status_endpoint),
+        )
+        // Contracts Browser (feature-flagged)
+        .route("/ui/contracts", get(contracts::contracts_browser_html))
+        .route(
+            "/api/contracts/registry/list",
+            get(contracts::list_contracts_api),
+        )
+        .route(
+            "/api/contracts/registry/:name/:version",
+            get(contracts::get_contract_detail_api),
         )
         // Graph viewer
         .route("/graph", get(routes::graph_viewer_html))
