@@ -35,9 +35,6 @@ pub struct AppState {
 
 impl AppState {
     pub async fn new() -> Self {
-        // Initialize feature flags from environment
-        feature_flags::init_feature_flags();
-
         // Initialize JetStream client and ensure stream exists
         let jetstream_client = match Self::init_jetstream().await {
             Ok(client) => {

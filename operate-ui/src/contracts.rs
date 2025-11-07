@@ -1,4 +1,4 @@
-use crate::{feature_flags, AppResult, AppState};
+use crate::{AppResult, AppState};
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
@@ -130,7 +130,6 @@ pub async fn bundle_status_endpoint(
 
 #[derive(Debug, Deserialize)]
 pub struct ContractsBrowserQuery {
-    pub flags: Option<String>,
     pub search: Option<String>,
 }
 
@@ -142,10 +141,12 @@ pub async fn contracts_browser_html(
     Query(query): Query<ContractsBrowserQuery>,
 ) -> AppResult<Html<String>> {
     // Check if feature flag is enabled
-    if !feature_flags::is_enabled_via_query("contracts-browser", query.flags.as_deref()) {
+    if !crate::feature_flags::is_enabled("contracts-browser") {
         return Err(crate::AppError {
             status_code: StatusCode::NOT_FOUND,
-            message: "Contracts browser feature is not enabled. Set OPERATE_UI_FLAGS=contracts-browser or use ?flags=contracts-browser".to_string(),
+            message:
+                "Contracts browser feature is not enabled. Set OPERATE_UI_FLAGS=contracts-browser"
+                    .to_string(),
         });
     }
 
