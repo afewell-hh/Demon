@@ -248,11 +248,15 @@ pub async fn get_contract_detail_api(
     let registry_url = std::env::var("SCHEMA_REGISTRY_URL")
         .unwrap_or_else(|_| "http://localhost:8080".to_string());
 
+    // Encode path segments to prevent path traversal/SSRF
+    let encoded_name = urlencoding::encode(&name);
+    let encoded_version = urlencoding::encode(&version);
+
     let client = reqwest::Client::new();
     let response = client
         .get(format!(
             "{}/registry/contracts/{}/{}",
-            registry_url, name, version
+            registry_url, encoded_name, encoded_version
         ))
         .send()
         .await
