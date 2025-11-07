@@ -177,6 +177,14 @@ pub async fn contracts_browser_html(
 pub async fn list_contracts_api(State(_state): State<AppState>) -> AppResult<Json<Value>> {
     debug!("Proxying to schema registry for contract list");
 
+    // Check feature flag
+    if !crate::feature_flags::is_enabled("contracts-browser") {
+        return Err(crate::AppError {
+            status_code: StatusCode::NOT_FOUND,
+            message: "Contracts browser feature is not enabled".to_string(),
+        });
+    }
+
     // Get registry URL from environment
     let registry_url = std::env::var("SCHEMA_REGISTRY_URL")
         .unwrap_or_else(|_| "http://localhost:8080".to_string());
@@ -227,6 +235,14 @@ pub async fn get_contract_detail_api(
     Path((name, version)): Path<(String, String)>,
 ) -> AppResult<Json<Value>> {
     debug!("Fetching contract detail: {} v{}", name, version);
+
+    // Check feature flag
+    if !crate::feature_flags::is_enabled("contracts-browser") {
+        return Err(crate::AppError {
+            status_code: StatusCode::NOT_FOUND,
+            message: "Contracts browser feature is not enabled".to_string(),
+        });
+    }
 
     let registry_url = std::env::var("SCHEMA_REGISTRY_URL")
         .unwrap_or_else(|_| "http://localhost:8080".to_string());
