@@ -1,0 +1,697 @@
+{% extends "base.html" %}
+
+{% block title %}Canvas DAG Viewer - Demon Operate UI{% endblock %}
+
+{% block content %}
+<style>
+    /* Canvas-specific styles */
+    .canvas-container {
+        position: relative;
+        width: 100%;
+        height: calc(100vh - 200px);
+        background: #fafafa;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    #canvas-svg {
+        width: 100%;
+        height: 100%;
+        cursor: grab;
+    }
+
+    #canvas-svg:active {
+        cursor: grabbing;
+    }
+
+    .canvas-controls {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        z-index: 10;
+    }
+
+    .control-btn {
+        background: white;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        padding: 10px;
+        cursor: pointer;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: all 0.2s;
+    }
+
+    .control-btn:hover {
+        background: var(--background-color);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+
+    .minimap {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        width: 200px;
+        height: 150px;
+        background: white;
+        border: 2px solid var(--border-color);
+        border-radius: 4px;
+        overflow: hidden;
+        z-index: 10;
+    }
+
+    #minimap-svg {
+        width: 100%;
+        height: 100%;
+    }
+
+    .node-inspector {
+        position: absolute;
+        top: 0;
+        right: -400px;
+        width: 400px;
+        height: 100%;
+        background: white;
+        border-left: 2px solid var(--border-color);
+        box-shadow: -4px 0 8px rgba(0,0,0,0.1);
+        transition: right 0.3s ease;
+        z-index: 20;
+        overflow-y: auto;
+    }
+
+    .node-inspector.open {
+        right: 0;
+    }
+
+    .inspector-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .inspector-content {
+        padding: 20px;
+    }
+
+    .inspector-section {
+        margin-bottom: 20px;
+    }
+
+    .inspector-section h4 {
+        margin-bottom: 10px;
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .metadata-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--background-color);
+    }
+
+    .metadata-label {
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+
+    .metadata-value {
+        color: var(--text-primary);
+        font-family: 'Courier New', monospace;
+    }
+
+    .node {
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .node:hover {
+        stroke-width: 3px !important;
+    }
+
+    .node.selected {
+        stroke-width: 4px !important;
+        filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+    }
+
+    .edge {
+        fill: none;
+        stroke-width: 2px;
+        transition: all 0.2s;
+    }
+
+    .edge:hover {
+        stroke-width: 3px;
+    }
+
+    .edge-label {
+        font-size: 10px;
+        fill: var(--text-secondary);
+        pointer-events: none;
+    }
+
+    .telemetry-badge {
+        font-size: 8px;
+        font-weight: bold;
+    }
+
+    .offline-banner {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: #ff9800;
+        color: white;
+        padding: 10px;
+        text-align: center;
+        display: none;
+        z-index: 30;
+    }
+
+    .offline-banner.show {
+        display: block;
+    }
+
+    .connection-status {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        padding: 8px 16px;
+        border-radius: 16px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        z-index: 10;
+    }
+
+    .status-connected {
+        background: #4caf50;
+        color: white;
+    }
+
+    .status-reconnecting {
+        background: #ff9800;
+        color: white;
+    }
+
+    .status-offline {
+        background: #f44336;
+        color: white;
+    }
+</style>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Canvas DAG Viewer</h2>
+        <div style="color: var(--text-secondary); font-size: 0.875rem;">
+            Interactive ritual DAG visualization with live telemetry
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="canvas-container">
+        <div id="offline-banner" class="offline-banner">
+            Telemetry feed unavailable. Reconnecting...
+        </div>
+
+        <div id="connection-status" class="connection-status status-connected">
+            Connected
+        </div>
+
+        <div class="canvas-controls">
+            <button class="control-btn" onclick="resetZoom()" title="Reset View">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                    <path d="M3 3v5h5"/>
+                </svg>
+            </button>
+            <button class="control-btn" onclick="zoomIn()" title="Zoom In">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="m21 21-4.35-4.35M11 8v6M8 11h6"/>
+                </svg>
+            </button>
+            <button class="control-btn" onclick="zoomOut()" title="Zoom Out">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="m21 21-4.35-4.35M8 11h6"/>
+                </svg>
+            </button>
+            <button class="control-btn" onclick="togglePause()" title="Pause/Resume Animation" id="pause-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <rect x="6" y="4" width="4" height="16"/>
+                    <rect x="14" y="4" width="4" height="16"/>
+                </svg>
+            </button>
+        </div>
+
+        <svg id="canvas-svg"></svg>
+
+        <div class="minimap">
+            <svg id="minimap-svg"></svg>
+        </div>
+
+        <div id="node-inspector" class="node-inspector">
+            <div class="inspector-header">
+                <h3 id="inspector-title">Node Inspector</h3>
+                <button class="btn btn-secondary" onclick="closeInspector()">Close</button>
+            </div>
+            <div class="inspector-content" id="inspector-content">
+                <p style="color: var(--text-secondary);">Select a node to view details</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+// Canvas DAG Viewer Implementation
+const width = document.getElementById('canvas-svg').clientWidth;
+const height = document.getElementById('canvas-svg').clientHeight;
+
+let simulation;
+let isPaused = false;
+let selectedNode = null;
+let connectionState = 'connected';
+
+// Mock DAG data structure (demonstrating ritual execution flow)
+const mockData = {
+    nodes: [
+        { id: 'ritual-1', label: 'Echo Ritual', type: 'ritual', metadata: { status: 'running', started: '2025-11-07T12:00:00Z' } },
+        { id: 'capsule-echo', label: 'Echo Capsule', type: 'capsule', metadata: { version: '1.0.0', runtime: 'wasm' } },
+        { id: 'stream-events', label: 'Event Stream', type: 'stream', metadata: { subject: 'demon.ritual.v1.echo.*', lag: 0 } },
+        { id: 'approval-gate', label: 'Approval Gate', type: 'gate', metadata: { status: 'pending', timeout: '300s' } },
+        { id: 'ui-endpoint', label: 'Operate UI', type: 'ui', metadata: { url: '/runs/echo-run-1' } },
+        { id: 'policy-ward', label: 'Policy Ward', type: 'policy', metadata: { quotaLimit: 5, quotaUsed: 2 } },
+        { id: 'nats-js', label: 'NATS JetStream', type: 'infra', metadata: { stream: 'RITUAL_EVENTS', consumers: 3 } },
+    ],
+    edges: [
+        { source: 'ritual-1', target: 'capsule-echo', label: 'invoke', telemetry: { lag: 5, latency: 45 } },
+        { source: 'capsule-echo', target: 'stream-events', label: 'emit', telemetry: { lag: 2, latency: 15 } },
+        { source: 'stream-events', target: 'nats-js', label: 'publish', telemetry: { lag: 0, latency: 8 } },
+        { source: 'ritual-1', target: 'approval-gate', label: 'request', telemetry: { lag: 10, latency: 120 } },
+        { source: 'approval-gate', target: 'ui-endpoint', label: 'display', telemetry: { lag: 5, latency: 30 } },
+        { source: 'ritual-1', target: 'policy-ward', label: 'check', telemetry: { lag: 1, latency: 5 } },
+        { source: 'ui-endpoint', target: 'stream-events', label: 'subscribe', telemetry: { lag: 3, latency: 25 } },
+    ]
+};
+
+// Node colors by type
+const nodeColors = {
+    ritual: '#2196F3',      // Blue
+    capsule: '#4CAF50',     // Green
+    stream: '#FF9800',      // Orange
+    gate: '#9C27B0',        // Purple
+    ui: '#00BCD4',          // Cyan
+    policy: '#F44336',      // Red
+    infra: '#607D8B'        // Blue Grey
+};
+
+// Initialize SVG
+const svg = d3.select('#canvas-svg')
+    .call(d3.zoom()
+        .scaleExtent([0.1, 4])
+        .on('zoom', (event) => {
+            mainGroup.attr('transform', event.transform);
+            updateMinimap(event.transform);
+        })
+    );
+
+const mainGroup = svg.append('g');
+
+// Add arrow marker definitions
+svg.append('defs').selectAll('marker')
+    .data(['end'])
+    .enter().append('marker')
+    .attr('id', 'arrowhead')
+    .attr('viewBox', '0 -5 10 10')
+    .attr('refX', 25)
+    .attr('refY', 0)
+    .attr('markerWidth', 6)
+    .attr('markerHeight', 6)
+    .attr('orient', 'auto')
+    .append('path')
+    .attr('d', 'M0,-5L10,0L0,5')
+    .attr('fill', '#999');
+
+// Create force simulation
+simulation = d3.forceSimulation(mockData.nodes)
+    .force('link', d3.forceLink(mockData.edges).id(d => d.id).distance(150))
+    .force('charge', d3.forceManyBody().strength(-300))
+    .force('center', d3.forceCenter(width / 2, height / 2))
+    .force('collision', d3.forceCollide().radius(40));
+
+// Draw edges
+const link = mainGroup.append('g')
+    .selectAll('.edge')
+    .data(mockData.edges)
+    .enter().append('path')
+    .attr('class', 'edge')
+    .attr('stroke', d => getEdgeColor(d.telemetry))
+    .attr('marker-end', 'url(#arrowhead)')
+    .on('mouseover', function(event, d) {
+        showEdgeTelemetry(event, d);
+    })
+    .on('mouseout', hideEdgeTelemetry);
+
+// Draw edge labels
+const linkLabel = mainGroup.append('g')
+    .selectAll('.edge-label')
+    .data(mockData.edges)
+    .enter().append('text')
+    .attr('class', 'edge-label')
+    .text(d => d.label);
+
+// Draw nodes
+const node = mainGroup.append('g')
+    .selectAll('.node')
+    .data(mockData.nodes)
+    .enter().append('g')
+    .attr('class', 'node')
+    .call(d3.drag()
+        .on('start', dragStart)
+        .on('drag', dragging)
+        .on('end', dragEnd)
+    )
+    .on('click', (event, d) => {
+        event.stopPropagation();
+        selectNode(d);
+    })
+    .on('keydown', (event, d) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            selectNode(d);
+        }
+    })
+    .attr('tabindex', 0)
+    .attr('role', 'button')
+    .attr('aria-label', d => `${d.type} node: ${d.label}`);
+
+node.append('circle')
+    .attr('r', 20)
+    .attr('fill', d => nodeColors[d.type] || '#999')
+    .attr('stroke', '#fff')
+    .attr('stroke-width', 2);
+
+node.append('text')
+    .attr('dy', 35)
+    .attr('text-anchor', 'middle')
+    .style('font-size', '12px')
+    .style('fill', 'var(--text-primary)')
+    .text(d => d.label);
+
+// Add telemetry badges to nodes
+node.append('circle')
+    .attr('class', 'telemetry-badge-bg')
+    .attr('r', 8)
+    .attr('cx', 15)
+    .attr('cy', -15)
+    .attr('fill', d => getTelemetryStatus(d))
+    .attr('opacity', 0.9);
+
+node.append('text')
+    .attr('class', 'telemetry-badge')
+    .attr('x', 15)
+    .attr('y', -12)
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'white')
+    .text('●');
+
+// Simulation tick
+simulation.on('tick', () => {
+    link.attr('d', d => {
+        const dx = d.target.x - d.source.x;
+        const dy = d.target.y - d.source.y;
+        const dr = Math.sqrt(dx * dx + dy * dy);
+        return `M${d.source.x},${d.source.y}A${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
+    });
+
+    linkLabel
+        .attr('x', d => (d.source.x + d.target.x) / 2)
+        .attr('y', d => (d.source.y + d.target.y) / 2);
+
+    node.attr('transform', d => `translate(${d.x},${d.y})`);
+
+    updateMinimap();
+});
+
+// Helper functions
+function getEdgeColor(telemetry) {
+    if (!telemetry) return '#999';
+    if (telemetry.latency < 50) return '#4CAF50';  // Green
+    if (telemetry.latency < 150) return '#FF9800'; // Amber
+    return '#F44336'; // Red
+}
+
+function getTelemetryStatus(node) {
+    const status = node.metadata?.status;
+    if (status === 'running') return '#4CAF50';
+    if (status === 'pending') return '#FF9800';
+    if (status === 'failed') return '#F44336';
+    return '#2196F3';
+}
+
+function showEdgeTelemetry(event, d) {
+    const tooltip = d3.select('body').append('div')
+        .attr('class', 'tooltip')
+        .style('position', 'absolute')
+        .style('background', 'rgba(0,0,0,0.8)')
+        .style('color', 'white')
+        .style('padding', '8px 12px')
+        .style('border-radius', '4px')
+        .style('font-size', '12px')
+        .style('pointer-events', 'none')
+        .style('z-index', 1000)
+        .html(`
+            <strong>${d.label}</strong><br/>
+            Lag: ${d.telemetry?.lag || 0}ms<br/>
+            Latency: ${d.telemetry?.latency || 0}ms
+        `)
+        .style('left', (event.pageX + 10) + 'px')
+        .style('top', (event.pageY - 28) + 'px');
+
+    setTimeout(() => tooltip.remove(), 2000);
+}
+
+function hideEdgeTelemetry() {
+    d3.selectAll('.tooltip').remove();
+}
+
+function selectNode(d) {
+    selectedNode = d;
+
+    // Update node selection visuals
+    node.classed('selected', n => n.id === d.id);
+
+    // Open inspector
+    const inspector = document.getElementById('node-inspector');
+    inspector.classList.add('open');
+
+    // Update inspector content
+    document.getElementById('inspector-title').textContent = d.label;
+    document.getElementById('inspector-content').innerHTML = `
+        <div class="inspector-section">
+            <h4>Type</h4>
+            <div class="metadata-item">
+                <span class="metadata-label">Node Type:</span>
+                <span class="metadata-value">${d.type}</span>
+            </div>
+        </div>
+
+        <div class="inspector-section">
+            <h4>Metadata</h4>
+            ${Object.entries(d.metadata || {}).map(([key, value]) => `
+                <div class="metadata-item">
+                    <span class="metadata-label">${key}:</span>
+                    <span class="metadata-value">${value}</span>
+                </div>
+            `).join('')}
+        </div>
+
+        <div class="inspector-section">
+            <h4>Connections</h4>
+            <p><strong>Incoming:</strong> ${mockData.edges.filter(e => e.target.id === d.id).length}</p>
+            <p><strong>Outgoing:</strong> ${mockData.edges.filter(e => e.source.id === d.id).length}</p>
+        </div>
+
+        <div class="inspector-section">
+            <h4>Actions</h4>
+            <a href="/ui/contracts?search=${d.type}" class="btn btn-primary" style="margin-right: 8px;">View Contracts</a>
+            ${d.metadata?.url ? `<a href="${d.metadata.url}" class="btn btn-secondary">Go to Run</a>` : ''}
+        </div>
+    `;
+}
+
+function closeInspector() {
+    document.getElementById('node-inspector').classList.remove('open');
+    selectedNode = null;
+    node.classed('selected', false);
+}
+
+// Click outside to close inspector
+svg.on('click', () => {
+    closeInspector();
+});
+
+// Drag handlers
+function dragStart(event, d) {
+    if (!event.active) simulation.alphaTarget(0.3).restart();
+    d.fx = d.x;
+    d.fy = d.y;
+}
+
+function dragging(event, d) {
+    d.fx = event.x;
+    d.fy = event.y;
+}
+
+function dragEnd(event, d) {
+    if (!event.active) simulation.alphaTarget(0);
+    d.fx = null;
+    d.fy = null;
+}
+
+// Zoom controls
+function resetZoom() {
+    svg.transition().duration(750).call(
+        d3.zoom().transform,
+        d3.zoomIdentity
+    );
+}
+
+function zoomIn() {
+    svg.transition().call(d3.zoom().scaleBy, 1.3);
+}
+
+function zoomOut() {
+    svg.transition().call(d3.zoom().scaleBy, 0.7);
+}
+
+function togglePause() {
+    isPaused = !isPaused;
+    const btn = document.getElementById('pause-btn');
+
+    if (isPaused) {
+        simulation.stop();
+        btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>`;
+    } else {
+        simulation.restart();
+        btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <rect x="6" y="4" width="4" height="16"/>
+            <rect x="14" y="4" width="4" height="16"/>
+        </svg>`;
+    }
+}
+
+// Minimap
+function updateMinimap(transform) {
+    const minimapSvg = d3.select('#minimap-svg');
+    minimapSvg.selectAll('*').remove();
+
+    const minimapScale = 0.15;
+    const g = minimapSvg.append('g')
+        .attr('transform', `scale(${minimapScale})`);
+
+    // Draw nodes in minimap
+    g.selectAll('circle')
+        .data(mockData.nodes)
+        .enter().append('circle')
+        .attr('r', 20)
+        .attr('fill', d => nodeColors[d.type] || '#999')
+        .attr('cx', d => d.x || width / 2)
+        .attr('cy', d => d.y || height / 2);
+
+    // Draw viewport indicator
+    if (transform) {
+        const viewportWidth = width / transform.k;
+        const viewportHeight = height / transform.k;
+        const viewportX = -transform.x / transform.k;
+        const viewportY = -transform.y / transform.k;
+
+        g.append('rect')
+            .attr('x', viewportX)
+            .attr('y', viewportY)
+            .attr('width', viewportWidth)
+            .attr('height', viewportHeight)
+            .attr('fill', 'none')
+            .attr('stroke', '#2196F3')
+            .attr('stroke-width', 2 / minimapScale);
+    }
+}
+
+// Telemetry simulation (mock live updates)
+let telemetryInterval;
+function startTelemetrySimulation() {
+    updateConnectionStatus('connected');
+
+    telemetryInterval = setInterval(() => {
+        // Simulate telemetry updates
+        mockData.edges.forEach(edge => {
+            if (edge.telemetry) {
+                edge.telemetry.lag = Math.max(0, edge.telemetry.lag + (Math.random() - 0.5) * 5);
+                edge.telemetry.latency = Math.max(5, edge.telemetry.latency + (Math.random() - 0.5) * 20);
+            }
+        });
+
+        // Update edge colors
+        link.attr('stroke', d => getEdgeColor(d.telemetry));
+
+    }, 1000);
+}
+
+function updateConnectionStatus(status) {
+    connectionState = status;
+    const statusEl = document.getElementById('connection-status');
+    const bannerEl = document.getElementById('offline-banner');
+
+    statusEl.className = 'connection-status';
+
+    if (status === 'connected') {
+        statusEl.classList.add('status-connected');
+        statusEl.textContent = 'Connected';
+        bannerEl.classList.remove('show');
+    } else if (status === 'reconnecting') {
+        statusEl.classList.add('status-reconnecting');
+        statusEl.textContent = 'Reconnecting...';
+        bannerEl.classList.add('show');
+    } else {
+        statusEl.classList.add('status-offline');
+        statusEl.textContent = 'Offline';
+        bannerEl.classList.add('show');
+    }
+}
+
+// Simulate occasional connection issues (for demo)
+function simulateConnectionIssues() {
+    setTimeout(() => {
+        if (Math.random() < 0.1) {
+            updateConnectionStatus('reconnecting');
+            setTimeout(() => {
+                updateConnectionStatus('connected');
+            }, 3000);
+        }
+        simulateConnectionIssues();
+    }, 10000 + Math.random() * 20000);
+}
+
+// Initialize
+updateMinimap();
+startTelemetrySimulation();
+simulateConnectionIssues();
+
+// Keyboard accessibility
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+        closeInspector();
+    }
+});
+</script>
+{% endblock %}
