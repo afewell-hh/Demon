@@ -257,6 +257,7 @@
     let allContracts = [];
     let filteredContracts = [];
     let currentSearch = '';
+    let currentContract = null;
 
     const elements = {
         searchInput: document.getElementById('search-input'),
@@ -405,6 +406,9 @@
     }
 
     function renderContractDetails(contract) {
+        // Store the full contract for download
+        currentContract = contract;
+
         const schema = contract.jsonSchema || contract.json_schema || '{}';
         const schemaPreview = typeof schema === 'string' ? schema : JSON.stringify(schema, null, 2);
         const previewLines = schemaPreview.split('\n').slice(0, 40);
@@ -445,7 +449,7 @@
             ${hasMore ? '<span class="expand-toggle" id="expand-toggle">Show full schema...</span>' : ''}
 
             <div class="action-buttons">
-                <button class="btn btn-primary contract-download-btn" data-contract-name="${escapeHtml(contract.name)}" data-contract-version="${escapeHtml(contract.version)}">
+                <button class="btn btn-primary contract-download-btn">
                     Download Schema
                 </button>
             </div>
@@ -471,18 +475,21 @@
         // Attach download button event listener securely using data attributes
         const downloadButton = elements.drawerContent.querySelector('.contract-download-btn');
         if (downloadButton) {
-            downloadButton.addEventListener('click', () => {
-                downloadContract(downloadButton.dataset.contractName, downloadButton.dataset.contractVersion);
-            });
+            downloadButton.addEventListener('click', downloadContract);
         }
     }
 
-    function downloadContract(name, version) {
-        const blob = new Blob([JSON.stringify({ name, version }, null, 2)], { type: 'application/json' });
+    function downloadContract() {
+        if (!currentContract) {
+            console.error('No contract loaded');
+            return;
+        }
+
+        const blob = new Blob([JSON.stringify(currentContract, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${name}-${version}.json`;
+        a.download = `${currentContract.name}-${currentContract.version}.json`;
         a.click();
         URL.revokeObjectURL(url);
     }
