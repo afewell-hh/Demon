@@ -358,11 +358,18 @@
                 <td>${formatDate(contract.created_at || contract.createdAt)}</td>
                 <td><code style="font-size: 0.75rem;">${truncateDigest(contract.digest || '')}</code></td>
                 <td>
-                    <button class="btn btn-primary btn-sm" onclick="window.contractsApp.viewDetails('${escapeHtml(contract.name)}', '${escapeHtml(contract.version)}')">
+                    <button class="btn btn-primary btn-sm contract-view-btn" data-contract-name="${escapeHtml(contract.name)}" data-contract-version="${escapeHtml(contract.version)}">
                         View
                     </button>
                 </td>
             `;
+
+            // Attach event listener securely using data attributes
+            const viewButton = row.querySelector('.contract-view-btn');
+            viewButton.addEventListener('click', () => {
+                viewDetails(viewButton.dataset.contractName, viewButton.dataset.contractVersion);
+            });
+
             elements.contractsTbody.appendChild(row);
         });
 
@@ -438,7 +445,7 @@
             ${hasMore ? '<span class="expand-toggle" id="expand-toggle">Show full schema...</span>' : ''}
 
             <div class="action-buttons">
-                <button class="btn btn-primary" onclick="window.contractsApp.downloadContract('${escapeHtml(contract.name)}', '${escapeHtml(contract.version)}')">
+                <button class="btn btn-primary contract-download-btn" data-contract-name="${escapeHtml(contract.name)}" data-contract-version="${escapeHtml(contract.version)}">
                     Download Schema
                 </button>
             </div>
@@ -458,6 +465,14 @@
                     expandToggle.textContent = 'Show less';
                 }
                 expanded = !expanded;
+            });
+        }
+
+        // Attach download button event listener securely using data attributes
+        const downloadButton = elements.drawerContent.querySelector('.contract-download-btn');
+        if (downloadButton) {
+            downloadButton.addEventListener('click', () => {
+                downloadContract(downloadButton.dataset.contractName, downloadButton.dataset.contractVersion);
             });
         }
     }
@@ -528,12 +543,6 @@
         if (!digest) return 'N/A';
         return digest.length > 16 ? digest.substring(0, 16) + '...' : digest;
     }
-
-    // Expose API for onclick handlers
-    window.contractsApp = {
-        viewDetails,
-        downloadContract
-    };
 
     // Initialize on load
     init();
