@@ -356,8 +356,8 @@
                 <td><strong>${escapeHtml(contract.name || 'Unknown')}</strong></td>
                 <td><code>${escapeHtml(contract.version || '0.0.0')}</code></td>
                 <td>${escapeHtml(contract.author || 'Unknown')}</td>
-                <td>${formatDate(contract.created_at || contract.createdAt)}</td>
-                <td><code style="font-size: 0.75rem;">${truncateDigest(contract.digest || '')}</code></td>
+                <td>${escapeHtml(formatDate(contract.created_at || contract.createdAt))}</td>
+                <td><code style="font-size: 0.75rem;">${escapeHtml(truncateDigest(contract.digest || ''))}</code></td>
                 <td>
                     <button class="btn btn-primary btn-sm contract-view-btn" data-contract-name="${escapeHtml(contract.name)}" data-contract-version="${escapeHtml(contract.version)}">
                         View
