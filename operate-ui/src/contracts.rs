@@ -155,7 +155,10 @@ pub async fn contracts_browser_html(
     context.insert("current_page", &"contracts");
     context.insert("search", &query.search);
     context.insert("registry_available", &true); // TODO: check actual registry health
-    context.insert("contracts_browser_enabled", &crate::feature_flags::is_enabled("contracts-browser"));
+    context.insert(
+        "contracts_browser_enabled",
+        &crate::feature_flags::is_enabled("contracts-browser"),
+    );
 
     let html = state
         .tera
