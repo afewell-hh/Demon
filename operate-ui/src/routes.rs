@@ -133,6 +133,10 @@ pub async fn list_runs_html_tenant(
     context.insert("run_id_filter", &query.run_id_filter);
     context.insert("status_filter", &query.status);
 
+    context.insert(
+        "contracts_browser_enabled",
+        &crate::feature_flags::is_enabled("contracts-browser"),
+    );
     let html = state
         .tera
         .render("runs_list.html", &context)
@@ -362,6 +366,10 @@ pub async fn get_run_html_tenant(
         }
     }
 
+    context.insert(
+        "contracts_browser_enabled",
+        &crate::feature_flags::is_enabled("contracts-browser"),
+    );
     let html = state
         .tera
         .render("run_detail.html", &context)
@@ -2466,6 +2474,10 @@ pub async fn graph_viewer_html(
         }
     }
 
+    context.insert(
+        "contracts_browser_enabled",
+        &crate::feature_flags::is_enabled("contracts-browser"),
+    );
     let html = state
         .tera
         .render("graph_viewer.html", &context)
@@ -2515,6 +2527,10 @@ pub async fn schema_form_html(
     context.insert("schema_url", &query.schema_url);
     context.insert("schema_name", &query.schema_name);
 
+    context.insert(
+        "contracts_browser_enabled",
+        &crate::feature_flags::is_enabled("contracts-browser"),
+    );
     let html = state
         .tera
         .render("form_renderer.html", &context)
@@ -2696,6 +2712,10 @@ pub async fn workflow_viewer_html(
     context.insert("workflow_path", &query.workflow_path);
     context.insert("runtime_api_url", &get_runtime_api_url());
 
+    context.insert(
+        "contracts_browser_enabled",
+        &crate::feature_flags::is_enabled("contracts-browser"),
+    );
     let html = state
         .tera
         .render("workflow_viewer.html", &context)
@@ -3048,6 +3068,10 @@ pub async fn app_pack_cards_html(
     context.insert("current_page", &"app_pack_cards");
     context.insert("ritual_filter", &query.ritual);
 
+    context.insert(
+        "contracts_browser_enabled",
+        &crate::feature_flags::is_enabled("contracts-browser"),
+    );
     let html = state
         .tera
         .render("app_pack_cards.html", &context)

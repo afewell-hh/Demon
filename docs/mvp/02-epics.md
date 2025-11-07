@@ -8,6 +8,7 @@
 | MVP-E7 | Multi-tenant Foundations | MVP-Alpha  | @afewell-hh | Complete (M1-2) | PR: #107 |
 | MVP-E8 | Advanced Policy Engine | MVP-Alpha  | @afewell-hh | Complete (M1-3) | PRs: #108, #109 |
 | MVP-E9 | Schema Registry & Observability | MVP-Beta | @afewell-hh | In Progress (Sprint C) | Epic: #304 |
+| MVP-E10 | Schema Visualization & Agent Empowerment | Sprint D — Schema Visualization & Agent Empowerment | @afewell-hh | Planned (Sprint D) | Epic: #324, Stories: #325-#330 |
 
 | Epic | Title | Outcome | Links |
 |------|-------|---------|-------|

@@ -17,7 +17,33 @@ Then visit:
 - `/runs` — recent runs, stable ordering (legacy - defaults to tenant "default")
 - `/runs/:runId` — ordered timeline per run (legacy - defaults to tenant "default")
 - `/graph` — graph viewer for commits, tags, and DAG visualization
+- `/ui/contracts` — contracts browser (feature-flagged, see Feature Flags section)
 - `/api/runs`, `/api/runs/:runId` — JSON APIs (502 when NATS unavailable) (legacy - defaults to tenant "default")
+
+## Feature Flags
+
+The Operate UI supports feature flags to enable experimental or in-development features.
+
+### Configuration
+
+Feature flags can be enabled via:
+- **Environment variable**: `OPERATE_UI_FLAGS=feature1,feature2`
+- **Query parameter**: `?flags=feature1,feature2`
+
+### Available Flags
+
+- `contracts-browser` — Enables the Contracts Browser UI for viewing and searching schema registry contracts
+
+### Example
+
+```bash
+# Enable via environment variable
+export OPERATE_UI_FLAGS=contracts-browser
+cargo run -p operate-ui
+
+# Enable via query parameter (useful for testing)
+curl http://localhost:3000/ui/contracts?flags=contracts-browser
+```
 
 ## Multi-tenant Support
 
@@ -207,6 +233,54 @@ http://localhost:3000/graph?tenantId=t1&projectId=p1&namespace=ns1&graphId=g1
 ```
 
 See `docs/api/graph.md` for detailed API documentation and usage examples.
+
+## Contracts Browser
+
+The Contracts Browser provides a web-based interface for exploring the schema registry.
+
+### Features
+- **Contract Discovery**: Browse all available contracts from the schema registry
+- **Search & Filter**: Real-time search by contract name, version, or author
+- **Detail View**: View full contract metadata, JSON schemas, and WIT definitions
+- **Schema Preview**: Display schema excerpts (first 40 lines) with expand toggle
+- **Download**: Export contract schemas as JSON files
+- **Accessibility**: Keyboard navigation (Escape to close drawer), ARIA roles
+
+### Endpoints
+- `/ui/contracts` — Contracts Browser UI page (feature-flagged)
+- `/api/contracts/registry/list` — List all contracts (JSON array)
+- `/api/contracts/registry/:name/:version` — Get specific contract bundle
+
+### Configuration
+- **Feature Flag**: Requires `contracts-browser` flag to be enabled
+- **Registry URL**: Set `SCHEMA_REGISTRY_URL` (default: `http://localhost:8080`)
+
+### Usage
+
+```bash
+# Enable feature flag
+export OPERATE_UI_FLAGS=contracts-browser
+export SCHEMA_REGISTRY_URL=http://localhost:8080
+
+# Start UI
+cargo run -p operate-ui
+
+# Visit in browser
+open http://localhost:3000/ui/contracts?flags=contracts-browser
+```
+
+### User Experience
+1. Navigate to Contracts Browser from the navigation menu
+2. View list of available contracts with metadata
+3. Use search box to filter by name, version, or author
+4. Click "View" to open detail drawer with full schema
+5. Click "Download Schema" to export as JSON
+6. Press Escape to close drawer
+
+### Error Handling
+- **404**: Feature flag not enabled
+- **502 Bad Gateway**: Schema registry unavailable
+- **Empty state**: No contracts in registry or no matches for search
 
 ## In-UI Approval Actions
 
