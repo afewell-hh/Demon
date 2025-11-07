@@ -467,13 +467,19 @@ function showEdgeTelemetry(event, d) {
         .style('border-radius', '4px')
         .style('font-size', '12px')
         .style('pointer-events', 'none')
-        .style('z-index', 1000)
-        .html(`
-            <strong>${d.label}</strong><br/>
-            Lag: ${d.telemetry?.lag || 0}ms<br/>
-            Latency: ${d.telemetry?.latency || 0}ms
-        `)
-        .style('left', (event.pageX + 10) + 'px')
+        .style('z-index', 1000);
+
+    // Build tooltip content using DOM manipulation (prevents XSS)
+    const tooltipNode = tooltip.node();
+    const strong = document.createElement('strong');
+    strong.textContent = d.label; // Safe: textContent escapes HTML
+    tooltipNode.appendChild(strong);
+    tooltipNode.appendChild(document.createElement('br'));
+    tooltipNode.appendChild(document.createTextNode(`Lag: ${d.telemetry?.lag || 0}ms`));
+    tooltipNode.appendChild(document.createElement('br'));
+    tooltipNode.appendChild(document.createTextNode(`Latency: ${d.telemetry?.latency || 0}ms`));
+
+    tooltip.style('left', (event.pageX + 10) + 'px')
         .style('top', (event.pageY - 28) + 'px');
 
     setTimeout(() => tooltip.remove(), 2000);
