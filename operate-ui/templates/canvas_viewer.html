@@ -495,37 +495,103 @@ function selectNode(d) {
 
     // Update inspector content
     document.getElementById('inspector-title').textContent = d.label;
-    document.getElementById('inspector-content').innerHTML = `
-        <div class="inspector-section">
-            <h4>Type</h4>
-            <div class="metadata-item">
-                <span class="metadata-label">Node Type:</span>
-                <span class="metadata-value">${d.type}</span>
-            </div>
-        </div>
+    // Build inspector content using DOM manipulation (prevents XSS)
+    const inspectorContent = document.getElementById('inspector-content');
+    inspectorContent.innerHTML = ''; // Clear existing content
 
-        <div class="inspector-section">
-            <h4>Metadata</h4>
-            ${Object.entries(d.metadata || {}).map(([key, value]) => `
-                <div class="metadata-item">
-                    <span class="metadata-label">${key}:</span>
-                    <span class="metadata-value">${value}</span>
-                </div>
-            `).join('')}
-        </div>
+    // Type section
+    const typeSection = document.createElement('div');
+    typeSection.className = 'inspector-section';
+    const typeHeading = document.createElement('h4');
+    typeHeading.textContent = 'Type';
+    typeSection.appendChild(typeHeading);
 
-        <div class="inspector-section">
-            <h4>Connections</h4>
-            <p><strong>Incoming:</strong> ${mockData.edges.filter(e => e.target.id === d.id).length}</p>
-            <p><strong>Outgoing:</strong> ${mockData.edges.filter(e => e.source.id === d.id).length}</p>
-        </div>
+    const typeItem = document.createElement('div');
+    typeItem.className = 'metadata-item';
+    const typeLabel = document.createElement('span');
+    typeLabel.className = 'metadata-label';
+    typeLabel.textContent = 'Node Type:';
+    const typeValue = document.createElement('span');
+    typeValue.className = 'metadata-value';
+    typeValue.textContent = d.type; // Safe: textContent escapes HTML
+    typeItem.appendChild(typeLabel);
+    typeItem.appendChild(typeValue);
+    typeSection.appendChild(typeItem);
+    inspectorContent.appendChild(typeSection);
 
-        <div class="inspector-section">
-            <h4>Actions</h4>
-            <a href="/ui/contracts?search=${d.type}" class="btn btn-primary" style="margin-right: 8px;">View Contracts</a>
-            ${d.metadata?.url ? `<a href="${d.metadata.url}" class="btn btn-secondary">Go to Run</a>` : ''}
-        </div>
-    `;
+    // Metadata section
+    const metadataSection = document.createElement('div');
+    metadataSection.className = 'inspector-section';
+    const metadataHeading = document.createElement('h4');
+    metadataHeading.textContent = 'Metadata';
+    metadataSection.appendChild(metadataHeading);
+
+    Object.entries(d.metadata || {}).forEach(([key, value]) => {
+        const metadataItem = document.createElement('div');
+        metadataItem.className = 'metadata-item';
+
+        const metadataLabel = document.createElement('span');
+        metadataLabel.className = 'metadata-label';
+        metadataLabel.textContent = key + ':'; // Safe: textContent escapes HTML
+
+        const metadataValue = document.createElement('span');
+        metadataValue.className = 'metadata-value';
+        metadataValue.textContent = String(value); // Safe: textContent escapes HTML
+
+        metadataItem.appendChild(metadataLabel);
+        metadataItem.appendChild(metadataValue);
+        metadataSection.appendChild(metadataItem);
+    });
+    inspectorContent.appendChild(metadataSection);
+
+    // Connections section
+    const connectionsSection = document.createElement('div');
+    connectionsSection.className = 'inspector-section';
+    const connectionsHeading = document.createElement('h4');
+    connectionsHeading.textContent = 'Connections';
+    connectionsSection.appendChild(connectionsHeading);
+
+    const incomingCount = mockData.edges.filter(e => e.target.id === d.id).length;
+    const incomingP = document.createElement('p');
+    const incomingStrong = document.createElement('strong');
+    incomingStrong.textContent = 'Incoming:';
+    incomingP.appendChild(incomingStrong);
+    incomingP.appendChild(document.createTextNode(' ' + incomingCount));
+    connectionsSection.appendChild(incomingP);
+
+    const outgoingCount = mockData.edges.filter(e => e.source.id === d.id).length;
+    const outgoingP = document.createElement('p');
+    const outgoingStrong = document.createElement('strong');
+    outgoingStrong.textContent = 'Outgoing:';
+    outgoingP.appendChild(outgoingStrong);
+    outgoingP.appendChild(document.createTextNode(' ' + outgoingCount));
+    connectionsSection.appendChild(outgoingP);
+
+    inspectorContent.appendChild(connectionsSection);
+
+    // Actions section
+    const actionsSection = document.createElement('div');
+    actionsSection.className = 'inspector-section';
+    const actionsHeading = document.createElement('h4');
+    actionsHeading.textContent = 'Actions';
+    actionsSection.appendChild(actionsHeading);
+
+    const contractsLink = document.createElement('a');
+    contractsLink.href = '/ui/contracts?search=' + encodeURIComponent(d.type); // Safe: encodeURIComponent
+    contractsLink.className = 'btn btn-primary';
+    contractsLink.style.marginRight = '8px';
+    contractsLink.textContent = 'View Contracts';
+    actionsSection.appendChild(contractsLink);
+
+    if (d.metadata?.url) {
+        const runLink = document.createElement('a');
+        runLink.href = d.metadata.url; // Safe: browser validates URLs
+        runLink.className = 'btn btn-secondary';
+        runLink.textContent = 'Go to Run';
+        actionsSection.appendChild(runLink);
+    }
+
+    inspectorContent.appendChild(actionsSection);
 }
 
 function closeInspector() {
