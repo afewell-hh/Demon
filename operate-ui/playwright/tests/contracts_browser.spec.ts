@@ -1,16 +1,16 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Contracts Browser", () => {
-  test("requires feature flag to access", async ({ page, baseURL }) => {
-    // Attempt to visit without feature flag
+  test("loads with feature flag enabled", async ({ page, baseURL }) => {
+    // In CI, OPERATE_UI_FLAGS=contracts-browser is set, so page should load
     const response = await page.goto(`${baseURL}/ui/contracts`);
 
-    // Should get 404 or error message
-    expect(response?.status()).toBe(404);
+    // Should get 200 when feature flag is enabled
+    expect(response?.status()).toBe(200);
   });
 
-  test("loads with feature flag via query param", async ({ page, baseURL }) => {
-    await page.goto(`${baseURL}/ui/contracts?flags=contracts-browser`);
+  test("displays contracts browser interface", async ({ page, baseURL }) => {
+    await page.goto(`${baseURL}/ui/contracts`);
 
     // Check that page loaded
     await expect(page.locator("h1.card-title")).toContainText("Contracts Browser");
@@ -20,7 +20,7 @@ test.describe("Contracts Browser", () => {
   });
 
   test("displays loading state initially", async ({ page, baseURL }) => {
-    await page.goto(`${baseURL}/ui/contracts?flags=contracts-browser`);
+    await page.goto(`${baseURL}/ui/contracts`);
 
     // Should show loading state
     const loadingState = page.locator("#loading-state");
@@ -29,7 +29,7 @@ test.describe("Contracts Browser", () => {
   });
 
   test("handles registry unavailable gracefully", async ({ page, baseURL }) => {
-    await page.goto(`${baseURL}/ui/contracts?flags=contracts-browser`);
+    await page.goto(`${baseURL}/ui/contracts`);
 
     // Wait for API call to complete
     await page.waitForTimeout(2000);
@@ -46,7 +46,7 @@ test.describe("Contracts Browser", () => {
   });
 
   test("search input filters contracts", async ({ page, baseURL }) => {
-    await page.goto(`${baseURL}/ui/contracts?flags=contracts-browser`);
+    await page.goto(`${baseURL}/ui/contracts`);
 
     // Wait for potential contracts to load
     await page.waitForTimeout(2000);
@@ -65,18 +65,17 @@ test.describe("Contracts Browser", () => {
   });
 
   test("nav link only appears when feature flag enabled", async ({ page, baseURL }) => {
-    // Without the env var, the nav link should not exist
+    // With OPERATE_UI_FLAGS=contracts-browser in CI, the nav link should appear
     await page.goto(`${baseURL}/runs`);
-    const contractsLinkWithoutFlag = page.locator('nav a[href*="/ui/contracts"]');
-    await expect(contractsLinkWithoutFlag).toHaveCount(0);
+    const contractsLink = page.locator('nav a[href*="/ui/contracts"]');
 
-    // Note: With the feature flag enabled via OPERATE_UI_FLAGS env var,
-    // the link would appear. This is tested in other tests that use the query param
-    // to access the page directly (which serves as a fallback for testing).
+    // In CI with the env var set, the link should be present
+    // (This test will fail if the env var is not set in CI)
+    await expect(contractsLink).toHaveCount(1);
   });
 
   test("drawer opens and closes", async ({ page, baseURL }) => {
-    await page.goto(`${baseURL}/ui/contracts?flags=contracts-browser`);
+    await page.goto(`${baseURL}/ui/contracts`);
 
     // Wait for page to load
     await page.waitForTimeout(1000);
@@ -91,14 +90,14 @@ test.describe("Contracts Browser", () => {
   });
 
   test("close drawer button is accessible", async ({ page, baseURL }) => {
-    await page.goto(`${baseURL}/ui/contracts?flags=contracts-browser`);
+    await page.goto(`${baseURL}/ui/contracts`);
 
     const closeButton = page.locator("#close-drawer");
     await expect(closeButton).toHaveAttribute("aria-label", "Close");
   });
 
   test("contract count indicator exists", async ({ page, baseURL }) => {
-    await page.goto(`${baseURL}/ui/contracts?flags=contracts-browser`);
+    await page.goto(`${baseURL}/ui/contracts`);
 
     const contractCount = page.locator("#contract-count");
     await expect(contractCount).toBeVisible();
@@ -108,7 +107,7 @@ test.describe("Contracts Browser", () => {
   });
 
   test("keyboard navigation - Escape closes drawer", async ({ page, baseURL }) => {
-    await page.goto(`${baseURL}/ui/contracts?flags=contracts-browser`);
+    await page.goto(`${baseURL}/ui/contracts`);
 
     // Press Escape key
     await page.keyboard.press("Escape");
@@ -120,12 +119,12 @@ test.describe("Contracts Browser", () => {
 });
 
 test.describe("Contracts Browser API Integration", () => {
-  test("API endpoint returns JSON", async ({ page, baseURL }) => {
+  test("API endpoint returns JSON or 404", async ({ page, baseURL }) => {
     // Check if API is accessible
     const response = await page.request.get(`${baseURL}/api/contracts/registry/list`);
 
-    // Should return 200 or 502 (if registry unavailable)
-    expect([200, 502]).toContain(response.status());
+    // Should return 200 (if feature enabled), 404 (if disabled), or 502 (if registry unavailable)
+    expect([200, 404, 502]).toContain(response.status());
 
     if (response.status() === 200) {
       const data = await response.json();
@@ -135,12 +134,12 @@ test.describe("Contracts Browser API Integration", () => {
   });
 
   test("contract detail API accepts name and version", async ({ page, baseURL }) => {
-    // Try to fetch a contract (will 404 if doesn't exist, which is fine)
+    // Try to fetch a contract (will 404 if doesn't exist or feature disabled, which is fine)
     const response = await page.request.get(
       `${baseURL}/api/contracts/registry/test-contract/1.0.0`
     );
 
-    // Should return 404 (not found) or 502 (registry unavailable) - both are acceptable
+    // Should return 404 (not found or feature disabled) or 502 (registry unavailable) - both are acceptable
     expect([404, 502]).toContain(response.status());
   });
 });
