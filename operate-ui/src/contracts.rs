@@ -160,6 +160,10 @@ pub async fn contracts_browser_html(
         "contracts_browser_enabled",
         &crate::feature_flags::is_enabled("contracts-browser"),
     );
+    context.insert(
+        "canvas_enabled",
+        &crate::feature_flags::is_enabled("canvas-ui"),
+    );
 
     let html = state
         .tera
