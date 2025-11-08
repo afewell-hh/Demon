@@ -356,6 +356,8 @@ pub fn create_app(state: AppState) -> Router {
         )
         // Graph viewer
         .route("/graph", get(routes::graph_viewer_html))
+        // Canvas DAG viewer (feature-flagged)
+        .route("/canvas", get(routes::canvas_viewer_html))
         // App Pack cards viewer
         .route("/app-pack-cards", get(routes::app_pack_cards_html))
         .route("/api/app-pack-cards", get(routes::app_pack_cards_api))

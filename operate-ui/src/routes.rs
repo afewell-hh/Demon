@@ -137,6 +137,10 @@ pub async fn list_runs_html_tenant(
         "contracts_browser_enabled",
         &crate::feature_flags::is_enabled("contracts-browser"),
     );
+    context.insert(
+        "canvas_enabled",
+        &crate::feature_flags::is_enabled("canvas-ui"),
+    );
     let html = state
         .tera
         .render("runs_list.html", &context)
@@ -369,6 +373,10 @@ pub async fn get_run_html_tenant(
     context.insert(
         "contracts_browser_enabled",
         &crate::feature_flags::is_enabled("contracts-browser"),
+    );
+    context.insert(
+        "canvas_enabled",
+        &crate::feature_flags::is_enabled("canvas-ui"),
     );
     let html = state
         .tera
@@ -2478,6 +2486,10 @@ pub async fn graph_viewer_html(
         "contracts_browser_enabled",
         &crate::feature_flags::is_enabled("contracts-browser"),
     );
+    context.insert(
+        "canvas_enabled",
+        &crate::feature_flags::is_enabled("canvas-ui"),
+    );
     let html = state
         .tera
         .render("graph_viewer.html", &context)
@@ -2494,6 +2506,45 @@ pub async fn graph_viewer_html(
 
 fn get_runtime_api_url() -> String {
     std::env::var("RUNTIME_API_URL").unwrap_or_else(|_| "http://localhost:8080".to_string())
+}
+
+// ---- Canvas DAG Viewer Routes ----
+
+/// Canvas DAG viewer - interactive ritual DAG visualization with telemetry overlays
+/// Feature flag: `canvas-ui`
+#[axum::debug_handler]
+pub async fn canvas_viewer_html(State(state): State<AppState>) -> Result<Html<String>, AppError> {
+    debug!("Handling Canvas DAG viewer HTML");
+
+    // Check feature flag
+    if !crate::feature_flags::is_enabled("canvas-ui") {
+        return Err(AppError {
+            status_code: StatusCode::NOT_FOUND,
+            message: "Canvas UI feature is not enabled. Set OPERATE_UI_FLAGS=canvas-ui to enable."
+                .to_string(),
+        });
+    }
+
+    let mut context = tera::Context::new();
+    context.insert("current_page", &"canvas");
+    context.insert(
+        "contracts_browser_enabled",
+        &crate::feature_flags::is_enabled("contracts-browser"),
+    );
+    context.insert("canvas_enabled", &true);
+
+    let html = state
+        .tera
+        .render("canvas_viewer.html", &context)
+        .map_err(|e| {
+            error!("Canvas template rendering failed: {}", e);
+            AppError {
+                status_code: StatusCode::INTERNAL_SERVER_ERROR,
+                message: format!("Failed to render Canvas page: {}", e),
+            }
+        })?;
+
+    Ok(Html(html))
 }
 
 // ---- Schema Form Renderer Routes ----
@@ -2530,6 +2581,10 @@ pub async fn schema_form_html(
     context.insert(
         "contracts_browser_enabled",
         &crate::feature_flags::is_enabled("contracts-browser"),
+    );
+    context.insert(
+        "canvas_enabled",
+        &crate::feature_flags::is_enabled("canvas-ui"),
     );
     let html = state
         .tera
@@ -2715,6 +2770,10 @@ pub async fn workflow_viewer_html(
     context.insert(
         "contracts_browser_enabled",
         &crate::feature_flags::is_enabled("contracts-browser"),
+    );
+    context.insert(
+        "canvas_enabled",
+        &crate::feature_flags::is_enabled("canvas-ui"),
     );
     let html = state
         .tera
@@ -3071,6 +3130,10 @@ pub async fn app_pack_cards_html(
     context.insert(
         "contracts_browser_enabled",
         &crate::feature_flags::is_enabled("contracts-browser"),
+    );
+    context.insert(
+        "canvas_enabled",
+        &crate::feature_flags::is_enabled("canvas-ui"),
     );
     let html = state
         .tera

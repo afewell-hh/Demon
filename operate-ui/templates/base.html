@@ -262,6 +262,9 @@
                 <nav class="nav">
                     <a href="/runs" {% if current_page == "runs" %}class="active"{% endif %}>Runs</a>
                     <a href="/graph" {% if current_page == "graph" %}class="active"{% endif %}>Graph</a>
+                    {% if canvas_enabled %}
+                    <a href="/canvas" {% if current_page == "canvas" %}class="active"{% endif %}>Canvas</a>
+                    {% endif %}
                     {% if contracts_browser_enabled %}
                     <a href="/ui/contracts" {% if current_page == "contracts" %}class="active"{% endif %}>Contracts</a>
                     {% endif %}

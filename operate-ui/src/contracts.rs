@@ -160,6 +160,10 @@ pub async fn contracts_browser_html(
         "contracts_browser_enabled",
         &crate::feature_flags::is_enabled("contracts-browser"),
     );
+    context.insert(
+        "canvas_enabled",
+        &crate::feature_flags::is_enabled("canvas-ui"),
+    );
 
     let html = state
         .tera
@@ -190,7 +194,18 @@ pub async fn list_contracts_api(State(_state): State<AppState>) -> AppResult<Jso
     let registry_url = std::env::var("SCHEMA_REGISTRY_URL")
         .unwrap_or_else(|_| "http://localhost:8080".to_string());
 
-    let client = reqwest::Client::new();
+    // Use client with timeout to prevent hanging connections
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| {
+            error!("Failed to build HTTP client: {}", e);
+            crate::AppError {
+                status_code: StatusCode::INTERNAL_SERVER_ERROR,
+                message: "Failed to initialize HTTP client".to_string(),
+            }
+        })?;
+
     let response = client
         .get(format!("{}/registry/contracts", registry_url))
         .send()
@@ -216,7 +231,24 @@ pub async fn list_contracts_api(State(_state): State<AppState>) -> AppResult<Jso
         });
     }
 
-    let contracts: Value = response.json().await.map_err(|e| {
+    // Read response with size limit to prevent memory exhaustion
+    let bytes = response.bytes().await.map_err(|e| {
+        error!("Failed to read response body: {}", e);
+        crate::AppError {
+            status_code: StatusCode::BAD_GATEWAY,
+            message: "Failed to read registry response".to_string(),
+        }
+    })?;
+
+    if bytes.len() > 1_000_000 {
+        error!("Registry response too large: {} bytes", bytes.len());
+        return Err(crate::AppError {
+            status_code: StatusCode::PAYLOAD_TOO_LARGE,
+            message: "Registry response exceeds 1MB limit".to_string(),
+        });
+    }
+
+    let contracts: Value = serde_json::from_slice(&bytes).map_err(|e| {
         error!("Failed to parse contracts response: {}", e);
         crate::AppError {
             status_code: StatusCode::INTERNAL_SERVER_ERROR,
@@ -252,7 +284,18 @@ pub async fn get_contract_detail_api(
     let encoded_name = urlencoding::encode(&name);
     let encoded_version = urlencoding::encode(&version);
 
-    let client = reqwest::Client::new();
+    // Use client with timeout to prevent hanging connections
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| {
+            error!("Failed to build HTTP client: {}", e);
+            crate::AppError {
+                status_code: StatusCode::INTERNAL_SERVER_ERROR,
+                message: "Failed to initialize HTTP client".to_string(),
+            }
+        })?;
+
     let response = client
         .get(format!(
             "{}/registry/contracts/{}/{}",
@@ -280,7 +323,29 @@ pub async fn get_contract_detail_api(
         });
     }
 
-    let contract: Value = response.json().await.map_err(|e| {
+    // Read response with size limit to prevent memory exhaustion
+    let bytes = response.bytes().await.map_err(|e| {
+        error!("Failed to read response body: {}", e);
+        crate::AppError {
+            status_code: StatusCode::BAD_GATEWAY,
+            message: "Failed to read registry response".to_string(),
+        }
+    })?;
+
+    if bytes.len() > 1_000_000 {
+        error!(
+            "Contract response too large: {} bytes for {}/{}",
+            bytes.len(),
+            name,
+            version
+        );
+        return Err(crate::AppError {
+            status_code: StatusCode::PAYLOAD_TOO_LARGE,
+            message: "Contract response exceeds 1MB limit".to_string(),
+        });
+    }
+
+    let contract: Value = serde_json::from_slice(&bytes).map_err(|e| {
         error!("Failed to parse contract response: {}", e);
         crate::AppError {
             status_code: StatusCode::INTERNAL_SERVER_ERROR,
