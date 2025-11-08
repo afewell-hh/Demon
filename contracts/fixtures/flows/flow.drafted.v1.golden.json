@@ -1,0 +1,10 @@
+{
+  "event": "flow.drafted:v1",
+  "ts": "2025-11-08T12:00:00Z",
+  "flow_id": "hello-agent-001",
+  "created_by": "claude-agent-001",
+  "manifest_digest": "sha256:abc123def456789",
+  "draft_id": "draft-xyz-789",
+  "idempotency_key": "idempotency-12345",
+  "traceId": "trace-abc-123"
+}

@@ -34,7 +34,12 @@ tera = "1"
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
 urlencoding = "2.1"
 
+# JWT authentication
+jsonwebtoken = "9.3"
+sha2 = "0.10"
+
 [dev-dependencies]
 tempfile = "3"
 tower = "0.4"
 axum-test = "14.0"
+serial_test = "3"

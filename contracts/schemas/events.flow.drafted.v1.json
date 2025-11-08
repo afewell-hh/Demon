@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demon.meta/contracts/events.flow.drafted.v1.json",
+  "title": "FlowDraftedV1",
+  "description": "Event emitted when a flow is drafted",
+  "type": "object",
+  "required": [
+    "event",
+    "ts",
+    "flow_id",
+    "created_by",
+    "manifest_digest"
+  ],
+  "properties": {
+    "event": { "const": "flow.drafted:v1" },
+    "ts": { "type": "string", "format": "date-time" },
+    "flow_id": {
+      "type": "string",
+      "description": "Unique flow identifier"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Agent or user who drafted the flow"
+    },
+    "manifest_digest": {
+      "type": "string",
+      "description": "SHA-256 digest of the flow manifest"
+    },
+    "draft_id": {
+      "type": "string",
+      "description": "Unique identifier for this draft version"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "description": "Idempotency key if provided"
+    },
+    "traceId": {
+      "type": "string",
+      "description": "Trace ID for distributed tracing"
+    }
+  },
+  "additionalProperties": false
+}

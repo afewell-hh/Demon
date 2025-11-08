@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demon.meta/contracts/flow_manifest.v1.json",
+  "title": "FlowManifestV1",
+  "description": "Agent-authored flow manifest defining workflow graph structure",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "metadata",
+    "nodes",
+    "edges"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "v1",
+      "description": "Schema version for compatibility tracking"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["flow_id", "name", "created_by"],
+      "properties": {
+        "flow_id": {
+          "type": "string",
+          "description": "Unique identifier for this flow"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable flow name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional flow description"
+        },
+        "created_by": {
+          "type": "string",
+          "description": "Agent or user ID that created this flow"
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Optional tags for categorization"
+        }
+      },
+      "additionalProperties": false
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["node_id", "type", "config"],
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "description": "Unique identifier for this node within the flow"
+          },
+          "type": {
+            "type": "string",
+            "description": "Node type (e.g., 'capsule', 'approval', 'decision')"
+          },
+          "config": {
+            "type": "object",
+            "description": "Node-specific configuration",
+            "additionalProperties": true
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Optional metadata for UI/debugging",
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Array of workflow nodes"
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["from", "to"],
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "Source node_id"
+          },
+          "to": {
+            "type": "string",
+            "description": "Target node_id"
+          },
+          "condition": {
+            "type": "string",
+            "description": "Optional condition for edge traversal"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Optional metadata for UI/debugging",
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Array of edges connecting nodes"
+    },
+    "bindings": {
+      "type": "object",
+      "description": "Optional bindings for data flow between nodes",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "Source node_id.output_field"
+          },
+          "target": {
+            "type": "string",
+            "description": "Target node_id.input_field"
+          },
+          "transform": {
+            "type": "string",
+            "description": "Optional transformation expression"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "description": "Provenance information for audit trail",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "Agent that generated this manifest"
+        },
+        "generation_timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When this manifest was generated"
+        },
+        "source": {
+          "type": "string",
+          "description": "Origin of this manifest (e.g., 'api', 'cli', 'ui')"
+        },
+        "parent_flow_id": {
+          "type": "string",
+          "description": "Optional parent flow if this is a derived version"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
