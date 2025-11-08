@@ -1,0 +1,20 @@
+{
+  "event": "flow.submitted:v1",
+  "ts": "2025-11-08T12:00:00Z",
+  "flow_id": "hello-agent-001",
+  "submitted_by": "claude-agent-001",
+  "manifest_digest": "sha256:abc123def456789",
+  "validation_result": {
+    "valid": true,
+    "checked_at": "2025-11-08T12:00:00Z",
+    "errors": [],
+    "warnings": []
+  },
+  "contract_compatibility": {
+    "compatible": true,
+    "checked_contracts": ["echo:v1"],
+    "incompatible_nodes": []
+  },
+  "idempotency_key": "idempotency-12345",
+  "traceId": "trace-abc-123"
+}

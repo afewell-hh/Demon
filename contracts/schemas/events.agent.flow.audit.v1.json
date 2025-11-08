@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demon.meta/contracts/events.agent.flow.audit.v1.json",
+  "title": "AgentFlowAuditV1",
+  "description": "Audit event for agent flow operations",
+  "type": "object",
+  "required": [
+    "event",
+    "ts",
+    "caller",
+    "action",
+    "manifest_digest"
+  ],
+  "properties": {
+    "event": { "const": "agent.flow.audit:v1" },
+    "ts": { "type": "string", "format": "date-time" },
+    "caller": {
+      "type": "string",
+      "description": "Agent or user ID performing the action"
+    },
+    "action": {
+      "type": "string",
+      "enum": ["draft", "submit"],
+      "description": "Action performed on the flow"
+    },
+    "manifest_digest": {
+      "type": "string",
+      "description": "SHA-256 digest of the flow manifest for integrity tracking"
+    },
+    "flow_id": {
+      "type": "string",
+      "description": "Flow identifier from the manifest"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "description": "Idempotency key if provided"
+    },
+    "result": {
+      "type": "string",
+      "enum": ["success", "failure", "duplicate"],
+      "description": "Result of the operation"
+    },
+    "error_code": {
+      "type": "string",
+      "description": "Error code if action failed"
+    },
+    "traceId": {
+      "type": "string",
+      "description": "Trace ID for distributed tracing"
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,7 +1,9 @@
 // Library interface for operate-ui
 
+pub mod agent_flows;
 pub mod api_version;
 pub mod app_packs;
+pub mod auth;
 pub mod card_renderers;
 pub mod contracts;
 pub mod feature_flags;
@@ -344,6 +346,10 @@ pub fn create_app(state: AppState) -> Router {
             "/api/contracts/status",
             get(contracts::bundle_status_endpoint),
         )
+        // Agent Flow API (feature-flagged)
+        .route("/api/contracts", get(agent_flows::list_contracts_handler))
+        .route("/api/flows/draft", post(agent_flows::draft_flow_handler))
+        .route("/api/flows/submit", post(agent_flows::submit_flow_handler))
         // Contracts Browser (feature-flagged)
         .route("/ui/contracts", get(contracts::contracts_browser_html))
         .route(

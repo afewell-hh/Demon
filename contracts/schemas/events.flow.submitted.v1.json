@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demon.meta/contracts/events.flow.submitted.v1.json",
+  "title": "FlowSubmittedV1",
+  "description": "Event emitted when a flow is validated and submitted for execution",
+  "type": "object",
+  "required": [
+    "event",
+    "ts",
+    "flow_id",
+    "submitted_by",
+    "manifest_digest",
+    "validation_result"
+  ],
+  "properties": {
+    "event": { "const": "flow.submitted:v1" },
+    "ts": { "type": "string", "format": "date-time" },
+    "flow_id": {
+      "type": "string",
+      "description": "Unique flow identifier"
+    },
+    "submitted_by": {
+      "type": "string",
+      "description": "Agent or user who submitted the flow"
+    },
+    "manifest_digest": {
+      "type": "string",
+      "description": "SHA-256 digest of the flow manifest"
+    },
+    "validation_result": {
+      "type": "object",
+      "required": ["valid", "checked_at"],
+      "properties": {
+        "valid": {
+          "type": "boolean",
+          "description": "Whether the manifest passed validation"
+        },
+        "checked_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string" },
+              "message": { "type": "string" },
+              "path": { "type": "string" }
+            },
+            "required": ["code", "message"]
+          },
+          "description": "Validation errors if any"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string" },
+              "message": { "type": "string" }
+            },
+            "required": ["code", "message"]
+          },
+          "description": "Validation warnings if any"
+        }
+      }
+    },
+    "contract_compatibility": {
+      "type": "object",
+      "description": "Contract compatibility check results",
+      "properties": {
+        "compatible": { "type": "boolean" },
+        "checked_contracts": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "incompatible_nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "node_id": { "type": "string" },
+              "reason": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "idempotency_key": {
+      "type": "string",
+      "description": "Idempotency key if provided"
+    },
+    "traceId": {
+      "type": "string",
+      "description": "Trace ID for distributed tracing"
+    }
+  },
+  "additionalProperties": false
+}

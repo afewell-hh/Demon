@@ -1,0 +1,87 @@
+{
+  "schema_version": "v1",
+  "metadata": {
+    "flow_id": "hello-agent-001",
+    "name": "Hello Agent Flow",
+    "description": "Example agent-authored flow demonstrating basic workflow structure",
+    "created_by": "claude-agent-demo",
+    "tags": ["demo", "hello-world", "agent-generated"]
+  },
+  "nodes": [
+    {
+      "node_id": "start",
+      "type": "trigger",
+      "config": {
+        "trigger_type": "manual",
+        "label": "Start Workflow"
+      },
+      "metadata": {
+        "position": { "x": 100, "y": 100 }
+      }
+    },
+    {
+      "node_id": "greet",
+      "type": "capsule",
+      "config": {
+        "capsule_name": "echo",
+        "inputs": {
+          "message": "Hello from agent-authored flow!"
+        }
+      },
+      "metadata": {
+        "position": { "x": 300, "y": 100 }
+      }
+    },
+    {
+      "node_id": "approval",
+      "type": "approval",
+      "config": {
+        "gate_id": "demo-approval",
+        "approvers": ["ops@example.com"],
+        "timeout_seconds": 3600
+      },
+      "metadata": {
+        "position": { "x": 500, "y": 100 }
+      }
+    },
+    {
+      "node_id": "complete",
+      "type": "completion",
+      "config": {
+        "status": "success",
+        "message": "Flow completed successfully"
+      },
+      "metadata": {
+        "position": { "x": 700, "y": 100 }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "greet"
+    },
+    {
+      "from": "greet",
+      "to": "approval"
+    },
+    {
+      "from": "approval",
+      "to": "complete",
+      "condition": "approved"
+    }
+  ],
+  "bindings": {
+    "greet_to_approval": {
+      "source": "greet.output",
+      "target": "approval.context",
+      "transform": "passthrough"
+    }
+  },
+  "provenance": {
+    "agent_id": "claude-demo-agent",
+    "generation_timestamp": "2025-11-08T00:00:00Z",
+    "source": "api",
+    "parent_flow_id": null
+  }
+}
