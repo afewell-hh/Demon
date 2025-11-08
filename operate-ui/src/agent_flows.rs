@@ -148,20 +148,13 @@ fn validate_manifest(manifest: &Value) -> ValidationResult {
 // ===== Route Handlers =====
 
 /// GET /api/contracts - List contract metadata
+/// Note: This handler is only accessible when the agent-flows feature flag is enabled,
+/// as the route is conditionally registered in lib.rs
 pub async fn list_contracts_handler(
     State(_state): State<AppState>,
     Query(query): Query<ListContractsQuery>,
 ) -> AppResult<Json<Vec<ContractMetadata>>> {
     debug!("Listing contracts with filters: {:?}", query);
-
-    // Check feature flag
-    if !crate::feature_flags::is_enabled("agent-flows") {
-        return Err(AppError {
-            status_code: StatusCode::NOT_FOUND,
-            message: "Agent flows feature is not enabled. Set OPERATE_UI_FLAGS=agent-flows"
-                .to_string(),
-        });
-    }
 
     // Mock response for MVP
     let contracts = vec![ContractMetadata {
@@ -176,20 +169,14 @@ pub async fn list_contracts_handler(
 }
 
 /// POST /api/flows/draft - Draft a flow manifest
+/// Note: This handler is only accessible when the agent-flows feature flag is enabled,
+/// as the route is conditionally registered in lib.rs
 pub async fn draft_flow_handler(
     State(_state): State<AppState>,
     headers: HeaderMap,
     Json(req): Json<DraftFlowRequest>,
 ) -> AppResult<Json<DraftFlowResponse>> {
     debug!("Drafting flow manifest");
-
-    // Check feature flag
-    if !crate::feature_flags::is_enabled("agent-flows") {
-        return Err(AppError {
-            status_code: StatusCode::NOT_FOUND,
-            message: "Agent flows feature is not enabled".to_string(),
-        });
-    }
 
     // Compute manifest digest
     let manifest_digest = compute_manifest_digest(&req.manifest);
@@ -233,20 +220,14 @@ pub async fn draft_flow_handler(
 }
 
 /// POST /api/flows/submit - Validate and submit flow
+/// Note: This handler is only accessible when the agent-flows feature flag is enabled,
+/// as the route is conditionally registered in lib.rs
 pub async fn submit_flow_handler(
     State(_state): State<AppState>,
     headers: HeaderMap,
     Json(req): Json<SubmitFlowRequest>,
 ) -> AppResult<Json<SubmitFlowResponse>> {
     debug!("Submitting flow manifest");
-
-    // Check feature flag
-    if !crate::feature_flags::is_enabled("agent-flows") {
-        return Err(AppError {
-            status_code: StatusCode::NOT_FOUND,
-            message: "Agent flows feature is not enabled".to_string(),
-        });
-    }
 
     // Validate manifest
     let validation_result = validate_manifest(&req.manifest);

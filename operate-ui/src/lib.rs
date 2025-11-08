@@ -330,7 +330,7 @@ async fn handle_static_file_error() -> impl IntoResponse {
 }
 
 pub fn create_app(state: AppState) -> Router {
-    Router::new()
+    let mut app = Router::new()
         .route("/health", get(health))
         // Contract validation endpoints
         .route(
@@ -345,23 +345,30 @@ pub fn create_app(state: AppState) -> Router {
         .route(
             "/api/contracts/status",
             get(contracts::bundle_status_endpoint),
-        )
-        // Agent Flow API (feature-flagged, JWT-protected)
-        .route(
-            "/api/contracts",
-            get(agent_flows::list_contracts_handler)
-                .route_layer(middleware::from_fn(auth::require_flows_read)),
-        )
-        .route(
-            "/api/flows/draft",
-            post(agent_flows::draft_flow_handler)
-                .route_layer(middleware::from_fn(auth::require_flows_write)),
-        )
-        .route(
-            "/api/flows/submit",
-            post(agent_flows::submit_flow_handler)
-                .route_layer(middleware::from_fn(auth::require_flows_write)),
-        )
+        );
+
+    // Agent Flow API (feature-flagged, JWT-protected)
+    // Routes only registered when agent-flows feature flag is enabled
+    if feature_flags::is_enabled("agent-flows") {
+        app = app
+            .route(
+                "/api/contracts",
+                get(agent_flows::list_contracts_handler)
+                    .route_layer(middleware::from_fn(auth::require_flows_read)),
+            )
+            .route(
+                "/api/flows/draft",
+                post(agent_flows::draft_flow_handler)
+                    .route_layer(middleware::from_fn(auth::require_flows_write)),
+            )
+            .route(
+                "/api/flows/submit",
+                post(agent_flows::submit_flow_handler)
+                    .route_layer(middleware::from_fn(auth::require_flows_write)),
+            );
+    }
+
+    app
         // Contracts Browser (feature-flagged)
         .route("/ui/contracts", get(contracts::contracts_browser_html))
         .route(
