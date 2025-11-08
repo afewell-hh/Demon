@@ -9,7 +9,12 @@ fn export_echo_ritual_produces_valid_manifest() -> Result<()> {
     let temp = TempDir::new()?;
     let output = temp.path().join("echo_flow.json");
 
+    // Get absolute path to project root (parent of demonctl/)
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let project_root = std::path::Path::new(manifest_dir).parent().unwrap();
+
     Command::cargo_bin("demonctl")?
+        .current_dir(project_root)
         .args([
             "flow",
             "export",
@@ -48,7 +53,12 @@ fn export_echo_ritual_yaml_output() -> Result<()> {
     let temp = TempDir::new()?;
     let output = temp.path().join("echo_flow.yaml");
 
+    // Get absolute path to project root (parent of demonctl/)
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let project_root = std::path::Path::new(manifest_dir).parent().unwrap();
+
     Command::cargo_bin("demonctl")?
+        .current_dir(project_root)
         .args([
             "flow",
             "export",
@@ -92,11 +102,20 @@ fn export_nonexistent_ritual_fails() {
 
 #[test]
 fn import_valid_manifest_dry_run_succeeds() -> Result<()> {
-    // Use the example flow manifest
-    let manifest_path = "examples/flows/hello-agent.json";
+    // Get absolute path to project root (parent of demonctl/)
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let project_root = std::path::Path::new(manifest_dir).parent().unwrap();
+    let manifest_path = project_root.join("examples/flows/hello-agent.json");
 
     Command::cargo_bin("demonctl")?
-        .args(["flow", "import", "--file", manifest_path, "--dry-run"])
+        .current_dir(project_root)
+        .args([
+            "flow",
+            "import",
+            "--file",
+            &manifest_path.to_string_lossy(),
+            "--dry-run",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("✓ Manifest validation passed"))
