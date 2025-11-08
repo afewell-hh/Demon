@@ -282,6 +282,164 @@ open http://localhost:3000/ui/contracts?flags=contracts-browser
 - **502 Bad Gateway**: Schema registry unavailable
 - **Empty state**: No contracts in registry or no matches for search
 
+## Canvas UI
+
+The Canvas UI provides an interactive DAG (Directed Acyclic Graph) visualization of ritual execution flows with real-time telemetry overlays.
+
+### Features
+- **Real-time DAG rendering**: Force-directed graph layout powered by D3.js v7
+- **Node type visualization**: Distinct colors for rituals, capsules, streams, gates, UI endpoints, policies, and infrastructure
+- **Live telemetry overlays**: Color-coded lag/latency metrics on edges (green/amber/red thresholds)
+- **Interactive node inspector**: Click nodes to view metadata, contract links, and execution status
+- **Navigation controls**: Zoom (+/−), pan (drag), reset view, pause/resume simulation
+- **Minimap**: Overview panel with viewport indicator for large graphs
+- **Keyboard accessibility**: Escape to close inspector, Tab navigation, Enter/Space activation
+- **Connection status**: Real-time indicator showing Connected/Reconnecting/Offline states
+
+### Configuration
+
+**Feature Flag**: Requires `canvas-ui` flag to be enabled
+
+```bash
+# Enable Canvas UI
+export OPERATE_UI_FLAGS=canvas-ui
+
+# Enable multiple features (comma-separated)
+export OPERATE_UI_FLAGS=canvas-ui,contracts-browser
+
+# Start UI
+cargo run -p operate-ui
+
+# Navigate to Canvas
+open http://localhost:3030/canvas
+```
+
+### Endpoints
+
+- `/canvas` — Canvas UI page (feature-flagged, returns 404 when disabled)
+- `/api/canvas/graph?tenant=<tenant>&run_id=<run_id>` — Get graph data (future)
+- `/api/canvas/telemetry/stream` — SSE stream for live telemetry updates (future)
+
+### Node Types
+
+| Node Type | Color | Description |
+|-----------|-------|-------------|
+| Ritual | Blue | Top-level workflow orchestrator |
+| Capsule | Green | WebAssembly execution unit |
+| Stream | Orange | NATS JetStream event stream |
+| Gate | Purple | Approval gate requiring human decision |
+| UI Endpoint | Cyan | Operate UI exposure point |
+| Policy | Red | Policy ward for validation/guardrails |
+| Infrastructure | Blue-Grey | Supporting infrastructure (NATS, etc.) |
+
+### Telemetry Thresholds
+
+Edge telemetry uses color coding to indicate performance:
+
+| Threshold | Color | Latency Range | Interpretation |
+|-----------|-------|---------------|----------------|
+| Healthy | Green | < 50ms | Normal operation |
+| Warning | Amber | 50ms - 150ms | Elevated latency |
+| Critical | Red | > 150ms | Performance degradation |
+
+### User Interface
+
+#### Main Canvas Area
+- SVG canvas with force-directed graph layout
+- Curved edges with directional arrows
+- Telemetry badges showing lag/latency values
+- Auto-stabilizing force simulation
+
+#### Node Inspector Panel
+Clicking a node opens a slide-out panel showing:
+- Node ID and type
+- Current execution status
+- Contract link (navigates to `/ui/contracts` for schema details)
+- Metadata (varies by node type)
+
+**Keyboard Navigation:**
+- `Escape` — Close inspector
+- `Tab` / `Shift+Tab` — Navigate between interactive elements
+
+#### Controls Toolbar
+- **Zoom In** (+) — Increase magnification
+- **Zoom Out** (−) — Decrease magnification
+- **Reset View** (⟳) — Return to default zoom/pan
+- **Pause/Resume** (⏸/▶) — Freeze/unfreeze force simulation
+- **Connection Status** — Shows "Connected", "Reconnecting", or "Offline"
+
+### Current Implementation
+
+The initial implementation includes:
+- **Mock data**: Embedded sample graph representing a typical ritual execution
+- **Static rendering**: Force-directed layout with simulated telemetry updates (1s interval)
+- **Connection simulation**: Toggles offline/reconnecting states every 30 seconds
+- **Feature flag gating**: Returns 404 when `canvas-ui` flag not enabled
+
+**Mock DAG Structure:**
+```
+Ritual (entry point)
+  ├─→ Capsule (echo@1.0.0)
+  │    └─→ Event Stream (demon.ritual.v1.events)
+  │         └─→ NATS JetStream (infrastructure)
+  ├─→ Approval Gate (deploy-gate)
+  │    └─→ UI Endpoint (/api/approvals/grant)
+  │         └─→ Event Stream (subscription)
+  └─→ Policy Ward (security-policy)
+```
+
+### Future Integration
+
+The Canvas UI is designed to integrate with:
+- **`demonctl inspect --graph`** — CLI command for exporting graph data
+- **NATS JetStream (SCALE_HINTS stream)** — Real-time telemetry feed
+- **Server-Sent Events (SSE)** — Live updates at `/api/canvas/telemetry/stream`
+- **Tenant/Run filtering** — Filter graph by `?tenant=<tenant>&run_id=<run_id>`
+
+### Troubleshooting
+
+**Canvas Page Returns 404**
+
+```bash
+# Check feature flag is set
+echo $OPERATE_UI_FLAGS
+
+# Enable Canvas UI
+export OPERATE_UI_FLAGS=canvas-ui
+
+# Restart Operate UI
+cargo run -p operate-ui
+```
+
+**Navigation Link Not Visible**
+
+Cause: Feature flag not set or `canvas_enabled` context variable not passed to templates
+
+**Graph Not Rendering**
+
+Possible causes:
+- D3.js library failed to load
+- Mock data structure invalid
+- SVG rendering error
+
+Check browser console for errors and verify D3 is loaded:
+```javascript
+console.log(d3.version); // Should print "7.9.0"
+```
+
+### Performance Considerations
+
+For graphs exceeding 100 nodes:
+- Force simulation may cause high CPU usage
+- Consider static layouts or HTML5 Canvas/WebGL rendering
+- Implement data pagination or filtering by run_id/tenant
+
+### See Also
+
+- [Canvas UI Documentation](../canvas-ui.md) — Comprehensive architecture and API integration guide
+- [demonctl inspect](../cli-inspect.md) — CLI command for graph metrics inspection
+- [Scale Feedback Telemetry](../scale-feedback.md) — Runtime telemetry schema and configuration
+
 ## In-UI Approval Actions
 
 The UI now provides interactive approval controls for pending approval gates:
