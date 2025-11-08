@@ -163,6 +163,11 @@ enum Commands {
         #[command(flatten)]
         args: commands::inspect::InspectArgs,
     },
+    /// Flow export/import commands for agent-authored workflows
+    Flow {
+        #[command(flatten)]
+        args: commands::flow::FlowArgs,
+    },
     /// Print version and exit
     Version,
     /// Run a batch of rituals from a YAML file (minimal driver for HOSS v0.2)
@@ -630,6 +635,9 @@ async fn main() -> Result<()> {
         }
         Commands::Inspect { args } => {
             commands::inspect::run(args).await?;
+        }
+        Commands::Flow { args } => {
+            commands::flow::run(args).await?;
         }
         Commands::Version => {
             println!("{}", env!("CARGO_PKG_VERSION"));
