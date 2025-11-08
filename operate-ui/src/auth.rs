@@ -111,6 +111,50 @@ pub async fn require_scope(
     }
 }
 
+/// Middleware to require flows:read scope
+pub async fn require_flows_read(request: Request, next: Next) -> Response {
+    match extract_and_validate_jwt(request.headers()) {
+        Ok(claims) => {
+            if claims.has_scope("flows:read") {
+                debug!(
+                    "JWT auth successful for subject: {} (scope: flows:read)",
+                    claims.sub
+                );
+                next.run(request).await
+            } else {
+                AuthError::InsufficientScope {
+                    required: "flows:read".to_string(),
+                    provided: claims.scope.unwrap_or_default(),
+                }
+                .into_response()
+            }
+        }
+        Err(e) => e.into_response(),
+    }
+}
+
+/// Middleware to require flows:write scope
+pub async fn require_flows_write(request: Request, next: Next) -> Response {
+    match extract_and_validate_jwt(request.headers()) {
+        Ok(claims) => {
+            if claims.has_scope("flows:write") {
+                debug!(
+                    "JWT auth successful for subject: {} (scope: flows:write)",
+                    claims.sub
+                );
+                next.run(request).await
+            } else {
+                AuthError::InsufficientScope {
+                    required: "flows:write".to_string(),
+                    provided: claims.scope.unwrap_or_default(),
+                }
+                .into_response()
+            }
+        }
+        Err(e) => e.into_response(),
+    }
+}
+
 /// Authentication errors
 #[derive(Debug)]
 pub enum AuthError {

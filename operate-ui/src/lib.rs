@@ -346,10 +346,22 @@ pub fn create_app(state: AppState) -> Router {
             "/api/contracts/status",
             get(contracts::bundle_status_endpoint),
         )
-        // Agent Flow API (feature-flagged)
-        .route("/api/contracts", get(agent_flows::list_contracts_handler))
-        .route("/api/flows/draft", post(agent_flows::draft_flow_handler))
-        .route("/api/flows/submit", post(agent_flows::submit_flow_handler))
+        // Agent Flow API (feature-flagged, JWT-protected)
+        .route(
+            "/api/contracts",
+            get(agent_flows::list_contracts_handler)
+                .route_layer(middleware::from_fn(auth::require_flows_read)),
+        )
+        .route(
+            "/api/flows/draft",
+            post(agent_flows::draft_flow_handler)
+                .route_layer(middleware::from_fn(auth::require_flows_write)),
+        )
+        .route(
+            "/api/flows/submit",
+            post(agent_flows::submit_flow_handler)
+                .route_layer(middleware::from_fn(auth::require_flows_write)),
+        )
         // Contracts Browser (feature-flagged)
         .route("/ui/contracts", get(contracts::contracts_browser_html))
         .route(

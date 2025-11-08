@@ -2580,6 +2580,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "serial_test 3.2.0",
  "sha2",
  "tempfile",
  "tera",
