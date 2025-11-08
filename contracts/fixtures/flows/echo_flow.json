@@ -1,0 +1,60 @@
+{
+  "schema_version": "v1",
+  "metadata": {
+    "flow_id": "flow-echo-ritual",
+    "name": "Echo Ritual",
+    "description": "Minimal ritual to validate the Demon engine.",
+    "created_by": "demonctl-cli",
+    "tags": [
+      "exported",
+      "ritual-derived"
+    ]
+  },
+  "nodes": [
+    {
+      "node_id": "start",
+      "type": "trigger",
+      "config": {
+        "label": "Start Workflow",
+        "trigger_type": "manual"
+      }
+    },
+    {
+      "node_id": "state_0",
+      "type": "task",
+      "config": {
+        "action": {
+          "functionRef": {
+            "arguments": {
+              "message": "Hello from Demon!"
+            },
+            "refName": "echo"
+          }
+        },
+        "state_name": "EchoState"
+      }
+    },
+    {
+      "node_id": "complete",
+      "type": "completion",
+      "config": {
+        "message": "Flow completed successfully",
+        "status": "success"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "state_0"
+    },
+    {
+      "from": "state_0",
+      "to": "complete"
+    }
+  ],
+  "provenance": {
+    "agent_id": "demonctl",
+    "source": "cli-export"
+  }
+}

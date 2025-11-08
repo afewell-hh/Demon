@@ -129,6 +129,27 @@ cargo run -p demonctl -- contracts bundle --format json --include-wit
 
 Schemas, fixtures, and WIT interfaces live under [`contracts/`](contracts/); update goldens whenever events change so automated compatibility checks stay reliable.
 
+## Flow Export/Import
+
+Export rituals as agent-authored flow manifests and import flows for execution:
+
+```bash
+# Export echo ritual as JSON flow manifest
+cargo run -p demonctl -- flow export --ritual echo --output my_flow.json
+
+# Export to YAML format
+cargo run -p demonctl -- flow export --ritual echo --output my_flow.yaml
+
+# Validate flow manifest (dry-run)
+cargo run -p demonctl -- flow import --file my_flow.json --dry-run
+
+# Submit flow to Agent Flow API (requires JWT)
+export DEMONCTL_JWT="your-jwt-token"
+cargo run -p demonctl -- flow import --file my_flow.json --api-url http://localhost:3000
+```
+
+Flow manifests follow the schema in `contracts/schemas/flow_manifest.v1.json`. See [docs/agent-api.md](docs/agent-api.md) for Agent Flow API details and authentication requirements.
+
 ## Approvals API
 
 ```bash
