@@ -14,6 +14,7 @@ async fn admin_probe_open_when_no_token() {
         admin_token: None, // Explicitly no admin token
         bundle_loader: runtime::bundle::BundleLoader::new(None),
         app_pack_registry: None,
+        feature_flags: std::collections::HashSet::new(),
     };
     let app = operate_ui::create_app(state);
     let response = app
@@ -39,6 +40,7 @@ async fn admin_probe_requires_token_when_set() {
         admin_token: Some("secret".to_string()), // Explicitly set admin token
         bundle_loader: runtime::bundle::BundleLoader::new(None),
         app_pack_registry: None,
+        feature_flags: std::collections::HashSet::new(),
     };
     let app = operate_ui::create_app(state);
     // missing token -> 401

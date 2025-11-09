@@ -11,6 +11,7 @@ async fn list_runs_api_rejects_invalid_status() {
         admin_token: None,
         bundle_loader: runtime::bundle::BundleLoader::new(None),
         app_pack_registry: None,
+        feature_flags: std::collections::HashSet::new(),
     };
     let app = operate_ui::create_app(state);
     let resp = app
@@ -33,6 +34,7 @@ async fn list_runs_api_rejects_invalid_limit() {
         admin_token: None,
         bundle_loader: runtime::bundle::BundleLoader::new(None),
         app_pack_registry: None,
+        feature_flags: std::collections::HashSet::new(),
     };
     let app = operate_ui::create_app(state);
     for bad in [0usize, 1001usize] {

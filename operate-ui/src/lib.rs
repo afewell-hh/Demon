@@ -33,6 +33,7 @@ pub struct AppState {
     pub admin_token: Option<String>,
     pub bundle_loader: runtime::bundle::BundleLoader,
     pub app_pack_registry: Option<app_packs::AppPackRegistry>,
+    pub feature_flags: std::collections::HashSet<String>,
 }
 
 impl AppState {
@@ -128,12 +129,16 @@ impl AppState {
             }
         };
 
+        // Initialize feature flags from environment variables
+        let feature_flags = feature_flags::init_feature_flags();
+
         Self {
             jetstream_client,
             tera,
             admin_token,
             bundle_loader,
             app_pack_registry,
+            feature_flags,
         }
     }
 
@@ -349,7 +354,7 @@ pub fn create_app(state: AppState) -> Router {
 
     // Agent Flow API (feature-flagged, JWT-protected)
     // Routes only registered when agent-flows feature flag is enabled
-    if feature_flags::is_enabled("agent-flows") {
+    if state.feature_flags.contains("agent-flows") {
         app = app
             .route(
                 "/api/contracts",
