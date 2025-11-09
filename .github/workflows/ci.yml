@@ -170,7 +170,7 @@ jobs:
           # Start server on 3000 without stream bootstrap and allow the test approver email
           export DEMON_SKIP_STREAM_BOOTSTRAP=1
           export APPROVER_ALLOWLIST="${APPROVER_EMAIL:-tester@example.com}"
-          export OPERATE_UI_FLAGS=contracts-browser
+          export OPERATE_UI_FLAGS=contracts-browser,canvas-ui
           (cd ../.. && OPERATE_UI_FLAGS="$OPERATE_UI_FLAGS" APPROVER_ALLOWLIST="$APPROVER_ALLOWLIST" RUST_LOG=info cargo run -p operate-ui --quiet &) 
           # Wait for port 3000 to open
           for i in {1..60}; do nc -z 127.0.0.1 3000 && break; sleep 0.5; done
@@ -1352,6 +1352,96 @@ jobs:
         run: |
           # Kill any cargo processes running runtime
           pkill -f "cargo.*-p runtime" || true
+
+      - name: Teardown NATS
+        if: always()
+        run: docker rm -f nats || true
+
+  ui-snapshots:
+    name: UI Snapshots (non-required)
+    runs-on: ubuntu-latest
+    needs: build-test
+    # Run only if operate-ui or playwright tests changed
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, 'ui-snapshot') ||
+      contains(github.event.pull_request.title, 'ui-snapshot') ||
+      (github.event_name == 'pull_request' && (
+        contains(github.event.pull_request.changed_files.*.filename, 'operate-ui/') ||
+        contains(github.event.pull_request.changed_files.*.filename, 'playwright/')
+      ))
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust (pinned toolchain)
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: 1.82.0
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+          cache-on-failure: true
+
+      - name: Start NATS (JetStream)
+        run: |
+          docker run -d --rm --name nats -p 4222:4222 -p 8222:8222 nats:2.10 -js
+          for i in {1..40}; do
+            if docker logs nats 2>&1 | grep -q "Server is ready"; then exit 0; fi
+            sleep 0.5
+          done
+          echo "NATS did not report ready in time"; docker logs nats; exit 1
+
+      - name: Build workspace
+        run: cargo build --workspace
+
+      - name: Start Operate UI (background)
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS_SNAPSHOTS
+          APPROVER_ALLOWLIST: ops@example.com
+          OPERATE_UI_FLAGS: contracts-browser,canvas-ui
+        run: |
+          nohup bash -c 'APPROVER_ALLOWLIST=ops@example.com OPERATE_UI_FLAGS=contracts-browser,canvas-ui RITUAL_STREAM_NAME=RITUAL_EVENTS_SNAPSHOTS cargo run -q -p operate-ui' >/tmp/ui.log 2>&1 &
+          for i in {1..60}; do
+            code=$(curl -sS -o /tmp/runs.json -w "%{http_code}" http://127.0.0.1:3000/api/runs || true)
+            if [[ "$code" == "200" ]] && jq -e . /tmp/runs.json >/dev/null 2>&1; then
+              echo "✓ Operate UI ready"
+              break
+            fi
+            sleep 0.5
+          done
+
+      - name: Seed preview data
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS_SNAPSHOTS
+        run: |
+          chmod +x examples/seed/seed_preview.sh
+          ./examples/seed/seed_preview.sh || echo "Seed script failed, continuing anyway"
+
+      - name: Install Playwright dependencies
+        working-directory: operate-ui/playwright
+        run: |
+          npm install
+          npx playwright install --with-deps
+
+      - name: Run Playwright snapshot tests
+        working-directory: operate-ui/playwright
+        env:
+          BASE_URL: http://127.0.0.1:3000
+        run: |
+          npx playwright test --grep "visual snapshot" --reporter=line
+        continue-on-error: true
+
+      - name: Upload snapshot diff artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ui-snapshot-diffs
+          path: operate-ui/playwright/test-results/
+          retention-days: 7
 
       - name: Teardown NATS
         if: always()

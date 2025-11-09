@@ -116,6 +116,44 @@ test.describe("Contracts Browser", () => {
     const drawer = page.locator("#detail-drawer");
     await expect(drawer).not.toHaveClass(/open/);
   });
+
+  test("visual snapshot of contracts browser", async ({ page, baseURL }) => {
+    // Set deterministic viewport
+    await page.setViewportSize({ width: 1280, height: 720 });
+
+    await page.goto(`${baseURL}/ui/contracts`);
+
+    // Wait for page to load
+    await page.waitForSelector("#search-input", { state: "visible" });
+
+    // Wait a moment for any loading states to settle
+    await page.waitForTimeout(1000);
+
+    // Take snapshot
+    await expect(page).toHaveScreenshot("contracts-browser.png", {
+      fullPage: false,
+      animations: "disabled",
+    });
+  });
+
+  test("visual snapshot of contracts browser search area", async ({ page, baseURL }) => {
+    // Set deterministic viewport
+    await page.setViewportSize({ width: 1280, height: 720 });
+
+    await page.goto(`${baseURL}/ui/contracts`);
+
+    // Wait for search input
+    await page.waitForSelector("#search-input", { state: "visible" });
+
+    // Wait for loading to complete
+    await page.waitForTimeout(1000);
+
+    // Take snapshot of the search and header area
+    const searchArea = page.locator(".card-title").locator("..");
+    await expect(searchArea.first()).toHaveScreenshot("contracts-browser-header.png", {
+      animations: "disabled",
+    });
+  });
 });
 
 test.describe("Contracts Browser API Integration", () => {

@@ -1,0 +1,8 @@
+# Line ending normalization
+* text=auto
+
+# Shell scripts always use LF
+*.sh text eol=lf
+
+# Ensure scripts in scripts/ directory use LF
+scripts/* text eol=lf
