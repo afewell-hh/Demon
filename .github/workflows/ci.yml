@@ -170,7 +170,7 @@ jobs:
           # Start server on 3000 without stream bootstrap and allow the test approver email
           export DEMON_SKIP_STREAM_BOOTSTRAP=1
           export APPROVER_ALLOWLIST="${APPROVER_EMAIL:-tester@example.com}"
-          export OPERATE_UI_FLAGS=contracts-browser
+          export OPERATE_UI_FLAGS=contracts-browser,canvas-ui
           (cd ../.. && OPERATE_UI_FLAGS="$OPERATE_UI_FLAGS" APPROVER_ALLOWLIST="$APPROVER_ALLOWLIST" RUST_LOG=info cargo run -p operate-ui --quiet &) 
           # Wait for port 3000 to open
           for i in {1..60}; do nc -z 127.0.0.1 3000 && break; sleep 0.5; done
