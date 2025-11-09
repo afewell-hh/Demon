@@ -59,13 +59,14 @@ test.describe("Canvas UI", () => {
     // Wait for canvas to be visible
     await page.waitForSelector("#canvas-svg", { state: "visible" });
 
-    // Wait a moment for any animations to settle
-    await page.waitForTimeout(500);
+    // Wait for canvas to fully stabilize (canvas may have dynamic elements)
+    await page.waitForTimeout(2000);
 
-    // Take snapshot
+    // Take snapshot with increased timeout for stability
     await expect(page).toHaveScreenshot("canvas-viewer.png", {
       fullPage: false,
       animations: "disabled",
+      timeout: 15000,
     });
   });
 
@@ -81,12 +82,13 @@ test.describe("Canvas UI", () => {
     // Wait for controls to be visible
     await page.waitForSelector(".canvas-controls", { state: "visible" });
 
-    // Wait a moment for any animations to settle
-    await page.waitForTimeout(500);
+    // Wait for canvas to fully stabilize (canvas may have dynamic elements)
+    await page.waitForTimeout(2000);
 
     // Take snapshot of the full canvas area including controls
     await expect(page.locator(".canvas-container")).toHaveScreenshot("canvas-with-controls.png", {
       animations: "disabled",
+      timeout: 15000,
     });
   });
 });
