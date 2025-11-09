@@ -34,10 +34,12 @@ fn create_test_jwt(scopes: &str) -> String {
     .expect("Failed to create test JWT")
 }
 
-fn create_test_app() -> axum::Router {
+fn create_test_app_with_flags(flags: Vec<&str>) -> axum::Router {
     let mut tera = tera::Tera::new("nonexistent/*").expect("Failed to create empty Tera instance");
     tera.add_raw_template("error.html", "<html><body>Error</body></html>")
         .expect("Failed to add error template");
+
+    let feature_flags = flags.iter().map(|s| s.to_string()).collect();
 
     let state = AppState {
         jetstream_client: None,
@@ -45,6 +47,7 @@ fn create_test_app() -> axum::Router {
         admin_token: None,
         bundle_loader: runtime::bundle::BundleLoader::new(None),
         app_pack_registry: None,
+        feature_flags,
     };
 
     operate_ui::create_app(state)
@@ -55,10 +58,9 @@ fn create_test_app() -> axum::Router {
 async fn test_draft_flow_validation() {
     // Set JWT secret for auth
     std::env::set_var("JWT_SECRET", "test-secret");
-    // Enable feature flag
-    std::env::set_var("OPERATE_UI_FLAGS", "agent-flows");
 
-    let app = create_test_app();
+    // Create app with explicit feature flags (no longer using global state)
+    let app = create_test_app_with_flags(vec!["agent-flows"]);
     let token = create_test_jwt("flows:write");
 
     let manifest = json!({
@@ -90,7 +92,6 @@ async fn test_draft_flow_validation() {
     assert_eq!(response.status(), StatusCode::OK);
 
     // Clean up
-    std::env::remove_var("OPERATE_UI_FLAGS");
     std::env::remove_var("JWT_SECRET");
 }
 
@@ -99,9 +100,9 @@ async fn test_draft_flow_validation() {
 async fn test_submit_flow_missing_schema_version() {
     // Set JWT secret for auth
     std::env::set_var("JWT_SECRET", "test-secret");
-    std::env::set_var("OPERATE_UI_FLAGS", "agent-flows");
 
-    let app = create_test_app();
+    // Create app with explicit feature flags (no longer using global state)
+    let app = create_test_app_with_flags(vec!["agent-flows"]);
     let token = create_test_jwt("flows:write");
 
     let manifest = json!({
@@ -131,6 +132,5 @@ async fn test_submit_flow_missing_schema_version() {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 
-    std::env::remove_var("OPERATE_UI_FLAGS");
     std::env::remove_var("JWT_SECRET");
 }

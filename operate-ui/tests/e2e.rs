@@ -64,6 +64,7 @@ fn create_test_app() -> axum::Router {
         admin_token: None,
         bundle_loader: runtime::bundle::BundleLoader::new(None),
         app_pack_registry: None,
+        feature_flags: std::collections::HashSet::new(),
     };
 
     operate_ui::create_app(state)

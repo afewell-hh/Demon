@@ -2,6 +2,12 @@
 //!
 //! Feature flags are controlled via the `OPERATE_UI_FLAGS` environment variable
 //! (comma-separated list, e.g., `OPERATE_UI_FLAGS=contracts-browser,other-feature`)
+//!
+//! ## Usage
+//!
+//! Feature flags should be passed through `AppState` for proper test isolation.
+//! The global `is_enabled()` function is available for backward compatibility
+//! but should be avoided in new code to prevent test ordering dependencies.
 
 use std::collections::HashSet;
 use std::sync::OnceLock;
@@ -10,8 +16,9 @@ static ENABLED_FLAGS: OnceLock<HashSet<String>> = OnceLock::new();
 
 /// Initialize feature flags from environment variable
 ///
-/// This is called automatically on first access to feature flags
-fn init_feature_flags() -> HashSet<String> {
+/// This function is public to allow tests to construct explicit feature flag sets
+/// without relying on global state.
+pub fn init_feature_flags() -> HashSet<String> {
     let flags_str = std::env::var("OPERATE_UI_FLAGS").unwrap_or_default();
     flags_str
         .split(',')
