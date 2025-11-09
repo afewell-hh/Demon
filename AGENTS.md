@@ -110,6 +110,27 @@
 - **Snapshot protections**:
   - `SNAP=.github/snapshots/branch-protection-$(date -u +%F).json; gh api repos/:owner/:repo/branches/main/protection > "$SNAP"; git add "$SNAP" && git commit -m "governance: snapshot branch protection ($(date -u +%F))" && git push`
 
+## Visualization & Agent Flow Quick-Refs (Sprint D)
+- **Enable Canvas UI** (interactive DAG viewer):
+  - `export OPERATE_UI_FLAGS=canvas-ui && cargo run -p operate-ui`
+  - Navigate to `http://localhost:3030/canvas` for force-directed ritual visualization
+  - Docs: [`docs/canvas-ui.md`](docs/canvas-ui.md)
+- **Enable Contracts Browser** (schema registry explorer):
+  - `export OPERATE_UI_FLAGS=contracts-browser && export SCHEMA_REGISTRY_URL=http://localhost:8080 && cargo run -p operate-ui`
+  - Navigate to `http://localhost:3000/ui/contracts` for contract search/browse
+  - Docs: [`docs/operate-ui/README.md#contracts-browser`](docs/operate-ui/README.md#contracts-browser)
+- **Export ritual as flow manifest**:
+  - `cargo run -p demonctl -- flow export --ritual echo --output my-flow.json`
+  - Supports JSON/YAML output via file extension
+  - Docs: [`docs/agent-flows.md`](docs/agent-flows.md)
+- **Import/submit flow manifest**:
+  - Validate: `cargo run -p demonctl -- flow import --file my-flow.json --dry-run`
+  - Submit: `export DEMONCTL_JWT="your-token" && cargo run -p demonctl -- flow import --file my-flow.json --api-url http://localhost:3000`
+  - Requires `agent-flows` feature flag and JWT with `flows:write` scope
+  - Docs: [`docs/agent-api.md`](docs/agent-api.md)
+- **List contracts for flow authoring**:
+  - `curl -H "Authorization: Bearer $JWT_TOKEN" -H "X-Demon-API-Version: v1" http://localhost:3000/api/contracts`
+
 ## Source Control & Secrets Hygiene
 - No secrets in repo. `.env` stays local; use GitHub Secrets for CI.
 - Do not force-push to protected branches. Do not rename required jobs or checks.

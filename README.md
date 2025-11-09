@@ -185,6 +185,102 @@ curl http://localhost:3000/api/runs
 
 For complete versioning policy, contract specifications, and client integration guidance, see [docs/api-versioning.md](docs/api-versioning.md).
 
+## Visualizing & Authoring Flows
+
+Demon provides visual tools for exploring contracts, visualizing ritual execution, and authoring agent-driven workflows.
+
+### Canvas UI — Interactive DAG Viewer
+
+View ritual execution flows as interactive force-directed graphs with live telemetry overlays:
+
+```bash
+# Enable Canvas UI feature flag
+export OPERATE_UI_FLAGS=canvas-ui
+
+# Start Operate UI
+cargo run -p operate-ui
+
+# Navigate to Canvas viewer
+open http://localhost:3030/canvas
+```
+
+**Features:**
+- Real-time DAG rendering with D3.js force simulation
+- Node type visualization (rituals, capsules, streams, gates, policies)
+- Live telemetry overlays showing lag/latency on edges
+- Interactive node inspector with contract links
+- Zoom/pan/reset navigation with minimap
+- Keyboard accessibility (Escape, Tab, Enter/Space)
+
+See [docs/canvas-ui.md](docs/canvas-ui.md) for architecture, configuration, and API integration details.
+
+### Contracts Browser — Schema Registry Explorer
+
+Explore available contracts, schemas, and WIT definitions:
+
+```bash
+# Enable Contracts Browser feature flag
+export OPERATE_UI_FLAGS=contracts-browser
+
+# Configure schema registry URL
+export SCHEMA_REGISTRY_URL=http://localhost:8080
+
+# Start Operate UI
+cargo run -p operate-ui
+
+# Navigate to Contracts Browser
+open http://localhost:3000/ui/contracts
+```
+
+**Features:**
+- Browse all contracts from schema registry
+- Real-time search by contract name, version, or author
+- View full contract metadata, JSON schemas, and WIT definitions
+- Download contract schemas as JSON
+- Schema preview with expand/collapse toggle
+
+See [docs/operate-ui/README.md#contracts-browser](docs/operate-ui/README.md#contracts-browser) for usage and configuration.
+
+### Agent Flow API — Programmatic Flow Authoring
+
+LLM agents and automated tools can draft and submit flows via REST or NATS:
+
+```bash
+# Enable Agent Flow API feature flag
+export OPERATE_UI_FLAGS=agent-flows
+
+# Configure JWT authentication
+export JWT_SECRET="your-secret-key"
+
+# Start API server
+cargo run -p operate-ui
+
+# List available contracts for flow authoring
+curl -H "Authorization: Bearer $JWT_TOKEN" \
+     -H "X-Demon-API-Version: v1" \
+     http://localhost:3000/api/contracts
+
+# Submit an agent-authored flow
+curl -X POST \
+     -H "Authorization: Bearer $JWT_TOKEN" \
+     -H "Content-Type: application/json" \
+     -H "X-Demon-API-Version: v1" \
+     -d @examples/flows/hello-agent.json \
+     http://localhost:3000/api/flows/submit
+```
+
+**JWT Scopes:**
+- `flows:read` — List contracts and query flow metadata
+- `flows:write` — Draft and submit flow manifests
+
+See [docs/agent-api.md](docs/agent-api.md) for JWT configuration, endpoints, and authentication details.
+
+**Quick Links:**
+- [Canvas UI Documentation](docs/canvas-ui.md) — Interactive DAG visualization
+- [Contracts Browser Guide](docs/operate-ui/README.md#contracts-browser) — Schema exploration
+- [Agent Flow CLI](docs/agent-flows.md) — Export/import workflows with demonctl
+- [Agent Flow API](docs/agent-api.md) — Programmatic flow authoring
+
 ## Layout
 
 - **`engine/`** — Ritual interpreter that executes workflows and emits envelopes
