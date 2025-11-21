@@ -725,6 +725,49 @@ A: Open an issue at https://github.com/afewell-hh/Demon/issues with label `area:
 
 ---
 
+## Demo Recording
+
+**Sprint D v0.4.0 Demo** (Target: 2025-11-21 14:00 PT)
+
+### Recording Details
+- **Status**: Placeholder - Recording to be scheduled
+- **Planned Duration**: ~30 minutes
+- **Planned Topics**:
+  - Canvas UI interactive DAG visualization (0:00-8:00)
+  - Contracts Browser schema exploration (8:00-15:00)
+  - Agent Flow API programmatic flow authoring (15:00-25:00)
+  - demonctl flow CLI export/import commands (25:00-30:00)
+
+### Environment Configuration
+When the demo is recorded, it will use:
+- **Feature Flags**: `OPERATE_UI_FLAGS=canvas-ui,contracts-browser,agent-flows`
+- **Schema Registry**: `SCHEMA_REGISTRY_URL=http://localhost:8080`
+- **JWT Secret**: `JWT_SECRET="demo-secret-key"` (demo only)
+- **Infrastructure**: NATS JetStream on ports 4222/8222
+- **Dataset**: Mock data for Canvas UI; live schema registry for Contracts Browser
+
+### Access Instructions
+Once the recording is published, assets will be available via:
+- **Primary Storage**: GitHub Release v0.4.0 (MP4 attachment or external link)
+- **Backup/Raw Assets**: Contact repository maintainers for access requests
+- **Format**: MP4, 1080p minimum resolution
+- **Verification**: SHA256 checksum will be provided with all artifacts
+
+**Distribution Channels** (when available):
+- This document (link updated in recording details section)
+- Sprint D Epic (#324) final status comment
+- Project README and CHANGELOG.md references
+
+### Placeholder Checksum
+```
+# Checksum will be added after recording is captured
+# Example format: sha256:abc123def456...
+Recording: [PENDING]
+Checksum:  [PENDING]
+```
+
+---
+
 **End of Demo Deck**
 **Sprint D — Canvas, Contracts Browser & Agent Flows**
 **v0.4.0 Release Candidate**
