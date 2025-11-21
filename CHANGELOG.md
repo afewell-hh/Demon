@@ -87,6 +87,12 @@
 - No flow execution control endpoints (`/api/flows/<id>/start`, `/api/flows/<id>/stop`)
 - Agent Flow API requires manual JWT configuration
 
+### Demo Recording
+
+- **Sprint D Demo Deck**: [docs/preview/beta/canvas_agent_demo.md](docs/preview/beta/canvas_agent_demo.md)
+- **Recording Status**: Placeholder - To be scheduled and published
+- **Planned Content**: Canvas UI, Contracts Browser, Agent Flow API, demonctl flow CLI demonstrations
+
 ### See Also
 
 - Epic #324: Sprint D — Schema Visualization & Agent Empowerment
