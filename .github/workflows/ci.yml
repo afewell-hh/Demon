@@ -1446,3 +1446,110 @@ jobs:
       - name: Teardown NATS
         if: always()
         run: docker rm -f nats || true
+
+  e2e-validation:
+    name: E2E Validation (non-required)
+    runs-on: ubuntu-latest
+    needs: build-test
+    # Run when operate-ui, demonctl, runtime, or E2E tests changed
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, 'e2e') ||
+      contains(github.event.pull_request.title, 'e2e') ||
+      (github.event_name == 'pull_request' && (
+        contains(github.event.pull_request.changed_files.*.filename, 'operate-ui/') ||
+        contains(github.event.pull_request.changed_files.*.filename, 'demonctl/') ||
+        contains(github.event.pull_request.changed_files.*.filename, 'runtime/') ||
+        contains(github.event.pull_request.changed_files.*.filename, 'playwright/')
+      ))
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust (pinned toolchain)
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: 1.82.0
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+          cache-on-failure: true
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Start NATS (JetStream)
+        run: |
+          docker run -d --rm --name nats -p 4222:4222 -p 8222:8222 nats:2.10 -js
+          for i in {1..40}; do
+            if docker logs nats 2>&1 | grep -q "Server is ready"; then exit 0; fi
+            sleep 0.5
+          done
+          echo "NATS did not report ready in time"; docker logs nats; exit 1
+
+      - name: Build workspace
+        run: cargo build --workspace
+
+      - name: Start Operate UI (background)
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS_E2E
+          APPROVER_ALLOWLIST: ops@example.com
+          OPERATE_UI_FLAGS: contracts-browser,canvas-ui,agent-flows
+          JWT_SECRET: test-secret-e2e
+        run: |
+          nohup bash -c 'APPROVER_ALLOWLIST=ops@example.com OPERATE_UI_FLAGS=contracts-browser,canvas-ui,agent-flows JWT_SECRET=test-secret-e2e RITUAL_STREAM_NAME=RITUAL_EVENTS_E2E cargo run -q -p operate-ui' >/tmp/e2e-ui.log 2>&1 &
+          for i in {1..60}; do
+            code=$(curl -sS -o /tmp/e2e-runs.json -w "%{http_code}" http://127.0.0.1:3000/api/runs || true)
+            if [[ "$code" == "200" ]] && jq -e . /tmp/e2e-runs.json >/dev/null 2>&1; then
+              echo "✓ Operate UI ready with E2E feature flags"
+              break
+            fi
+            sleep 0.5
+          done
+
+      - name: Install Playwright dependencies
+        working-directory: operate-ui/playwright
+        run: |
+          npm install
+          npx playwright install --with-deps
+
+      - name: Run Playwright E2E tests (Contracts Browser)
+        working-directory: operate-ui/playwright
+        env:
+          BASE_URL: http://127.0.0.1:3000
+        run: |
+          npx playwright test e2e_contracts_browser.spec.ts --reporter=html
+        continue-on-error: true
+
+      - name: Run Playwright E2E tests (Canvas UI)
+        working-directory: operate-ui/playwright
+        env:
+          BASE_URL: http://127.0.0.1:3000
+        run: |
+          npx playwright test e2e_canvas_ui.spec.ts --reporter=html
+        continue-on-error: true
+
+      - name: Run demonctl flow E2E integration tests
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS_E2E
+        run: |
+          cargo test -p demonctl flow_e2e_integration_spec -- --nocapture
+        continue-on-error: true
+
+      - name: Upload E2E test artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-validation-artifacts
+          path: |
+            operate-ui/playwright/playwright-report/
+            operate-ui/playwright/test-results/
+            /tmp/e2e-ui.log
+          retention-days: 7
+
+      - name: Teardown NATS
+        if: always()
+        run: docker rm -f nats || true
