@@ -1546,7 +1546,6 @@ jobs:
           BASE_URL: http://127.0.0.1:3000
         run: |
           npx playwright test e2e_contracts_browser.spec.ts --reporter=html
-        continue-on-error: true
 
       - name: Run Playwright E2E tests (Canvas UI)
         if: steps.should-run.outputs.enabled == 'true'
@@ -1555,7 +1554,6 @@ jobs:
           BASE_URL: http://127.0.0.1:3000
         run: |
           npx playwright test e2e_canvas_ui.spec.ts --reporter=html
-        continue-on-error: true
 
       - name: Run demonctl flow E2E integration tests
         if: steps.should-run.outputs.enabled == 'true'
@@ -1563,7 +1561,6 @@ jobs:
           RITUAL_STREAM_NAME: RITUAL_EVENTS_E2E
         run: |
           cargo test -p demonctl flow_e2e_integration_spec -- --nocapture
-        continue-on-error: true
 
       - name: Upload E2E test artifacts
         uses: actions/upload-artifact@v4
