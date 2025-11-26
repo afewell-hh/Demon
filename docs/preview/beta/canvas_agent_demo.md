@@ -59,6 +59,27 @@ cargo run -p operate-ui
 - http://localhost:3030/canvas → Canvas UI loads
 - http://localhost:3000/ui/contracts → Contracts Browser loads
 
+### Automated E2E Validation (Story S9)
+**This demo relies on automated end-to-end validation** ensuring all user journeys work correctly before human demonstration:
+
+```bash
+# Run full E2E test suite (Playwright + Rust integration tests)
+make fmt && make lint && make test
+
+# Run Playwright E2E tests only
+cd operate-ui/playwright && npx playwright test --grep "end-to-end"
+
+# Run demonctl flow E2E tests
+cargo test -p demonctl flow_e2e_integration_spec -- --nocapture
+```
+
+**Coverage**:
+- Contracts Browser journey (search, inspect, download)
+- Canvas UI journey (DAG visualization, navigation, controls)
+- Agent Flow API workflow (export, validate, submit)
+
+See `docs/process/end_to_end_validation.md` for canonical user journeys and CI integration details.
+
 ---
 
 ## Slide 3: Canvas UI — Overview

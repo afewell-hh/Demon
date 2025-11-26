@@ -57,6 +57,16 @@
 - Automated screenshot comparison for UI changes
 - Test artifacts captured and linked in CI runs
 
+**End-to-End UX Validation** (Story S9, PR #TBD)
+- Comprehensive E2E test suite for Sprint D features
+- Playwright tests for Contracts Browser user journey (search, inspect, download)
+- Playwright tests for Canvas UI visualization journey (DAG interaction, navigation)
+- Rust integration tests for Agent Flow API workflow (export, validate, submit)
+- Documented canonical user journeys in `docs/process/end_to_end_validation.md`
+- Non-required CI job `e2e-validation` for advisory E2E testing
+- Tests follow Given/When/Then pattern for clarity
+- Full workflow validation before demos and recordings
+
 ### Enhancements
 
 - operate-ui: Feature flag system for progressive feature rollout
