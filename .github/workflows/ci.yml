@@ -171,7 +171,7 @@ jobs:
           export DEMON_SKIP_STREAM_BOOTSTRAP=1
           export APPROVER_ALLOWLIST="${APPROVER_EMAIL:-tester@example.com}"
           export OPERATE_UI_FLAGS=contracts-browser,canvas-ui
-          (cd ../.. && OPERATE_UI_FLAGS="$OPERATE_UI_FLAGS" APPROVER_ALLOWLIST="$APPROVER_ALLOWLIST" RUST_LOG=info cargo run -p operate-ui --quiet &) 
+          (cd ../.. && OPERATE_UI_FLAGS="$OPERATE_UI_FLAGS" APPROVER_ALLOWLIST="$APPROVER_ALLOWLIST" RUST_LOG=info cargo run -p operate-ui --quiet &)
           # Wait for port 3000 to open
           for i in {1..60}; do nc -z 127.0.0.1 3000 && break; sleep 0.5; done
           # Stronger readiness: require HTTP 200 and JSON body from /api/runs
@@ -185,7 +185,8 @@ jobs:
           jq . /tmp/runs.json || true
           npm install
           npx playwright install --with-deps
-          npm test
+          # Run smoke tests only (exclude E2E tests which require full infrastructure)
+          npx playwright test --grep-invert "e2e_contracts_browser|e2e_canvas_ui"
 
       - name: Teardown NATS
         if: always()
@@ -1441,6 +1442,136 @@ jobs:
         with:
           name: ui-snapshot-diffs
           path: operate-ui/playwright/test-results/
+          retention-days: 7
+
+      - name: Teardown NATS
+        if: always()
+        run: docker rm -f nats || true
+
+  e2e-validation:
+    name: E2E Validation (non-required)
+    runs-on: ubuntu-latest
+    needs: build-test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for changed-files detection
+
+      - name: Detect E2E-relevant file changes
+        id: changed
+        uses: tj-actions/changed-files@v45
+        with:
+          files: |
+            operate-ui/**
+            demonctl/**
+            runtime/**
+            **/*playwright*/**
+
+      - name: Determine if E2E tests should run
+        id: should-run
+        run: |
+          # Run tests if: manually triggered, commit/PR mentions e2e, or relevant files changed
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
+             [[ "${{ contains(github.event.head_commit.message, 'e2e') }}" == "true" ]] || \
+             [[ "${{ contains(github.event.pull_request.title, 'e2e') }}" == "true" ]] || \
+             [[ "${{ steps.changed.outputs.any_changed }}" == "true" ]]; then
+            echo "enabled=true" >> $GITHUB_OUTPUT
+            echo "✅ E2E tests will run (manual trigger or relevant changes detected)"
+          else
+            echo "enabled=false" >> $GITHUB_OUTPUT
+            echo "⏭️  Skipping E2E tests (no relevant file changes)"
+          fi
+
+      - name: Install Rust (pinned toolchain)
+        if: steps.should-run.outputs.enabled == 'true'
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: 1.82.0
+
+      - name: Cache cargo registry + target
+        if: steps.should-run.outputs.enabled == 'true'
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+          cache-on-failure: true
+
+      - name: Install jq
+        if: steps.should-run.outputs.enabled == 'true'
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Start NATS (JetStream)
+        if: steps.should-run.outputs.enabled == 'true'
+        run: |
+          docker run -d --rm --name nats -p 4222:4222 -p 8222:8222 nats:2.10 -js
+          for i in {1..40}; do
+            if docker logs nats 2>&1 | grep -q "Server is ready"; then exit 0; fi
+            sleep 0.5
+          done
+          echo "NATS did not report ready in time"; docker logs nats; exit 1
+
+      - name: Build workspace
+        if: steps.should-run.outputs.enabled == 'true'
+        run: cargo build --workspace
+
+      - name: Start Operate UI (background)
+        if: steps.should-run.outputs.enabled == 'true'
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS_E2E
+          APPROVER_ALLOWLIST: ops@example.com
+          OPERATE_UI_FLAGS: contracts-browser,canvas-ui,agent-flows
+          JWT_SECRET: test-secret-e2e
+        run: |
+          nohup bash -c 'APPROVER_ALLOWLIST=ops@example.com OPERATE_UI_FLAGS=contracts-browser,canvas-ui,agent-flows JWT_SECRET=test-secret-e2e RITUAL_STREAM_NAME=RITUAL_EVENTS_E2E cargo run -q -p operate-ui' >/tmp/e2e-ui.log 2>&1 &
+          for i in {1..60}; do
+            code=$(curl -sS -o /tmp/e2e-runs.json -w "%{http_code}" http://127.0.0.1:3000/api/runs || true)
+            if [[ "$code" == "200" ]] && jq -e . /tmp/e2e-runs.json >/dev/null 2>&1; then
+              echo "✓ Operate UI ready with E2E feature flags"
+              break
+            fi
+            sleep 0.5
+          done
+
+      - name: Install Playwright dependencies
+        if: steps.should-run.outputs.enabled == 'true'
+        working-directory: operate-ui/playwright
+        run: |
+          npm install
+          npx playwright install --with-deps
+
+      - name: Run Playwright E2E tests (Contracts Browser)
+        if: steps.should-run.outputs.enabled == 'true'
+        working-directory: operate-ui/playwright
+        env:
+          BASE_URL: http://127.0.0.1:3000
+        run: |
+          npx playwright test e2e_contracts_browser.spec.ts --reporter=html
+
+      - name: Run Playwright E2E tests (Canvas UI)
+        if: steps.should-run.outputs.enabled == 'true'
+        working-directory: operate-ui/playwright
+        env:
+          BASE_URL: http://127.0.0.1:3000
+        run: |
+          npx playwright test e2e_canvas_ui.spec.ts --reporter=html
+
+      - name: Run demonctl flow E2E integration tests
+        if: steps.should-run.outputs.enabled == 'true'
+        env:
+          RITUAL_STREAM_NAME: RITUAL_EVENTS_E2E
+        run: |
+          cargo test -p demonctl flow_e2e_integration_spec -- --nocapture
+
+      - name: Upload E2E test artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-validation-artifacts
+          path: |
+            operate-ui/playwright/playwright-report/
+            operate-ui/playwright/test-results/
+            /tmp/e2e-ui.log
           retention-days: 7
 
       - name: Teardown NATS
